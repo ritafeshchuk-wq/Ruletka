@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Рулетка — инструкция</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=PT+Mono&display=swap">
+<style>
+/* Лист-памятка: узкая колонка для планшета, жёлтый цвет рулетки как акцент, шаги — реальная последовательность */
+:root{
+  --bg:#F5F6F8; --card:#FFFFFF; --ink:#1B2430; --mute:#5D6877; --line:#DDE2E9;
+  --tape:#E3A21A; --tape-soft:#FCF2DC; --tape-ink:#7A5200; --ok:#1E8A55; --bad:#C4372F;
+  --f-body:"Golos Text",-apple-system,"Segoe UI",Roboto,sans-serif; --f-num:"PT Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12171E;--card:#1A212B;--ink:#E7ECF2;--mute:#9AA6B4;--line:#2C3643;--tape:#F0B433;--tape-soft:#2E2512;--tape-ink:#F3C766;--ok:#3DBB7E;--bad:#EF6A61;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#12171E;--card:#1A212B;--ink:#E7ECF2;--mute:#9AA6B4;--line:#2C3643;--tape:#F0B433;--tape-soft:#2E2512;--tape-ink:#F3C766;--ok:#3DBB7E;--bad:#EF6A61;color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font:16px/1.55 var(--f-body);padding-inline:16px;padding-block:28px 56px}
+.wrap{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:28px}
+h1{font-size:30px;line-height:1.15;margin:0;letter-spacing:-.4px;text-wrap:balance}
+h2{font-size:20px;margin:0 0 10px;text-wrap:balance;display:flex;align-items:center;gap:10px}
+h2 .n{flex:none;width:30px;height:30px;border-radius:50%;background:var(--tape);color:#1B2430;font-size:15px;display:grid;place-items:center}
+p{margin:0}
+.lead{color:var(--mute);max-width:62ch}
+.url{font-family:var(--f-num);background:var(--tape-soft);color:var(--tape-ink);padding:2px 7px;border-radius:6px;word-break:break-all}
+section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;display:flex;flex-direction:column;gap:10px;min-width:0}
+ol,ul{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:6px}
+b.btn{display:inline-block;font-weight:600;background:var(--tape-soft);color:var(--tape-ink);border:1px solid var(--tape);border-radius:7px;padding:0 7px;white-space:nowrap}
+.tip{border-left:3px solid var(--tape);padding:4px 0 4px 12px;color:var(--mute)}
+.warn{border-left-color:var(--bad)}
+.gest{display:grid;grid-template-columns:minmax(120px,190px) 1fr;border-top:1px solid var(--line)}
+.gest>div{padding:9px 4px;border-bottom:1px solid var(--line);min-width:0}
+.gest>div:nth-child(odd){font-weight:600}
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.modes>div{border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.modes h3{margin:0;font-size:16px}
+.modes .rec{border-color:var(--tape);background:var(--tape-soft)}
+.num{font-family:var(--f-num)}
+@media (max-width:560px){.modes{grid-template-columns:1fr}.gest{grid-template-columns:1fr}.gest>div:nth-child(odd){border-bottom:0;padding-bottom:0}h1{font-size:25px}}
+</style></head><body>
+
+<div class="wrap">
+<header style="display:flex;flex-direction:column;gap:8px">
+  <h1>Рулетка: как работать</h1>
+  <p class="lead">Обмер лазерной рулеткой Leica DISTO по плану БТИ на iPad. Замер с рулетки сам приходит в программу и встаёт на нужную стену.</p>
+  <p>Адрес программы: <span class="url">ritafeshchuk-wq.github.io/Ruletka/</span></p>
+</header>
+
+<section>
+  <h2><span class="n">1</span>Один раз перед началом</h2>
+  <ol>
+    <li>Установите на iPad бесплатный браузер <b>Bluefy – Web BLE Browser</b> из App Store. В Safari и Chrome на iPad рулетка не подключится: Apple не пускает их к Bluetooth.</li>
+    <li>Откройте адрес программы <b>в Bluefy</b>. Вверху должна быть зелёная плашка «Bluetooth доступен ✓».</li>
+    <li>Если на iPad есть приложение Leica DISTO Plan, закройте его: иначе оно перехватит рулетку.</li>
+  </ol>
+  <p class="tip">Добавлять DISTO в «Настройки → Bluetooth» не нужно, программа подключается к ней сама.</p>
+</section>
+
+<section>
+  <h2><span class="n">2</span>Подключить рулетку</h2>
+  <ol>
+    <li>Включите DISTO и включите на ней Bluetooth. Единицы измерения — метры.</li>
+    <li>В программе: <b class="btn">Начать с рулетки</b> → <b class="btn">Подключить DISTO</b> → выберите рулетку в списке.</li>
+    <li>Рядом с кнопкой загорится зелёная точка. Нажмите замер на рулетке: прозвучит сигнал, внизу появится «Последний замер».</li>
+  </ol>
+  <p class="tip">Рулетка уснула — программа переподключится сама. Не получилось — <b class="btn">Переподключить</b>. Без рулетки число можно ввести вручную: <span class="num">4.237</span> или <span class="num">4237</span>.</p>
+</section>
+
+<section>
+  <h2><span class="n">3</span>Загрузить план БТИ</h2>
+  <ol>
+    <li><b class="btn">Загрузить PDF / картинку</b>. Если в PDF несколько листов, выберите нужный.</li>
+    <li>После первого замера программа сама сравнит его с чертежом. Если масштаб не совпадает, она предложит <b class="btn">Подогнать</b>, соглашайтесь.</li>
+    <li>Подогнать можно и потом: <b class="btn">Масштаб по замерам</b>.</li>
+  </ol>
+</section>
+
+<section>
+  <h2><span class="n">4</span>Обход помещения</h2>
+  <ol>
+    <li>Инструмент <b class="btn">Обход</b> включён сразу.</li>
+    <li>Коснитесь угла, с которого начинаете, затем следующего угла. Отрезок между ними замигает оранжевым.</li>
+    <li>Сделайте замер рулеткой этой стены. Число появится в панели. <b class="btn">✓ Принять</b>, или <b class="btn">Отклонить</b> и перемерить.</li>
+    <li>Так по всем углам. Коснитесь первой точки, и помещение замкнётся.</li>
+    <li>Сделайте хотя бы одну диагональ: <b class="btn">Замер / диагональ</b> → две точки → замер. Без диагонали углы принимаются прямыми.</li>
+  </ol>
+  <p class="tip">Включите «Принимать замер сразу», чтобы не нажимать «Принять» после каждого замера.</p>
+</section>
+
+<section>
+  <h2><span class="n">5</span>Прервались — продолжить с нужной точки</h2>
+  <ol>
+    <li><b class="btn">■ Закончить обход</b>: кнопка в нижней панели и в панели слева.</li>
+    <li>Коснитесь нужной точки, и обход пойдёт от неё.</li>
+    <li>Касание пустого места ставит новую точку.</li>
+  </ol>
+  <p class="tip">Не заканчивая обход: долго держите палец на точке → <b class="btn">▶ Продолжить обход от этой точки</b>.</p>
+</section>
+
+<section>
+  <h2><span class="n">6</span>Касания</h2>
+  <div class="gest">
+    <div>Касание</div><div>Поставить точку или выбрать существующую</div>
+    <div>Палец на точке и вести</div><div>Передвинуть точку; линии идут за ней, замеры не меняются</div>
+    <div>Палец на пустом месте и вести</div><div>Сдвинуть чертёж</div>
+    <div>Два пальца</div><div>Приблизить или отдалить</div>
+    <div>Долгое нажатие</div><div>Меню правки: перемерить, изменить число, удалить, продолжить обход</div>
+    <div><b class="btn">↶ Отменить</b></div><div>Убрать последнее действие</div>
+    <div><b class="btn">⤢</b></div><div>Показать весь план</div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">7</span>Режим отрисовки</h2>
+  <div class="modes">
+    <div class="rec"><h3>Условно по чертежу</h3><p>Точки остаются там, где вы их поставили. Замеры подписаны числами и идут в листы, площади считаются по замерам. Удобнее для работы по плану БТИ.</p></div>
+    <div><h3>Факт по замерам</h3><p>Программа сдвигает точки под замеры и показывает невязки красным. Нужен, чтобы получить настоящую геометрию.</p></div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">8</span>Другие инструменты</h2>
+  <ul>
+    <li><b class="btn">Точка на стене</b>: откос окна или двери, угол проёма. Замер идёт от начала стены.</li>
+    <li><b class="btn">Проём</b>: коснитесь участка стены между двумя точками.</li>
+    <li><b class="btn">Толщина</b>: сторона стены в одном помещении, затем в соседнем, затем замер.</li>
+    <li><b class="btn">Помещение</b>: собрать контур из уже стоящих точек.</li>
+  </ul>
+</section>
+
+<section>
+  <h2><span class="n">9</span>Сохранить и сдать</h2>
+  <ul>
+    <li>Работа сама сохраняется в памяти iPad каждые 15 секунд. После перезагрузки страницы нажмите <b class="btn">Восстановить</b> на первом экране.</li>
+    <li>В конце дня — <b class="btn">Сохранить проект</b> → «Сохранить в Файлы». Этот файл открывается и в «Скан → План» на компьютере.</li>
+    <li>Вкладка <b class="btn">Листы</b> — готовые листы с длинами, проёмами и площадями, DXF.</li>
+  </ul>
+  <p class="tip warn">Память iPad — запасной вариант. Очистка данных Bluefy её стирает, поэтому файл проекта сохраняйте обязательно.</p>
+</section>
+
+<section>
+  <h2><span class="n">?</span>Если что-то не так</h2>
+  <ul>
+    <li><b>Красная плашка «нет Bluetooth»</b>: страница открыта не в Bluefy.</li>
+    <li><b>Пустой список рулеток</b>: выключите и включите Bluetooth на DISTO, закройте DISTO Plan.</li>
+    <li><b>Замер не приходит</b>: проверьте зелёную точку у кнопки, нажмите «Переподключить».</li>
+    <li><b>Чертёж мельче или крупнее замеров</b>: <b class="btn">Масштаб по замерам</b>.</li>
+    <li><b>Красная полоса «Ошибка программы»</b>: сделайте снимок экрана и пришлите его.</li>
+  </ul>
+</section>
+<p style="color:var(--mute);font-size:13px">Рулетка 1.3 · © d1sco, 2026</p>
+</div>
+
+</body></html>
