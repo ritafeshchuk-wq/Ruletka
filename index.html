@@ -188,6 +188,21 @@ header{overflow-x:auto;scrollbar-width:none}header::-webkit-scrollbar{display:no
 .seg2 button{flex:1}.seg2 button.on{background:var(--tape,#E3A21A);border-color:var(--tape,#E3A21A);color:#1B2430;font-weight:600}
 html,body{overscroll-behavior:none}
 .asind{display:inline!important}
+.cards,.homefoot>button,.homefoot>span{display:none!important}
+#projHome{display:flex;flex-direction:column;gap:22px;max-width:760px}
+#projHome h2{font-size:19px;margin:0 0 10px;display:flex;gap:8px;align-items:baseline}
+.pj-new{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+.pj-new input{font-size:16px;padding:10px 12px;border:1px solid var(--line);border-radius:9px}
+.pj-new .row{display:flex;flex-wrap:wrap;gap:8px}.pj-new .row button{font-size:15px;padding:10px 14px}
+.pj-list{display:flex;flex-direction:column;gap:8px}
+.pj-item{display:flex;gap:6px;align-items:stretch}
+.pj-item .pj-open{flex:1;min-width:0;text-align:left;display:flex;flex-direction:column;gap:3px;padding:12px 14px;background:#fff;border:1px solid var(--line);border-radius:11px;font-size:15px}
+.pj-item .pj-open span{color:var(--mute);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pj-item.cur .pj-open{border-color:var(--tape,#E3A21A);box-shadow:0 0 0 2px rgba(227,162,26,.25)}
+.pj-item>button:not(.pj-open){width:46px;font-size:17px;border-radius:11px}
+header .modes,#bOpen,.homein .lead{display:none!important}
+#projName{min-width:0;flex:0 1 auto}
+.projname{color:#fff;font-weight:600;font-size:14px;align-self:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;padding:0 6px}
 </style>
 </head>
 <body>
@@ -204,7 +219,7 @@ html,body{overscroll-behavior:none}
     <button data-mode="tape"><span class="dotm"></span>Рулетка</button>
   </nav>
   <span class="sp"></span>
-  <button class="hb" id="bPanel" title="Скрыть / показать панель">☰ Панель</button>
+  <button class="hb" id="bProj" title="Все проекты: открыть другой или создать новый">☰ Проекты</button><span id="projName" class="projname"></span><button class="hb" id="bPanel" title="Скрыть / показать панель">Панель</button>
   <button class="hb" id="bHelp">Справка</button>
   <button class="hb" id="bAbout" title="О программе, авторство, лицензии">О программе</button>
   <button class="hb" id="bOpen">Открыть проект</button>
@@ -213,11 +228,11 @@ html,body{overscroll-behavior:none}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 1.9 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 2.0 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
-    <h1>Обмер лазерной рулеткой Leica DISTO</h1><div id="btSup" class="asbox" style="display:none"></div>
+    <h1>Обмер лазерной рулеткой Leica DISTO</h1><div id="btSup" class="asbox" style="display:none"></div><div id="projHome"></div>
     <p class="lead">План БТИ — подложкой, замеры DISTO по Bluetooth сразу ложатся на стены, программа уравнивает их и показывает невязки. На выходе листы с длинами, проёмами, толщинами и площадями, DXF и файл проекта для «Скан → План».</p>
     <div class="cards">
       <button class="mode-card scan" data-go="scan">
@@ -3052,7 +3067,7 @@ function setMode(mode) {
   setStep(last || STEPS[mode][0][0]);
   if (mode === 'tape' && !T.fitted) { T.fitted = true; fitTape(); draw(); }
 }
-function goHome() { $('#app').classList.add('home'); document.querySelectorAll('.modes button').forEach(b => b.classList.remove('on')); }
+function goHome() { leaveProject().then(renderHome); $('#app').classList.add('home'); document.querySelectorAll('.modes button').forEach(b => b.classList.remove('on')); }
 document.querySelectorAll('.modes button').forEach(b => b.onclick = () => setMode(b.dataset.mode));
 document.querySelectorAll('[data-go]').forEach(b => b.onclick = () => setMode(b.dataset.go));
 $('#brand').onclick = goHome;
@@ -4047,7 +4062,7 @@ $('#bSave').onclick = () => {
 $('#bOpen').onclick = () => $('#fProj').click();
 $('#fProj').onchange = async e => {
   const f = e.target.files[0]; if (!f) return;
-  try { await applyProject(JSON.parse(await f.text())); }
+  try { const j = JSON.parse(await f.text()); await leaveProject(); resetWork(); await projCreate((j.sheetOpt && j.sheetOpt.info && j.sheetOpt.info.object) || f.name.replace(/\.scanplan\.json$|\.json$/i, ''), false); await applyProject(j); await autosave(true); }
   catch (err) { uiAlert('Не удалось открыть проект: ' + err.message); }
   e.target.value = '';
 };
@@ -4065,7 +4080,7 @@ async function applyProject(j) {
   }
 }
 // ---------- автосохранение в браузере (IndexedDB): обновление страницы, закрытие вкладки или вылет Safari не стирают работу ----------
-const AS = { db: null, last: '', savedAt: 0, fileAt: 0, busy: false, off: false, snapAt: 0, sid: Date.now(), dirty: false };
+const AS = { db: null, last: '', savedAt: 0, fileAt: 0, busy: false, off: false, snapAt: 0, sid: Date.now(), dirty: false, pid: null, pname: '' };
 const SNAP_EVERY = 120000, SNAP_KEEP = 40; // копия каждые 2 минуты, хранится 40 последних (~1,5 часа работы) + последнее состояние каждого сеанса
 function asDB() { return new Promise(res => { try { const r = indexedDB.open('scan2plan', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => res(r.result); r.onerror = () => res(null); r.onblocked = () => res(null); } catch (e) { res(null); } }); }
 async function asTx(mode, fn) { try { const db = AS.db || (AS.db = await asDB()); if (!db) return null; return await new Promise(res => { const tx = db.transaction('kv', mode), st = tx.objectStore('kv'); let out = null; const r = fn(st); if (r) r.onsuccess = () => { out = r.result; }; tx.oncomplete = () => res(out === null ? true : out); tx.onerror = tx.onabort = () => res(null); }); } catch (e) { return null; } }
@@ -4114,11 +4129,13 @@ async function autosave(force) {
     let txt; try { txt = await packProj(); } catch (e) { txt = null; }
     if (!txt) { AS.off = true; showAS(); return; }
     const now = Date.now(), changed = txt !== AS.last;
+    if (!AS.pid) await projCreate(AS.pname || ('Обмер ' + new Date().toLocaleDateString('ru')), true);
     if (changed || force) {
-      const ok = await asPutK('last', { when: now, summary: workSummary(), proj: txt, sid: AS.sid });
+      const ok = await asPutK('proj:' + AS.pid, txt) && await asPutK('last', { when: now, summary: workSummary(), proj: txt, sid: AS.sid, pid: AS.pid });
+      if (ok) await projIndexTouch(AS.pid, { updated: now, summary: workSummary() });
       if (ok) { AS.last = txt; AS.savedAt = now; AS.off = false; } else AS.off = true;
     }
-    if (changed && now - AS.snapAt >= SNAP_EVERY) await addSnap({ when: now, summary: workSummary(), proj: txt, sid: AS.sid });
+    if (changed && now - AS.snapAt >= SNAP_EVERY) await addSnap({ when: now, summary: workSummary(), proj: txt, sid: AS.sid, pid: AS.pid });
     showAS();
   } finally { AS.busy = false; AS.dirty = false; }
 }
@@ -4126,7 +4143,7 @@ async function addSnap(r) {
   const idx = (await asGetK('snaps')) || []; const list = Array.isArray(idx) ? idx : [];
   if (list.some(x => x.when === r.when)) return;
   const ok = await asPutK('snap:' + r.when, r.proj); if (!ok) return;
-  list.push({ when: r.when, summary: r.summary, sid: r.sid });
+  list.push({ when: r.when, summary: r.summary, sid: r.sid, pid: r.pid || null, pname: r.pid ? AS.pname : (r.pname || '') });
   // оставляем 40 последних + последнюю копию каждого старого сеанса
   list.sort((a, b) => a.when - b.when);
   const keepSid = new Map(); list.forEach(x => keepSid.set(x.sid, x.when));
@@ -4150,37 +4167,92 @@ async function restoreFrom(r, label) {
   AS.restoring = false; busy(''); showAS(); autosave(true);
 }
 async function snapsDialog() {
-  const list = ((await asGetK('snaps')) || []).slice().reverse();
+  const list = ((await asGetK('snaps')) || []).filter(x => !AS.pid || !x.pid || x.pid === AS.pid).slice().reverse();
   closeTapeMenu(); const el = document.createElement('div'); el.id = 'pagePick';
-  el.innerHTML = `<div class="pp-box" style="max-width:560px"><div class="pp-head"><div><b>Сохранённые копии</b><div class="hint" style="margin:2px 0 0">Копия делается каждые 2 минуты работы. Выберите, к какой вернуться — текущее состояние тоже останется в списке.</div></div><button id="snX">Закрыть</button></div><div class="row" style="margin:0 0 10px"><button id="snNew">＋ Начать новый обмер</button><span class="hint" style="margin:0">текущая работа останется в копиях</span></div><div style="display:flex;flex-direction:column;gap:6px;max-height:60vh;overflow:auto">${list.length ? list.map(x => `<button data-w="${x.when}" style="text-align:left;padding:10px 12px"><b>${tfmt(x.when)}</b> · ${escH(x.summary || '')}</button>`).join('') : '<p class="hint">Копий пока нет.</p>'}</div></div>`;
+  el.innerHTML = `<div class="pp-box" style="max-width:560px"><div class="pp-head"><div><b>Сохранённые копии</b><div class="hint" style="margin:2px 0 0">Копии этого проекта — каждые 2 минуты работы. Выберите, к какой вернуться: текущее состояние тоже останется в списке.</div></div><button id="snX">Закрыть</button></div><div class="row" style="margin:0 0 10px"><button id="snNew">☰ Все проекты</button><span class="hint" style="margin:0">новый проект, другой объект</span></div><div style="display:flex;flex-direction:column;gap:6px;max-height:60vh;overflow:auto">${list.length ? list.map(x => `<button data-w="${x.when}" style="text-align:left;padding:10px 12px"><b>${tfmt(x.when)}</b> · ${escH(x.summary || '')}</button>`).join('') : '<p class="hint">Копий пока нет.</p>'}</div></div>`;
   document.body.appendChild(el);
   el.querySelector('#snX').onclick = () => el.remove();
-  el.querySelector('#snNew').onclick = async () => { el.remove(); if (!(await uiDialog({ title: 'Начать новый обмер?', text: 'Текущая работа сохранится в «Копиях», к ней можно вернуться.', ok: 'Начать новый', cancel: 'Отмена' }))) return;
-    await autosave(true); if (hasWork()) await addSnap({ when: Date.now(), summary: workSummary(), proj: AS.last, sid: AS.sid });
-    Object.assign(M, { pts: [], meas: [], edges: [], rooms: [], chains: [], objs: [], nextId: 1, nextMeas: 1, cond: M.cond, scaleFit: false, scaleAsked: false });
-    U.img = null; U.pdf = null; U.pages = 0; U.name = ''; T.undo = []; T.redo = []; T.pending = null; T.chain = null; T.sel = null;
-    AS.sid = Date.now(); AS.last = ''; AS.snapAt = 0; try { localStorage.removeItem('ruletka_quick'); } catch (e) { }
-    await asDel(); adjust(); fitTape(); draw(); renderTape(); stat('Новый обмер. Прошлая работа — в «Копиях».'); }; el.onclick = e => { if (e.target === el) el.remove(); };
+  el.querySelector('#snNew').onclick = () => { el.remove(); goHome(); }; el.onclick = e => { if (e.target === el) el.remove(); };
   el.querySelectorAll('[data-w]').forEach(b => b.onclick = async () => { const w = +b.dataset.w; el.remove(); await autosave(true); if (hasWork()) await addSnap({ when: Date.now(), summary: workSummary() + ' (до возврата)', proj: AS.last, sid: AS.sid }); const proj = await asGetK('snap:' + w); if (!proj || proj === true) { uiAlert('Эта копия не найдена.'); return; } restoreFrom({ when: w, proj }, 'копия ' + tfmt(w)); });
+}
+// ---------- проекты ----------
+const PJ = { list: [] };
+async function projIndex() { const l = await asGetK('projects'); PJ.list = Array.isArray(l) ? l : []; return PJ.list; }
+async function projIndexTouch(id, patch) { await projIndex(); const p = PJ.list.find(x => x.id === id); if (p) Object.assign(p, patch); await asPutK('projects', PJ.list); }
+async function projCreate(name, keepWork) {
+  await projIndex(); const id = 'p' + Date.now(); const now = Date.now();
+  PJ.list.push({ id, name, created: now, updated: now, summary: keepWork ? workSummary() : 'пусто' }); await asPutK('projects', PJ.list);
+  AS.pid = id; AS.pname = name; AS.sid = now; AS.snapAt = 0; if (S.sheetOpt && S.sheetOpt.info) S.sheetOpt.info.object = name; showProjName(); return id;
+}
+function showProjName() { const el = $('#projName'); if (el) el.textContent = AS.pname || ''; }
+function resetWork() {
+  Object.assign(M, { pts: [], meas: [], edges: [], rooms: [], chains: [], objs: [], nextId: 1, nextMeas: 1, cond: false, scaleFit: false, scaleAsked: false });
+  Object.assign(U, { img: null, pdf: null, pages: 0, page: 1, name: '', src: null, ptPerPx: null, srcPage: 1, _imgKey: null, _imgKeyFor: null, _imgSaved: false, _srcKey: null, _data: null, _dataFor: null, mip: null, mipSrc: null, s: 0.01, rot: 0, tx: 0, ty: 0 });
+  Object.assign(T, { undo: [], redo: [], pending: null, chain: null, sel: null, buffer: null, objIds: null, roomIds: null, mA: null, tA: null, fitted: false });
+  AS.last = ''; AS.savedAt = 0; try { localStorage.removeItem('ruletka_quick'); } catch (e) { }
+  adjust();
+}
+async function leaveProject() { if (AS.pid && hasWork()) await autosave(true); }
+async function projOpen(id) {
+  await leaveProject(); await projIndex(); const p = PJ.list.find(x => x.id === id); if (!p) return;
+  const txt = await asGetK('proj:' + id); resetWork(); AS.pid = id; AS.pname = p.name; AS.sid = Date.now(); AS.snapAt = 0; showProjName();
+  if (txt && txt !== true) await restoreFrom({ when: p.updated, proj: txt }, p.name); else { T.fitted = true; setMode('tape'); fitTape(); draw(); renderTape(); }
+  if (S.sheetOpt && S.sheetOpt.info) S.sheetOpt.info.object = p.name;
+}
+async function projNew(name, withUnderlay) {
+  await leaveProject(); resetWork(); await projCreate(name || ('Обмер ' + new Date().toLocaleDateString('ru')), false);
+  T.fitted = true; setMode('tape'); fitTape(); draw(); renderTape(); stat(withUnderlay ? 'Новый проект. Выберите план БТИ (PDF или картинку).' : 'Новый проект на чистом листе. Начинайте обход: коснитесь первого угла.');
+}
+async function projDelete(id) {
+  await projIndex(); const p = PJ.list.find(x => x.id === id); if (!p) return;
+  if (!(await uiDialog({ title: `Удалить проект «${p.name}»?`, text: 'Проект и все его копии будут удалены из памяти iPad. Если нужна копия — сначала откройте его и «Сохранить проект».', ok: 'Удалить', cancel: 'Отмена' }))) return;
+  PJ.list = PJ.list.filter(x => x.id !== id); await asPutK('projects', PJ.list); await asDelK('proj:' + id);
+  const sn = ((await asGetK('snaps')) || []); for (const x of sn.filter(x => x.pid === id)) await asDelK('snap:' + x.when); await asPutK('snaps', sn.filter(x => x.pid !== id));
+  if (AS.pid === id) { AS.pid = null; AS.pname = ''; resetWork(); showProjName(); }
+  renderHome();
+}
+async function projRename(id) { await projIndex(); const p = PJ.list.find(x => x.id === id); if (!p) return; const v = await uiAsk('Название проекта:', p.name); if (!v || !v.trim()) return; p.name = v.trim(); await asPutK('projects', PJ.list); if (AS.pid === id) { AS.pname = p.name; showProjName(); if (S.sheetOpt && S.sheetOpt.info) S.sheetOpt.info.object = p.name; } renderHome(); }
+async function renderHome() {
+  const host = $('#projHome'); if (!host) return;
+  const list = (await projIndex()).slice().sort((a, b) => b.updated - a.updated);
+  const t = d => new Date(d).toLocaleString('ru', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+  const def = 'Обмер ' + new Date().toLocaleDateString('ru');
+  host.innerHTML = `
+  <div class="pj-new">
+    <h2>Новый проект</h2>
+    <input type="text" id="pjName" placeholder="Название объекта, например «Профсоюзная, 2 этаж»" value="">
+    <div class="row"><button class="pri" id="pjNewU">📄 С подложкой (план БТИ)</button><button id="pjNewB">▢ Чистый лист</button><button id="pjImport">📂 Открыть файл проекта</button></div>
+  </div>
+  <div class="pj-list">
+    <h2>Мои проекты <span class="hint" style="margin:0">${list.length ? '(' + list.length + ')' : ''}</span></h2>
+    ${list.length ? list.map(p => `<div class="pj-item ${p.id === AS.pid ? 'cur' : ''}"><button class="pj-open" data-open="${p.id}"><b>${escH(p.name)}</b><span>${t(p.updated)} · ${escH(p.summary || '')}</span></button><button data-ren="${p.id}" title="Переименовать">✎</button><button data-del="${p.id}" title="Удалить" class="danger">🗑</button></div>`).join('') : '<p class="hint">Проектов пока нет. Создайте первый — работа будет сохраняться в нём сама.</p>'}
+  </div>
+  ${AS.db === null ? '<div class="asbox" style="border-color:#C4372F;background:#FDECEA">⚠ Память браузера недоступна — проекты не сохранятся сами. Сохраняйте работу кнопкой «Сохранить проект».</div>' : ''}`;
+  const nm = () => ($('#pjName').value || '').trim() || def;
+  $('#pjNewU').onclick = () => { const n = nm(); $('#uFile') ? null : null; const fi = document.createElement('input'); fi.type = 'file'; fi.accept = IOS ? '' : '.pdf,.png,.jpg,.jpeg'; fi.onchange = async () => { const f = fi.files[0]; await projNew(n, true); if (f) { await loadUnderlay(f); asSoon(); } }; fi.click(); };
+  $('#pjNewB').onclick = () => projNew(nm(), false);
+  $('#pjImport').onclick = () => { PJ.importing = true; $('#fProj').click(); };
+  host.querySelectorAll('[data-open]').forEach(b => b.onclick = () => projOpen(b.dataset.open));
+  host.querySelectorAll('[data-ren]').forEach(b => b.onclick = () => projRename(b.dataset.ren));
+  host.querySelectorAll('[data-del]').forEach(b => b.onclick = () => projDelete(b.dataset.del));
 }
 (async () => {
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) { }
-  let r = await asGet();
-  // прошлый сеанс сначала кладём в копии — новая работа его уже не перезапишет
-  if (r && r.proj) { const list = (await asGetK('snaps')) || []; if (!list.some(x => x.when === r.when)) await addSnap({ when: r.when, summary: r.summary, proj: r.proj, sid: r.sid || 0 }); AS.snapAt = 0; }
-  if (!r || !r.proj) { // запасной слой: localStorage (без картинки подложки)
-    let q = null; try { q = JSON.parse(localStorage.getItem('ruletka_quick') || 'null'); } catch (e) { }
-    if (q && q.M && q.M.pts && q.M.pts.length) { Object.assign(M, q.M); M.objs = M.objs || []; if (typeof markObjEdges === 'function') markObjEdges(); adjust(); T.fitted = true; setMode('tape'); fitTape(); draw(); stat('Замеры восстановлены из запасной копии (' + tfmt(q.when) + '). Подложку загрузите заново.'); }
-    if (AS.db === null) { AS.off = true; showAS(); }
-    return;
-  }
-  // сразу возвращаем последнюю работу — ничего нажимать не нужно
-  await restoreFrom(r);
+  AS.db = await asDB();
+  await projIndex();
+  // перенос работы из прежних версий (без проектов) в проект
+  const r = await asGet();
+  if (r && r.proj && !r.pid && !PJ.list.length) { const id = 'p' + (r.when || Date.now()); PJ.list.push({ id, name: 'Обмер ' + tfmt(r.when), created: r.when, updated: r.when, summary: r.summary || '' }); await asPutK('proj:' + id, r.proj); await asPutK('projects', PJ.list); await asPutK('last', { ...r, pid: id }); }
+  else if (r && r.proj && r.pid && !PJ.list.some(p => p.id === r.pid)) { PJ.list.push({ id: r.pid, name: 'Восстановленный обмер', created: r.when, updated: r.when, summary: r.summary || '' }); await asPutK('proj:' + r.pid, r.proj); await asPutK('projects', PJ.list); }
+  if (!AS.db) { let q = null; try { q = JSON.parse(localStorage.getItem('ruletka_quick') || 'null'); } catch (e) { }
+    if (q && q.M && q.M.pts && q.M.pts.length) { Object.assign(M, q.M); M.objs = M.objs || []; markObjEdges(); adjust(); T.fitted = true; setMode('tape'); fitTape(); draw(); stat('Замеры восстановлены из запасной копии (' + tfmt(q.when) + '). Подложку загрузите заново.'); } }
+  renderHome();
 })();
 function fitTape() { if (M.pts.length) { const xs = M.pts.map(p => PX(p)); fitBounds([Math.min(...xs.map(p => p[0])) - 1, Math.min(...xs.map(p => p[1])) - 1, Math.max(...xs.map(p => p[0])) + 1, Math.max(...xs.map(p => p[1])) + 1]); } else if (U.img) fitUnderlay(); else fitBounds([-2, -2, 10, 8]); }
 if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([document.getElementById('pdfworker').textContent], { type: 'text/javascript' }));
 $('#bOpen2').onclick = () => $('#fProj').click();
 $('#bSnaps').onclick = snapsDialog;
+$('#bProj').onclick = goHome;
 (function () { const b = $('#btSup'); if (!b) return; b.style.display = 'flex';
   if (navigator.bluetooth) { b.classList.add('ok'); b.innerHTML = '<div><b>Bluetooth доступен ✓</b> — включите DISTO, нажмите «Начать с рулетки», затем «Подключить DISTO».</div>'; }
   else { b.classList.add('no'); b.innerHTML = '<div><b>В этом браузере нет Bluetooth.</b> ' + btSupportNote() + '</div><div class="row"><button id="cpUrl">Скопировать ссылку для Bluefy</button></div>';
@@ -5025,7 +5097,7 @@ async function exportOverlayPdf() {
     for (const p of M.pts) { const q = P2(p); page.drawCircle({ x: q[0], y: q[1], size: lw * 1.6, color: rgb(1, 1, 1), borderColor: rgb(0.1, 0.1, 0.1), borderWidth: lw * 0.6 }); text(pname(p.id), [q[0] + fs * 0.4, q[1] + fs * 0.4], fs * 0.6, rgb(0.2, 0.2, 0.2), 0, 'l'); }
     const d = new Date(); text(`Обмер рулеткой · ${d.toLocaleDateString('ru')} · ${M.cond ? 'условно по чертежу' : 'факт по замерам'} · размеры в метрах · Рулетка · © d1sco`, [10, 10], Math.max(4, Math.min(8, W / 160)), GRY, 0, 'l');
     const bytes = await doc.save();
-    busy(''); download(((U.name || 'Обмер').replace(/\.[^.]+$/, '')) + '_замеры.pdf', bytes, 'application/pdf');
+    busy(''); download(((AS.pname || U.name || 'Обмер').replace(/\.[^.]+$/, '').replace(/[\\/:*?"<>|]/g, '_')) + '_замеры.pdf', bytes, 'application/pdf');
     stat('PDF готов: подложка в исходном качестве, замеры поверх — векторные (можно увеличивать без потери чёткости).');
   } catch (e) { busy(''); console.error(e); uiAlert('Не удалось сделать PDF: ' + (e.message || e)); }
 }
