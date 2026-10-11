@@ -206,6 +206,26 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 #selbox{position:absolute;left:50%;transform:translateX(-50%);bottom:150px;max-height:calc(100% - 170px);overflow:auto;width:min(560px,calc(100% - 24px));background:#fff;border:2px solid #1f6feb;border-radius:14px;box-shadow:0 8px 28px rgba(15,23,36,.25);padding:12px 14px;display:flex;flex-direction:column;gap:8px;z-index:7;font-size:14px}
 #selbox.ok{border-color:#1E8A55}#selbox.warn{border-color:#E3A21A}#selbox.bad{border-color:#C4372F}
 #selbox .sb-h{font-weight:700}#selbox .row{display:flex;flex-wrap:wrap;gap:6px}#selbox button{min-height:40px}
+#trail{position:absolute;left:8px;top:8px;bottom:8px;display:flex;flex-direction:column;gap:4px;overflow-y:auto;z-index:6;padding:4px;background:rgba(27,36,48,.88);border-radius:14px;scrollbar-width:none;width:66px}
+#trail::-webkit-scrollbar{display:none}
+#trail button{display:flex;flex-direction:column;align-items:center;gap:1px;padding:6px 2px;min-height:52px;border:0;border-radius:10px;background:transparent;color:#E7ECF2;font-size:10.5px;line-height:1.1;flex:none}
+#trail button i{font-style:normal;font-size:20px;line-height:1}
+#trail button.on{background:var(--tape,#E3A21A);color:#1B2430}
+#mcard{position:absolute;top:8px;left:calc(50% + 37px);transform:translateX(-50%);width:min(440px,calc(100% - 100px));z-index:6;background:#fff;border:2px solid var(--line);border-radius:14px;box-shadow:0 6px 20px rgba(15,23,36,.18);padding:8px 10px;display:flex;flex-direction:column;gap:6px}
+#mcard.wait{border-color:var(--tape,#E3A21A);background:#FFFBF1}#mcard.got{border-color:#1E8A55}
+#mcard.idle{padding:5px 8px;opacity:.94}
+#mcard .mc-h{font-size:15px}#mcard .mc-ap{color:var(--mute);font-size:13px}
+#mcard .mc-big{font-size:34px;font-weight:700;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
+#mcard .mc-bad{color:#C4372F;font-size:13px}#mcard .mc-last{color:var(--mute);font-size:12.5px}
+#mcard .mc-row{display:flex;gap:6px}#mcard .mc-row input{flex:1;min-width:0;font-size:18px;padding:8px 10px}
+#mcard .mc-row button{min-height:44px;font-size:15px;padding:6px 14px}
+#mcard.got .mc-row button.pri{flex:1;font-size:17px}
+#side .acts{display:grid;grid-template-columns:1fr 1fr;gap:6px}#side .acts button{min-height:46px;font-size:14px}
+#side details{border-top:1px solid var(--line);padding:8px 0}#side details summary{font-weight:600;cursor:pointer;padding:6px 0;font-size:15px}
+#side .cur-tool{margin:8px 0 0}#side .cur-walk{margin-top:8px}
+#bAbout{display:none!important}
+@media (max-width:1000px) and (min-width:821px){#app{grid-template-columns:290px 1fr}#side .acts button{font-size:13px}}
+@media (pointer:coarse){#help-line,#coord{display:none!important}}
 </style>
 </head>
 <body>
@@ -231,7 +251,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 2.5 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 2.6 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -3760,7 +3780,6 @@ function renderTouchBar() {
     tape ? btn('undo', '↶ Отменить', '', !T.undo.length && !(T.pending && T.pending.got == null)) + btn('redo', '↷', '', !T.redo.length) : '',
     plan && TB.shown ? btn('undo', '↶ Отменить') : '',
     reg ? btn('undo', '↶ Назад', '', !(S.rUndo || []).length) + btn('redo', '↷', '', !(S.rRedo || []).length) : '',
-    tape ? btn('edit', '✎ Правка', T.tool === 'select' ? 'on' : '') : '',
     tape ? btn('s90', '⟂ 90°', M.snap90 === false ? '' : 'on') : '',
     (tape || plan) && TB.shown ? btn('alt', 'Без привязки', TB.alt ? 'on' : '') : '',
     (plan || reg) && TB.shown ? btn('shift', reg ? 'Поворот' : 'Добавлять к выбору', TB.shift ? 'on' : '') : '',
@@ -5103,50 +5122,54 @@ const TTOOLS = [['walk', 'Обход', 'щёлкайте углы по поря�
   ['select', '✎ Правка', 'коснитесь точки, стены или размера — откроется меню: перемерить, изменить число, выключить, удалить. В любом инструменте то же меню — долгое нажатие или правый щелчок']];
 function renderTape() {
   if (window.TB) renderTouchBar();
-  if (S.step !== 'tape') return;
+  if (S.step !== 'tape') { ['trail', 'mcard', 'selbox'].forEach(id => { const e = document.getElementById(id); if (e) e.remove(); }); return; }
   const pd = T.pending, ap = pd && approxOf(pd);
   const R = T.result || {};
   const rows = M.meas.filter(m => m.type !== 'line' && m.type !== 'angle').slice().reverse();
   const warn = m => Math.abs(m.res || 0) > 0.015 ? 'bad' : Math.abs(m.res || 0) > 0.005 ? 'warn' : 'ok';
-  side.innerHTML = `<h3>Подложка (план БТИ)</h3>
-  <div class="row"><button id="uLoad">${U.img ? 'Заменить' : 'Загрузить PDF / картинку'}</button><input type="file" id="uFile" accept=".pdf,.png,.jpg,.jpeg" hidden>
-</div>
-  ${U.pages > 1 ? `<div class="row"><button id="uPick" class="pri" style="background:var(--acc);border-color:var(--acc);color:var(--ink)">Выбрать лист…</button><select id="uPage" style="flex:1;min-width:0">${Array.from({ length: U.pages }, (_, i) => `<option value="${i + 1}" ${U.page === i + 1 ? 'selected' : ''}>${i + 1} · ${escH(pageLabel(i + 1))}</option>`).join('')}</select></div>` : ''}
-  ${U.img ? `<div class="row"><button id="uCal" class="${T.calMode ? 'on' : ''}">Масштаб по 2 точкам</button><label><input type="checkbox" id="calH" checked> выровнять</label></div>
-  <div class="row"><label>Прозрачность</label><input type="range" id="uA" min="0.1" max="1" step="0.05" value="${U.alpha}" style="width:120px"><span class="hint" style="margin:0">${U.zoomPdf ? '' : ''}${nf(U.s * 1000, 3)} мм/px</span></div>` : '<p class="hint">Можно работать и без подложки — на сетке 1 м.</p>'}
-  <h3>Рулетка</h3>
-  <div class="row"><span class="btdot ${T.btState === 'подключена' ? 'on' : /…/.test(T.btState) ? 'wait' : ''}"></span><button class="btbig ${T.btState === 'подключена' ? 'on' : 'pri'}" id="bBt">${T.btState === 'подключена' ? '✓ ' + escH(T.btName) : 'Подключить DISTO'}</button>${T.btState === 'отключена' ? '<button id="bRe" class="pri">Переподключить</button>' : ''}${T.cmd && T.btState === 'подключена' ? '<button id="bMeas" class="btbig">◉ Замер</button>' : ''}<span class="hint" style="margin:0">${escH(T.btState)}${T.batt != null ? ' · батарея ' + T.batt + '%' : ''}</span></div>
-  ${!navigator.bluetooth ? `<p class="hint" style="color:#C4372F">${btSupportNote()}</p>` : ''}
-  <div class="row"><input type="text" id="mIn" inputmode="decimal" enterkeyhint="done" autocomplete="off" placeholder="${T.pending && T.pending.got == null ? 'введите замер ' + pendLabel(T.pending) : 'ввод вручную: 4,237 или 4237'}" style="flex:1;${T.pending && T.pending.got == null && T.btState !== 'подключена' ? 'border-color:var(--tape,#E3A21A);box-shadow:0 0 0 3px rgba(227,162,26,.25)' : ''}"><button id="mOk">↵</button></div>
-  <div class="chk"><input type="checkbox" id="auto" ${T.auto ? 'checked' : ''}><label for="auto">Принимать замер сразу, без подтверждения</label></div>
-  ${pd ? `<div class="pend">
-     <div><b>Замер ${pendLabel(pd)}</b>${ap ? ` <span class="hint">(по подложке ≈ ${nf(ap, 2)} м)</span>` : ''}</div>
-     ${pd.got != null ? `<div class="big">${fm(pd.got)} м</div>
-       ${ap && Math.abs(pd.got - ap) / ap > 0.2 ? '<div class="bad">Сильно отличается от подложки — та ли стена?</div>' : ''}
-       <div class="row"><button class="pri" id="pAcc">Принять (Enter)</button><button id="pRej">Отклонить</button></div>`
-      : `<div class="hint">Ожидаю замер с рулетки или ввод вручную… <a href="#" id="pSkip">пропустить (Esc)</a></div>`}</div>`
-    : (T.buffer ? `<div class="hint">В буфере: <b>${fm(T.buffer.v)} м</b> — укажите точки на плане</div>` : '')}
-  ${T.last ? `<div class="hint">Последний замер: ${fm(T.last.v)} м (${T.last.src === 'bt' ? 'DISTO' : 'вручную'})</div>` : ''}
-  ${T.tool === 'walk' && T.chain ? `<div class="row"><span class="hint" style="margin:0;flex:1">Обход идёт от <b>${pname(T.chain[T.chain.length - 1])}</b></span><button id="bEnd" class="pri">■ Закончить обход</button></div>` : T.tool === 'walk' ? '<p class="hint">Обход не начат: коснитесь точки — продолжить от неё; пустого места — новая точка.</p>' : ''}
-  <h3>Отрисовка</h3>
+  const TICON = { walk: '⬠', meas: '↔', online: '⊸', open: '🚪', thick: '▥', room: '▢', obj: '◆', note: '💬', box: '⬚', drag: '✥', select: '✎' };
+  const TSHORT = { walk: 'Обход', meas: 'Замер', online: 'На стене', open: 'Дверь', thick: 'Толщина', room: 'Помещ.', obj: 'Объект', note: 'Выноска', box: 'Выделить', drag: 'Двигать', select: 'Правка' };
+  // панель инструментов на чертеже — всегда под рукой
+  let rail = document.getElementById('trail'); if (!rail) { rail = document.createElement('div'); rail.id = 'trail'; $('#main').appendChild(rail); }
+  rail.innerHTML = TTOOLS.map(t => `<button data-tt="${t[0]}" class="${T.tool === t[0] ? 'on' : ''}" title="${escH(t[1] + ': ' + t[2])}"><i>${TICON[t[0]] || '•'}</i><span>${TSHORT[t[0]] || t[1]}</span></button>`).join('');
+  // карточка замера сверху по центру: что меряем, число, ввод вручную, принять
+  let mc = document.getElementById('mcard'); if (!mc) { mc = document.createElement('div'); mc.id = 'mcard'; $('#main').appendChild(mc); }
+  const waiting = pd && pd.got == null, got = pd && pd.got != null;
+  mc.className = pd ? (got ? 'got' : 'wait') : 'idle';
+  mc.innerHTML = `${pd ? `<div class="mc-h">Замер <b>${pendLabel(pd)}</b>${ap ? ` <span class="mc-ap">≈ ${fm(ap)} по чертежу</span>` : ''}</div>` : ''}
+    ${got ? `<div class="mc-big">${fm(pd.got)} м</div>${ap && Math.abs(pd.got - ap) / ap > 0.2 ? '<div class="mc-bad">Сильно отличается от чертежа — та ли стена?</div>' : ''}
+      <div class="mc-row"><button class="pri" id="pAcc">✓ Принять</button><button id="pRej">✕ Отклонить</button></div>` : ''}
+    ${!got ? `<div class="mc-row"><input type="text" id="mIn" inputmode="decimal" enterkeyhint="done" autocomplete="off" placeholder="${waiting ? (T.btState === 'подключена' ? 'жму кнопку на DISTO… или введите' : 'введите замер, м') : 'ввести замер вручную'}"><button id="mOk">↵</button>${waiting ? '<button id="pSkip">Пропустить</button>' : ''}</div>` : ''}
+    ${!pd && T.last ? `<div class="mc-last">последний: ${fm(T.last.v)} м${T.buffer ? ' — в буфере, укажите точки' : ''}</div>` : ''}`;
+  const btShort = !navigator.bluetooth ? `<p class="hint" style="color:#C4372F;margin:4px 0 0">Нет Bluetooth в этом браузере — откройте программу в <b>Bluefy</b>. Вводить замеры можно вручную.</p>` : '';
+  side.innerHTML = `
+  <div class="row"><span class="btdot ${T.btState === 'подключена' ? 'on' : /…/.test(T.btState) ? 'wait' : ''}"></span><button class="btbig ${T.btState === 'подключена' ? 'on' : 'pri'}" id="bBt">${T.btState === 'подключена' ? '✓ ' + escH(T.btName) : 'Подключить DISTO'}</button>${T.btState === 'отключена' ? '<button id="bRe" class="pri">Переподключить</button>' : ''}${T.cmd && T.btState === 'подключена' ? '<button id="bMeas" class="btbig">◉ Замер</button>' : ''}<span class="hint" style="margin:0">${T.btState === 'нет' ? '' : escH(T.btState)}${T.batt != null ? ' · ' + T.batt + '%' : ''}</span></div>
+  ${btShort}
+  ${T.tool === 'walk' && T.chain ? `<div class="row cur-walk"><span style="flex:1">Обход идёт от <b>${pname(T.chain[T.chain.length - 1])}</b></span><button id="bEnd" class="pri">■ Закончить обход</button></div>` : `<p class="hint cur-tool"><b>${escH((TTOOLS.find(t => t[0] === T.tool) || [])[1] || '')}:</b> ${escH((TTOOLS.find(t => t[0] === T.tool) || [])[2] || '')}</p>`}
+  <h3>Готово — проверить и сдать</h3>
+  <div class="acts">
+    <button id="bSelAll" ${M.meas.length ? '' : 'disabled'}>⬚ Проверить невязки</button>
+    <button id="bStr" ${M.pts.length > 2 ? '' : 'disabled'}>▦ Выровнять 90°</button>
+    <button id="bOvPdf" class="pri" ${M.pts.length ? '' : 'disabled'}>📄 PDF на подложке</button>
+    <button id="toSheetT" ${M.rooms.length || M.edges.length ? '' : 'disabled'}>🗎 Листы и DXF</button>
+  </div>
+  <details ${U.img ? '' : 'open'}><summary>Подложка (план БТИ)${U.img ? ' — ' + escH(U.name || 'загружена') : ''}</summary>
+  <div class="row"><button id="uLoad">${U.img ? 'Заменить' : 'Загрузить PDF / картинку'}</button><input type="file" id="uFile" accept=".pdf,.png,.jpg,.jpeg" hidden></div>
+  ${U.pages > 1 ? `<div class="row"><button id="uPick">Выбрать лист…</button><select id="uPage" style="flex:1;min-width:0">${Array.from({ length: U.pages }, (_, i) => `<option value="${i + 1}" ${U.page === i + 1 ? 'selected' : ''}>${i + 1} · ${escH(pageLabel(i + 1))}</option>`).join('')}</select></div>` : ''}
+  ${U.img ? `<div class="row"><button id="mFit" ${M.meas.length ? '' : 'disabled'}>Масштаб по замерам</button><button id="uCal" class="${T.calMode ? 'on' : ''}">Масштаб по 2 точкам</button><label style="display:none"><input type="checkbox" id="calH" checked></label></div>
+  <div class="row"><label>Прозрачность</label><input type="range" id="uA" min="0.1" max="1" step="0.05" value="${U.alpha}" style="flex:1"></div>` : '<p class="hint">Без подложки — обмер на сетке 1 м.</p>'}
+  </details>
+  <details><summary>Настройки обмера</summary>
   <div class="row seg2"><button id="mFact" class="${M.cond ? '' : 'on'}">Факт по замерам</button><button id="mCond" class="${M.cond ? 'on' : ''}">Условно по чертежу</button></div>
-  <p class="hint">${M.cond ? 'Точки стоят там, где вы их поставили на чертеже; замеры подписываются числами и идут в листы, площади — по замерам.' : 'Точки сдвигаются под замеры рулетки (уравнивание), чертёж — только подсказка.'}</p>
-  ${M.meas.length ? `<div class="row"><button id="bSelAll">⬚ Выделить всё и проверить невязки</button></div>` : ''}
-  ${M.pts.length > 2 ? `<div class="row"><button id="bStr">▦ Выровнять углы до 90°</button><span class="hint" style="margin:0">исправит кривые углы на чертеже</span></div>` : ''}
-  ${M.meas.length ? `<div class="row"><button id="mFit">Масштаб по замерам</button><span class="hint" style="margin:0">${(() => { const r = scaleRatio(); return r ? 'замер / чертёж ≈ ' + nf(r.k, 3) : ''; })()}</span></div>` : ''}
-  <div class="row"><button id="bOvPdf" class="pri" ${M.pts.length ? '' : 'disabled'}>📄 PDF: замеры на подложке</button></div>
-  <h3>Инструменты</h3>
-  <div class="tools">${TTOOLS.map(t => `<button data-tt="${t[0]}" class="${T.tool === t[0] ? 'on' : ''}" title="${escH(t[2])}">${t[1]}</button>`).join('')}</div>
-  <p class="hint">${escH((TTOOLS.find(t => t[0] === T.tool) || [])[2] || '')}</p>
-  <div class="row"><button id="tUndo" ${T.undo.length ? '' : 'disabled'}>↶ Отменить</button><button id="tRedo" ${T.redo.length ? '' : 'disabled'}>↷ Вернуть</button></div>
-  <p class="hint">Ошиблись — «↶ Отменить» (Ctrl+Z) убирает последний шаг. Убрать конкретную точку или замер: долгое нажатие (правый щелчок) по ней → меню, или инструмент «✎ Правка».</p>
-  <div class="chk"><input type="checkbox" id="orth" ${M.ortho !== false ? 'checked' : ''}><label for="orth">Считать углы близкие к 90° прямыми (если нет диагоналей)</label></div>
-  <h3>Контроль</h3>
-  <div class="hint">Точек ${M.pts.length} · замеров ${M.meas.filter(m => m.type !== 'line').length} · помещений ${M.rooms.length}<br>
-  Наибольшая невязка: <b class="${(R.maxR || 0) > 0.015 ? 'bad' : (R.maxR || 0) > 0.005 ? 'warn' : 'ok'}">${Math.round((R.maxR || 0) * 1000)} мм</b> ${(R.maxR || 0) > 0.005 ? '— замеры не сходятся, проверьте красные' : '— длины сходятся'}</div>
+  <p class="hint">${M.cond ? 'Точки стоят, где вы их поставили; замеры — подписи и данные для листов.' : 'Точки встают по замерам рулетки, углы около 90° — прямые.'}</p>
+  <div class="chk"><input type="checkbox" id="auto" ${T.auto ? 'checked' : ''}><label for="auto">Принимать замер с DISTO сразу, без «Принять»</label></div>
+  <div class="chk"><input type="checkbox" id="orth" ${M.ortho !== false ? 'checked' : ''}><label for="orth">Углы около 90° считать прямыми</label></div>
+  </details>
+  <details><summary>Помещения и замеры (${M.rooms.length} / ${M.meas.filter(m => m.type !== 'line' && m.type !== 'angle').length}) · невязка <b class="${(R.maxR || 0) > 0.015 ? 'bad' : (R.maxR || 0) > 0.005 ? 'warn' : 'ok'}">${Math.round((R.maxR || 0) * 1000)} мм</b></summary>
   ${M.rooms.map(Rm => { const i = TAPE.roomInfo(M, Rm); return `<div class="item" data-room="${Rm.num}"><input type="text" value="${escH(Rm.name)}" data-rn="${Rm.num}" style="width:120px">${Rm.num}<span class="q ${i.diags < i.need ? 'warn' : 'ok'}">${SHEET.fmtArea(i.area)} м² · стороны ${i.sides}/${i.k} · диаг. ${i.diags}${i.diags < i.need ? ' (нужно ' + i.need + ')' : ''}</span></div>`; }).join('')}
   <div class="list" style="margin-top:6px">${rows.map(m => `<div class="item"><input type="checkbox" data-mon="${m.id}" ${m.on !== false ? 'checked' : ''}><span>${m.type === 'thick' ? 'δ ' : ''}${pname(m.a)}–${pname(m.type === 'thick' ? m.c : m.b)}</span><input type="text" data-mv="${m.id}" value="${fm(m.v)}" style="width:72px"><span class="q ${warn(m)}">${m.res != null ? (m.res > 0 ? '+' : '') + Math.round(m.res * 1000) + ' мм' : ''}</span><button data-mdel="${m.id}" style="padding:1px 6px">×</button></div>`).join('') || '<div class="hint" style="padding:6px">Замеров пока нет</div>'}</div>
-  <div class="row next"><button class="pri" id="toSheetT" ${M.rooms.length || M.edges.length ? '' : 'disabled'}>Оформить листы</button></div>`;
+  </details>
+  <div class="row" style="display:none"><button id="tUndo"></button><button id="tRedo"></button></div>`;
   $('#uLoad').onclick = () => $('#uFile').click();
   $('#uFile').onchange = e => e.target.files[0] && loadUnderlay(e.target.files[0]);
   const upk = $('#uPick'); if (upk) upk.onclick = changePage;
@@ -5164,12 +5187,13 @@ function renderTape() {
   $('#mFact').onclick = () => setCond(false); $('#mCond').onclick = () => setCond(true);
   const mf = $('#mFit'); if (mf) mf.onclick = () => { const r = scaleRatio(); if (r) fitScale(r.k); };
   const br = $('#bRe'); if (br) br.onclick = reconnectDisto;
-  const mi = $('#mIn'), mo = () => { const v = parseManual(mi.value); if (v) { mi.value = ''; onReading(v, 'key'); if (T.pending && T.pending.got != null) acceptPending(); } };
-  $('#mOk').onclick = mo; mi.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); if (mi.value.trim()) mo(); else if (T.pending && T.pending.got != null) acceptPending(); } };
+  const mi = $('#mIn'), mo = () => { if (!mi) return; const v = parseManual(mi.value); if (v) { mi.value = ''; onReading(v, 'key'); if (T.pending && T.pending.got != null) acceptPending(); } };
+  if (mi) { $('#mOk').onclick = mo; mi.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); if (mi.value.trim()) mo(); else if (T.pending && T.pending.got != null) acceptPending(); } }; }
   $('#auto').onchange = e => T.auto = e.target.checked;
   const pa = $('#pAcc'); if (pa) pa.onclick = acceptPending; const pr = $('#pRej'); if (pr) pr.onclick = rejectPending;
   const ps = $('#pSkip'); if (ps) ps.onclick = e => { e.preventDefault(); skipPending(); };
-  side.querySelectorAll('[data-tt]').forEach(b => b.onclick = () => { if (T.selSet && b.dataset.tt !== 'box') { T.selSet = null; showSelBox(); } T.tool = b.dataset.tt; T.mA = null; T.tA = null; T.roomIds = null; T.objIds = null; T.noteTip = null; if (T.tool !== 'walk') T.chain = null; renderTape(); });
+  const mfi = $('#mFit'); void mfi;
+  rail.querySelectorAll('[data-tt]').forEach(b => b.onclick = () => { if (T.selSet && b.dataset.tt !== 'box') { T.selSet = null; showSelBox(); } T.tool = b.dataset.tt; T.mA = null; T.tA = null; T.roomIds = null; T.objIds = null; T.noteTip = null; if (T.tool !== 'walk') T.chain = null; const tt = TTOOLS.find(t => t[0] === T.tool); if (tt) stat(tt[1] + ': ' + tt[2]); renderTape(); });
   $('#tUndo').onclick = tUndo; $('#tRedo').onclick = tRedo;
   $('#orth').onchange = e => { M.ortho = e.target.checked; adjust(); renderTape(); };
   side.querySelectorAll('[data-mon]').forEach(c => c.onchange = () => { const m = M.meas.find(x => x.id === +c.dataset.mon); tPush(); m.on = c.checked; adjust(); renderTape(); });
