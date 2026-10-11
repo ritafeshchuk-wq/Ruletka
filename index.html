@@ -228,7 +228,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 2.2 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 2.3 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -4762,7 +4762,7 @@ function tapeDown(e, w) {
     const prev = T.chain[T.chain.length - 1];
     if (p && p.id === prev) return;
     tPush();
-    if (!p) p = addPoint(snap90(prev, w));
+    if (!p) { p = addPoint(snap90(prev, w)); if (M.snap90 === false || TB.alt || e.altKey) p.free = true; }
     if (M.axis == null) { const a = PX(ptById(prev)), b = PX(p), g = Math.atan2(b[1] - a[1], b[0] - a[0]), q = Math.PI / 2; const d = g - Math.round(g / q) * q; M.axis = Math.abs(d) < 15 * Math.PI / 180 ? 0 : g; }
     const closing = p.id === T.chain[0] && T.chain.length >= 3;
     if (!hasEdge(prev, p.id)) M.edges.push({ a: prev, b: p.id });
