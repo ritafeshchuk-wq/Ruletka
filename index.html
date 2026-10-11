@@ -228,7 +228,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 2.1 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 2.2 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -2066,6 +2066,8 @@ const TAPE = (() => {
         for (let j = 0; j < k; j++) angCons.push([ids[(j - 1 + k) % k], ids[j], ids[(j + 1) % k]]);
       }
       for (const ch of M.chains || []) for (let j = 1; j + 1 < ch.length; j++) angCons.push([ch[j - 1], ch[j], ch[j + 1]]);
+      const nb = new Map(); for (const e of M.edges || []) { if (!nb.has(e.a)) nb.set(e.a, []); if (!nb.has(e.b)) nb.set(e.b, []); nb.get(e.a).push(e.b); nb.get(e.b).push(e.a); }
+      for (const [v, ns] of nb) for (let i = 0; i < ns.length; i++) for (let j = i + 1; j < ns.length; j++) angCons.push([ns[i], v, ns[j]]);
     }
     const seenA = new Set(); const AC = [];
     const fixedAng = new Set((M.meas || []).filter(m => m.type === 'angle' && m.on !== false).map(m => m.b));
@@ -2103,7 +2105,7 @@ const TAPE = (() => {
         if (!r) continue;
         // target: nearest of 90/180/270 if within 12°
         const tgts = [Math.PI / 2, Math.PI, 1.5 * Math.PI];
-        let best = null; for (const t of tgts) if (Math.abs(r.f - t) < 12 * Math.PI / 180) best = t;
+        const tol = (opt.angTol || M.orthoTol || 15) * Math.PI / 180; let best = null; for (const t of tgts) if (Math.abs(r.f - t) < tol) best = t;
         if (best === null) continue;
         add(r.J, best - r.f, 1 / (SIG.angle ** 2));
       }
@@ -3756,6 +3758,7 @@ function renderTouchBar() {
     plan && TB.shown ? btn('undo', '↶ Отменить') : '',
     reg ? btn('undo', '↶ Назад', '', !(S.rUndo || []).length) + btn('redo', '↷', '', !(S.rRedo || []).length) : '',
     tape ? btn('edit', '✎ Правка', T.tool === 'select' ? 'on' : '') : '',
+    tape ? btn('s90', '⟂ 90°', M.snap90 === false ? '' : 'on') : '',
     (tape || plan) && TB.shown ? btn('alt', 'Без привязки', TB.alt ? 'on' : '') : '',
     (plan || reg) && TB.shown ? btn('shift', reg ? 'Поворот' : 'Добавлять к выбору', TB.shift ? 'on' : '') : '',
     plan && TB.shown ? btn('del', 'Удалить') : '',
@@ -3781,6 +3784,7 @@ function tbAct(e) {
   else if (k === 'del') tbKey('Delete');
   else if (k === 'esc') tbKey('Escape');
   else if (k === 'endc') endChain();
+  else if (k === 's90') { M.snap90 = M.snap90 === false; stat(M.snap90 === false ? 'Привязка 90° выключена: точки ставятся как есть.' : 'Привязка 90°: новая стена ложится вдоль или поперёк предыдущей (если отклонение меньше 15°).'); }
   else if (k === 'ok') tbKey('Enter');
   renderTouchBar(); return true;
 }
@@ -4187,7 +4191,7 @@ async function projCreate(name, keepWork) {
 }
 function showProjName() { const el = $('#projName'); if (el) el.textContent = AS.pname || ''; }
 function resetWork() {
-  Object.assign(M, { pts: [], meas: [], edges: [], rooms: [], chains: [], objs: [], notes: [], nextId: 1, nextMeas: 1, cond: false, scaleFit: false, scaleAsked: false });
+  Object.assign(M, { axis: null, snap90: true, pts: [], meas: [], edges: [], rooms: [], chains: [], objs: [], notes: [], nextId: 1, nextMeas: 1, cond: false, scaleFit: false, scaleAsked: false });
   Object.assign(U, { img: null, pdf: null, pages: 0, page: 1, name: '', src: null, ptPerPx: null, srcPage: 1, _imgKey: null, _imgKeyFor: null, _imgSaved: false, _srcKey: null, _data: null, _dataFor: null, mip: null, mipSrc: null, s: 0.01, rot: 0, tx: 0, ty: 0 });
   Object.assign(T, { noteTip: null, undo: [], redo: [], pending: null, chain: null, sel: null, buffer: null, objIds: null, roomIds: null, mA: null, tA: null, fitted: false });
   AS.last = ''; AS.savedAt = 0; try { localStorage.removeItem('ruletka_quick'); } catch (e) { }
@@ -4475,6 +4479,30 @@ function noteTip(n) { const p = n.pt != null ? ptById(n.pt) : null; return p ? P
 function noteLines(t) { const out = []; for (const para of String(t).split(/\n|\s\/\s/)) { let cur = ''; for (const w of para.split(' ')) { if ((cur + ' ' + w).trim().length > 28 && cur) { out.push(cur); cur = w; } else cur = (cur + ' ' + w).trim(); } out.push(cur); } return out.filter(x => x !== ''); }
 async function noteEdit(n) { const v = await uiAsk('Текст выноски (« / » — новая строка):', n.text || ''); if (v == null) return false; if (!v.trim()) { M.notes = M.notes.filter(x => x !== n); } else n.text = v.trim(); return true; }
 function noteAt(sx, sy) { for (const r of (T.noteRects || []).slice().reverse()) if (sx >= r.x0 && sx <= r.x1 && sy >= r.y0 && sy <= r.y1) return r.n; return null; }
+// ---------- привязка 90°: новая стена ложится строго вдоль/поперёк предыдущей ----------
+function snap90(prevId, w) {
+  if (M.snap90 === false || TB.alt) return w;
+  const P = PX(ptById(prevId)); let base = M.axis != null ? M.axis : 0;
+  if (T.chain && T.chain.length >= 2) { const Q = PX(ptById(T.chain[T.chain.length - 2])); base = Math.atan2(P[1] - Q[1], P[0] - Q[0]); }
+  const a = Math.atan2(w[1] - P[1], w[0] - P[0]), L = Math.hypot(w[0] - P[0], w[1] - P[1]);
+  const q = Math.PI / 2; let d = a - base; d = d - Math.round(d / q) * q;
+  if (Math.abs(d) > 15 * Math.PI / 180) return w;
+  const t = a - d; return [P[0] + Math.cos(t) * L, P[1] + Math.sin(t) * L];
+}
+// ---------- выровнять нарисованное: углы около 90° делаются прямыми, длины на чертеже сохраняются ----------
+function straighten() {
+  if (M.pts.length < 3) return;
+  tPush();
+  const tmp = { pts: M.pts.map(p => ({ id: p.id, x0: p.x0, y0: p.y0 })), edges: M.edges, rooms: M.rooms, chains: M.chains, objs: [], ortho: true,
+    meas: M.edges.map((e, i) => { const A = ptById(e.a), B = ptById(e.b); return { id: i + 1, type: 'dist', a: e.a, b: e.b, v: Math.hypot(B.x0 - A.x0, B.y0 - A.y0), on: true }; }) };
+  const sv = { ...TAPE.SIG }; Object.assign(TAPE.SIG, { prior: 3, dist: 0.2, angle: 0.01 * Math.PI / 180 }); try { TAPE.solve(tmp, { angTol: 20 }); TAPE.solve(tmp, { angTol: 20 }); } finally { Object.assign(TAPE.SIG, sv); }
+  // общий поворот: самая длинная стена — строго по горизонтали/вертикали
+  let best = null; for (const e of M.edges) { const A = tmp.pts.find(p => p.id === e.a), B = tmp.pts.find(p => p.id === e.b); const L = Math.hypot(B.x - A.x, B.y - A.y); if (!best || L > best.L) best = { L, a: Math.atan2(B.y - A.y, B.x - A.x) }; }
+  let rot = 0; if (best) { const q = Math.PI / 2; rot = -(best.a - Math.round(best.a / q) * q); if (Math.abs(rot) > 20 * Math.PI / 180) rot = 0; }
+  const c = [tmp.pts.reduce((s0, p) => s0 + p.x, 0) / tmp.pts.length, tmp.pts.reduce((s0, p) => s0 + p.y, 0) / tmp.pts.length], cr = Math.cos(rot), sr = Math.sin(rot);
+  for (const p of M.pts) { const q = tmp.pts.find(x => x.id === p.id); const dx = q.x - c[0], dy = q.y - c[1]; p.x0 = c[0] + cr * dx - sr * dy; p.y0 = c[1] + sr * dx + cr * dy; p.x = p.x0; p.y = p.y0; }
+  M.axis = 0; adjust(); draw(); renderTape(); stat('Чертёж выровнен: углы около 90° стали прямыми. Не то — «↶ Отменить».');
+}
 function continueFrom(p) { // начать (продолжить) обход от существующей точки
   if (T.pending && T.pending.got == null) T.pending = null;
   T.tool = 'walk'; T.mA = null; T.tA = null; T.roomIds = null;
@@ -4734,7 +4762,8 @@ function tapeDown(e, w) {
     const prev = T.chain[T.chain.length - 1];
     if (p && p.id === prev) return;
     tPush();
-    if (!p) p = addPoint(w);
+    if (!p) p = addPoint(snap90(prev, w));
+    if (M.axis == null) { const a = PX(ptById(prev)), b = PX(p), g = Math.atan2(b[1] - a[1], b[0] - a[0]), q = Math.PI / 2; const d = g - Math.round(g / q) * q; M.axis = Math.abs(d) < 15 * Math.PI / 180 ? 0 : g; }
     const closing = p.id === T.chain[0] && T.chain.length >= 3;
     if (!hasEdge(prev, p.id)) M.edges.push({ a: prev, b: p.id });
     // collinearity: if prev is nearly straight between its neighbours
@@ -4813,7 +4842,7 @@ function tapeMove(w) {
   if (T.dragNote) { const d = T.dragNote; d.n.at = [w[0] + d.off[0], w[1] + d.off[1]]; draw(); return true; }
   if (T.dragPt) { const o = T.dragOff || [0, 0], x = w[0] + o[0], y = w[1] + o[1]; T.dragPt.x0 = x; T.dragPt.y0 = y; T.dragPt.x = x; T.dragPt.y = y; adjust(); draw(); return true; }
   if (T.dragU) { U.tx = T.dragU.tx + w[0] - T.dragU.w0[0]; U.ty = T.dragU.ty + w[1] - T.dragU.w0[1]; draw(); return true; }
-  T.mouse = w; if (T.tool === 'walk' && T.chain) draw();
+  T.mouse = (T.tool === 'walk' && T.chain) ? snap90(T.chain[T.chain.length - 1], w) : w; if (T.tool === 'walk' && T.chain) draw();
   return false;
 }
 function tapeUp() { if (T.dragNote) { T.dragNote = null; asSoon(); renderTape(); draw(); } if (T.dragPt || T.dragU) { asSoon(); T.dragPt = null; T.dragOff = null; T.dragU = null; renderTape(); draw(); } }
@@ -5015,6 +5044,7 @@ function renderTape() {
   <h3>Отрисовка</h3>
   <div class="row seg2"><button id="mFact" class="${M.cond ? '' : 'on'}">Факт по замерам</button><button id="mCond" class="${M.cond ? 'on' : ''}">Условно по чертежу</button></div>
   <p class="hint">${M.cond ? 'Точки стоят там, где вы их поставили на чертеже; замеры подписываются числами и идут в листы, площади — по замерам.' : 'Точки сдвигаются под замеры рулетки (уравнивание), чертёж — только подсказка.'}</p>
+  ${M.pts.length > 2 ? `<div class="row"><button id="bStr">▦ Выровнять углы до 90°</button><span class="hint" style="margin:0">исправит кривые углы на чертеже</span></div>` : ''}
   ${M.meas.length ? `<div class="row"><button id="mFit">Масштаб по замерам</button><span class="hint" style="margin:0">${(() => { const r = scaleRatio(); return r ? 'замер / чертёж ≈ ' + nf(r.k, 3) : ''; })()}</span></div>` : ''}
   <div class="row"><button id="bOvPdf" class="pri" ${M.pts.length ? '' : 'disabled'}>📄 PDF: замеры на подложке</button></div>
   <h3>Инструменты</h3>
@@ -5040,6 +5070,7 @@ function renderTape() {
   if (T.pending && T.pending.got == null && T.btState !== 'подключена' && !T.dragPt) { const f = $('#mIn'); if (f && document.activeElement !== f) try { f.focus({ preventScroll: true }); } catch (e) { } }
   const be = $('#bEnd'); if (be) be.onclick = endChain;
   const bo = $('#bOvPdf'); if (bo) bo.onclick = exportOverlayPdf;
+  const bs = $('#bStr'); if (bs) bs.onclick = straighten;
   const setCond = v => { M.cond = v; adjust(); draw(); renderTape(); };
   $('#mFact').onclick = () => setCond(false); $('#mCond').onclick = () => setCond(true);
   const mf = $('#mFit'); if (mf) mf.onclick = () => { const r = scaleRatio(); if (r) fitScale(r.k); };
