@@ -256,7 +256,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 2.7 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 2.8 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -1995,7 +1995,7 @@ const SHEET = (() => {
         }
         g += `<path d="${d}" stroke="#bbb" stroke-width="0.12" fill="none"/>`;
       }
-      const colors = { STENY: '#000', PROEMY: '#0a7', POMESCH: '#36c', RAZMERY: '#000', TOLSCH: '#c00', TEKST: '#000', OBJEKTY: '#000', DVERI: '#0a7' };
+      const colors = { STENY: '#000', PROEMY: '#0a7', POMESCH: '#36c', RAZMERY: '#000', TOLSCH: '#c00', TEKST: '#000', OBJEKTY: '#000', DVERI: '#0a7', FOTO_SKAN: '#1f6feb' };
       const byLayer = {};
       for (const l of prim.lines) (byLayer[l.layer + '|' + l.w] = byLayer[l.layer + '|' + l.w] || []).push(l);
       for (const key in byLayer) {
@@ -2051,7 +2051,7 @@ const SHEET = (() => {
     const o = [];
     const p = (c, v) => { o.push(String(c)); o.push(String(v)); };
     p(999, 'Скан-План 1.1. (c) d1sco, 2026. ' + 'sha256:328908ed1181127a9f21b77d19d70a47e4ad0be284785c97777810ddff0d519a'); p(0, 'SECTION'); p(2, 'HEADER'); p(9, '$ACADVER'); p(1, 'AC1009'); p(9, '$DWGCODEPAGE'); p(3, 'ANSI_1251'); p(9, '$INSUNITS'); p(70, opt.units === 'm' ? 6 : 4); p(0, 'ENDSEC');
-    const layers = { SREZ: 8, STENY: 7, PROEMY: 3, POMESCH: 5, RAZMERY: 7, TOLSCH: 1, TEKST: 7, STANCII: 4, OBJEKTY: 6, DVERI: 3 };
+    const layers = { SREZ: 8, STENY: 7, PROEMY: 3, POMESCH: 5, RAZMERY: 7, TOLSCH: 1, TEKST: 7, STANCII: 4, OBJEKTY: 6, DVERI: 3, FOTO_SKAN: 5 };
     p(0, 'SECTION'); p(2, 'TABLES'); p(0, 'TABLE'); p(2, 'LAYER'); p(70, Object.keys(layers).length);
     for (const [n, c] of Object.entries(layers)) { p(0, 'LAYER'); p(2, n); p(70, 0); p(62, c); p(6, 'CONTINUOUS'); }
     p(0, 'ENDTAB'); p(0, 'ENDSEC');
@@ -3768,7 +3768,7 @@ var TB = { alt: false, shift: false, shown: false };
 var TP = { pts: new Map(), tap: null, pinch: null, pan: null, toolDrag: false, pen: null, lp: null };
 const fakeEv = (ev, x, y) => ({ clientX: x != null ? x : ev.clientX, clientY: y != null ? y : ev.clientY, button: 0, buttons: 1, altKey: ev.altKey || TB.alt, shiftKey: ev.shiftKey || TB.shift, ctrlKey: ev.ctrlKey || TB.shift, metaKey: ev.metaKey, target: cv, pointerType: ev.pointerType, preventDefault() { } });
 function toolDrags() {
-  if (S.step === 'tape') return T.tool === 'drag' || T.tool === 'box';
+  if (S.step === 'tape') return T.tool === 'drag' || T.tool === 'box' || T.tool === 'photo' || T.tool === 'scan';
   if (S.step === 'plan') return ['select', 'erase'].includes(S.tool);
   if (S.step === 'reg') return S.regTool === 'move' && S.sel.size > 0;
   return false;
@@ -3858,7 +3858,8 @@ function pMove(ev) {
     if (Math.hypot(ev.clientX - TP.tap.x, ev.clientY - TP.tap.y) < 10) return;
     lpCancel(); const t0 = TP.tap; TP.tap = null;
     // «Рулетка»: палец лёг на точку и повёл — двигаем точку (линии идут за ней, замеры не меняются)
-    if (S.step === 'tape' && !T.calMode) { const w0 = S2W(t0.x - r.left, t0.y - r.top), nt = noteAt(t0.x - r.left, t0.y - r.top), p = nt ? null : nearestPoint(w0, 11);
+    if (S.step === 'tape' && !T.calMode) { const w0 = S2W(t0.x - r.left, t0.y - r.top), mkd = (T.tool === 'photo' || T.tool === 'scan') ? null : markAt(t0.x - r.left, t0.y - r.top), nt = mkd ? null : noteAt(t0.x - r.left, t0.y - r.top), p = (nt || mkd) ? null : nearestPoint(w0, 11);
+      if (mkd) { tPush(); T.dragMark = { m: mkd, off: [mkd.p[0] - w0[0], mkd.p[1] - w0[1]] }; T.sel = { mark: mkd }; TP.toolDrag = true; }
       if (nt) { tPush(); T.dragNote = { n: nt, off: [nt.at[0] - w0[0], nt.at[1] - w0[1]] }; T.sel = { note: nt }; TP.toolDrag = true; }
       if (p) { tPush(); const q = PX(p); T.dragPt = p; T.dragOff = [q[0] - w0[0], q[1] - w0[1]]; T.sel = { pt: p }; TP.toolDrag = true; if (navigator.vibrate) navigator.vibrate(10); stat(`Двигаю ${pname(p.id)}${M.cond ? '' : ' — в режиме «Факт» итоговое место точки определяют замеры'}`); } }
     if (TP.toolDrag) { }
@@ -4226,9 +4227,9 @@ async function projCreate(name, keepWork) {
 }
 function showProjName() { const el = $('#projName'); if (el) el.textContent = AS.pname || ''; }
 function resetWork() {
-  Object.assign(M, { axis: null, snap90: true, pts: [], meas: [], edges: [], rooms: [], chains: [], objs: [], notes: [], nextId: 1, nextMeas: 1, cond: false, scaleFit: false, scaleAsked: false });
+  Object.assign(M, { axis: null, snap90: true, pts: [], meas: [], edges: [], rooms: [], chains: [], objs: [], notes: [], marks: [], lastNum: {}, nextId: 1, nextMeas: 1, cond: false, scaleFit: false, scaleAsked: false });
   Object.assign(U, { img: null, pdf: null, pages: 0, page: 1, name: '', src: null, ptPerPx: null, srcPage: 1, _imgKey: null, _imgKeyFor: null, _imgSaved: false, _srcKey: null, _data: null, _dataFor: null, mip: null, mipSrc: null, s: 0.01, rot: 0, tx: 0, ty: 0 });
-  Object.assign(T, { selSet: null, box: null, noteTip: null, undo: [], redo: [], pending: null, chain: null, sel: null, buffer: null, objIds: null, roomIds: null, mA: null, tA: null, fitted: false });
+  Object.assign(T, { mk: null, dragMark: null, selSet: null, box: null, noteTip: null, undo: [], redo: [], pending: null, chain: null, sel: null, buffer: null, objIds: null, roomIds: null, mA: null, tA: null, fitted: false });
   AS.last = ''; AS.savedAt = 0; try { localStorage.removeItem('ruletka_quick'); } catch (e) { }
   adjust();
 }
@@ -4340,7 +4341,7 @@ resize();
 /* Программа для ЭВМ «Скан → План». © d1sco, 2026. Все права защищены. */
 // ================== Вкладка «Рулетка»: подложка БТИ + DISTO + обход ==================
 const DISTO_SVC = '3ab10100-f831-4395-b29d-570977d5bf94', DISTO_DIST = '3ab10101-f831-4395-b29d-570977d5bf94', DISTO_UNIT = '3ab10102-f831-4395-b29d-570977d5bf94';
-const M = { pts: [], meas: [], edges: [], rooms: [], chains: [], objs: [], notes: [], ortho: true, nextId: 1, nextMeas: 1 };
+const M = { pts: [], meas: [], edges: [], rooms: [], chains: [], objs: [], notes: [], marks: [], ortho: true, nextId: 1, nextMeas: 1 };
 const U = { img: null, name: '', s: 0.01, rot: 0, tx: 0, ty: 0, alpha: 0.55, pdf: null, page: 1, pages: 0 }; // underlay: world = t + s*R*(u,-v)
 const T = { tool: 'walk', chain: null, pending: null, buffer: null, auto: false, bt: null, btName: '', btState: 'нет', last: null, sel: null, cal: [], undo: [], redo: [] };
 
@@ -4348,14 +4349,14 @@ const T = { tool: 'walk', chain: null, pending: null, buffer: null, auto: false,
 const ptById = id => M.pts.find(p => p.id === id);
 const PX = p => M.cond ? [p.x0, p.y0] : [p.x !== undefined ? p.x : p.x0, p.y !== undefined ? p.y : p.y0];
 const pname = id => 'Т' + id;
-function tSnap() { return JSON.stringify({ pts: M.pts, meas: M.meas, edges: M.edges, rooms: M.rooms, chains: M.chains, objs: M.objs || [], notes: M.notes || [], nextId: M.nextId, nextMeas: M.nextMeas }); }
-function tPush() { asSoon(); T.redo = []; T.undo.push(JSON.stringify({ pts: M.pts, meas: M.meas, edges: M.edges, rooms: M.rooms, chains: M.chains, objs: M.objs || [], notes: M.notes || [], nextId: M.nextId, nextMeas: M.nextMeas })); if (T.undo.length > 100) T.undo.shift(); }
+function tSnap() { return JSON.stringify({ pts: M.pts, meas: M.meas, edges: M.edges, rooms: M.rooms, chains: M.chains, objs: M.objs || [], notes: M.notes || [], marks: M.marks || [], nextId: M.nextId, nextMeas: M.nextMeas }); }
+function tPush() { asSoon(); T.redo = []; T.undo.push(JSON.stringify({ pts: M.pts, meas: M.meas, edges: M.edges, rooms: M.rooms, chains: M.chains, objs: M.objs || [], notes: M.notes || [], marks: M.marks || [], nextId: M.nextId, nextMeas: M.nextMeas })); if (T.undo.length > 100) T.undo.shift(); }
 function tUndo() { if (T.pending && T.pending.got == null && !T.pending.re) { skipPending(); } if (!T.undo.length) { renderTape(); return; } T.redo.push(tSnap()); Object.assign(M, JSON.parse(T.undo.pop())); T.pending = null; T.chain = null; T.sel = null; closeTapeMenu(); adjust(); renderTape(); stat('Отменено. ↷ Вернуть — если отменили лишнее.'); }
 function tRedo() { if (!T.redo.length) return; T.undo.push(tSnap()); Object.assign(M, JSON.parse(T.redo.pop())); T.pending = null; T.chain = null; T.sel = null; closeTapeMenu(); adjust(); renderTape(); }
 // ---------- edit menu: tap (Правка), long press, right click ----------
 function distToSeg(w, a, b) { const dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy || 1e-12; let t = ((w[0] - a[0]) * dx + (w[1] - a[1]) * dy) / L2; t = Math.max(0, Math.min(1, t)); return Math.hypot(w[0] - a[0] - t * dx, w[1] - a[1] - t * dy); }
 function hitTape(w) {
-  { const r = cv.getBoundingClientRect(), sp = W2S(...w), nt = noteAt(sp[0] / devicePixelRatio, sp[1] / devicePixelRatio); if (nt) return { note: nt }; }
+  { const sp = W2S(...w), mk = markAt(sp[0] / devicePixelRatio, sp[1] / devicePixelRatio); if (mk) return { mark: mk }; const nt = noteAt(sp[0] / devicePixelRatio, sp[1] / devicePixelRatio); if (nt) return { note: nt }; }
   const p = nearestPoint(w, 9); if (p) return { pt: p };
   const tol = 10 * HITK() / S.view.s; let best = null, bd = tol;
   for (const m of M.meas) { if (m.type !== 'dist' || hasEdge(m.a, m.b)) continue; const A = ptById(m.a), B = ptById(m.b); if (!A || !B) continue; const d = distToSeg(w, PX(A), PX(B)); if (d < bd) { bd = d; best = { meas: m }; } }
@@ -4369,7 +4370,7 @@ function closeTapeMenu() { const m = document.getElementById('tmenu'); if (m) m.
 function tapeMenu(w, cx, cy) {
   closeTapeMenu();
   const h = hitTape(w); if (!h) { stat('Здесь нечего править: коснитесь точки, стены или размера'); return false; }
-  T.sel = h.note ? { note: h.note } : h.pt ? { pt: h.pt } : h.edge ? { edge: h.edge } : h.obj ? { obj: h.obj } : { meas: h.meas }; draw();
+  T.sel = h.mark ? { mark: h.mark } : h.note ? { note: h.note } : h.pt ? { pt: h.pt } : h.edge ? { edge: h.edge } : h.obj ? { obj: h.obj } : { meas: h.meas }; draw();
   const mv = m => m ? fm(m.v) + ' м' : '';
   let title, items = [];
   const remeasure = m => ['↻ Перемерить', () => { tPush(); M.meas = M.meas.filter(x => x !== m); adjust(); makePending({ type: m.type, a: m.a, b: m.b, c: m.c, d: m.d, re: true }); stat('Сделайте замер заново: ' + pendLabel(T.pending)); }];
@@ -4398,6 +4399,13 @@ function tapeMenu(w, cx, cy) {
     items.push(['▯ Пустой проём', () => { tPush(); h.edge.open = true; delete h.edge.kind; delete h.edge.dor; draw(); renderTape(); }]);
     if (h.edge.open) items.push(['▭ Это стена (не проём)', () => { tPush(); h.edge.open = false; delete h.edge.kind; delete h.edge.dor; draw(); renderTape(); }]);
     items.push(['🗑 Удалить стену', () => { tPush(); M.edges = M.edges.filter(x => x !== h.edge); M.meas = M.meas.filter(x => !(x.type === 'dist' && ((x.a === h.edge.a && x.b === h.edge.b) || (x.a === h.edge.b && x.b === h.edge.a)))); adjust(); renderTape(); }, 'danger']);
+  } else if (h.mark) {
+    const m = h.mark; title = `${MKN[m.type]} ${m.num}`;
+    items.push(['№ Изменить номер…', async () => { const v = await uiAsk('Номер:', m.num); if (v && v.trim()) { tPush(); m.num = v.trim(); draw(); } }]);
+    items.push(['↻ Повернуть направление на 45°', () => { tPush(); m.dir = (m.dir == null ? 0 : m.dir) + Math.PI / 4; draw(); }]);
+    if (m.dir != null) items.push(['➝ Убрать направление', () => { tPush(); m.dir = null; draw(); }]);
+    items.push(['✥ Передвинуть', () => stat('Ведите значок пальцем')]);
+    items.push(['🗑 Удалить', () => { tPush(); M.marks = M.marks.filter(x => x !== m); draw(); renderTape(); }, 'danger']);
   } else if (h.note) {
     const n = h.note; title = 'Выноска';
     items.push(['✎ Изменить текст…', async () => { tPush(); await noteEdit(n); renderTape(); draw(); }]);
@@ -4616,10 +4624,10 @@ function showSelBox() {
 }
 // ---------- несколько листов одного PDF в одном проекте ----------
 const PGS = { data: {} };
-const MKEYS = ['pts', 'meas', 'edges', 'rooms', 'chains', 'objs', 'notes', 'nextId', 'nextMeas', 'cond', 'axis', 'snap90', 'scaleFit', 'scaleAsked', 'ortho'];
+const MKEYS = ['pts', 'meas', 'edges', 'rooms', 'chains', 'objs', 'notes', 'marks', 'lastNum', 'nextId', 'nextMeas', 'cond', 'axis', 'snap90', 'scaleFit', 'scaleAsked', 'ortho'];
 function savePage() { if (!U.img || !U.srcPage) return; const m = {}; MKEYS.forEach(k => m[k] = M[k]); PGS.data[U.srcPage] = { m: JSON.stringify(m), u: { s: U.s, rot: U.rot, tx: U.tx, ty: U.ty, alpha: U.alpha, ptPerPx: U.ptPerPx, pw: U.pw || (U.img && U.img.width), ph: U.ph || (U.img && U.img.height) } }; }
 function pgHas(n) { const d = PGS.data[n]; if (!d) return false; try { return JSON.parse(d.m).pts.length > 0; } catch (e) { return false; } }
-function loadPageModel(pg) { const d = PGS.data[pg]; Object.assign(M, { pts: [], meas: [], edges: [], rooms: [], chains: [], objs: [], notes: [], nextId: 1, nextMeas: 1, axis: null, scaleFit: false, scaleAsked: false }); if (d) { Object.assign(M, JSON.parse(d.m)); } M.objs = M.objs || []; M.notes = M.notes || []; markObjEdges(); return d; }
+function loadPageModel(pg) { const d = PGS.data[pg]; Object.assign(M, { pts: [], meas: [], edges: [], rooms: [], chains: [], objs: [], notes: [], marks: [], nextId: 1, nextMeas: 1, axis: null, scaleFit: false, scaleAsked: false }); if (d) { Object.assign(M, JSON.parse(d.m)); } M.objs = M.objs || []; M.notes = M.notes || []; M.marks = M.marks || []; markObjEdges(); return d; }
 async function ensurePdf() { if (U.pdf || !U.src || U.src.kind !== 'pdf') return !!U.pdf; U.pdf = await pdfjsLib.getDocument({ data: U.src.bytes.slice(0) }).promise; U.pages = U.pdf.numPages; try { U.titles = await pdfTitles(U.pdf); } catch (e) { } return true; }
 async function switchPage(pg) {
   if (!(await ensurePdf())) return; if (pg === U.srcPage) return;
@@ -4631,6 +4639,15 @@ async function switchPage(pg) {
   stat(`Лист ${pg}${U.titles && U.titles[pg] ? ' · ' + pageLabel(pg) : ''}${M.pts.length ? ' — замеры этого листа на месте.' : ' — новых замеров пока нет.'}`);
 }
 function pagesWithWork() { savePage(); const ks = Object.keys(PGS.data).map(Number).filter(n => pgHas(n)).sort((a, b) => a - b); return ks.length ? ks : [U.srcPage || 1]; }
+// ---------- фото и сканы: номер, место, направление ----------
+const MKN = { photo: 'Фото', scan: 'Скан' };
+function nextNum(type) { const l = (M.lastNum || {})[type]; if (l == null) return ''; const m = String(l).match(/^(.*?)(\d+)(\D*)$/); return m ? m[1] + String(+m[2] + 1).padStart(m[2].length, '0') + m[3] : ''; }
+async function addMark(type, p, dir) {
+  draw(); const v = await uiAsk(`Номер ${type === 'photo' ? 'фото' : 'скана'}:`, nextNum(type)); if (v == null || !String(v).trim()) { draw(); return; }
+  tPush(); const num = String(v).trim(); (M.marks = M.marks || []).push({ id: (M.marks || []).reduce((m, x) => Math.max(m, x.id), 0) + 1, type, p: p.slice(), dir, num });
+  M.lastNum = M.lastNum || {}; M.lastNum[type] = num; draw(); renderTape(); stat(`${MKN[type]} ${num} отмечено${dir == null ? '' : ' с направлением'}. Следующее — тем же движением.`);
+}
+function markAt(sx, sy) { for (const r of (T.markRects || []).slice().reverse()) if (Math.hypot(sx - r.x, sy - r.y) < 18) return r.m; return null; }
 function continueFrom(p) { // начать (продолжить) обход от существующей точки
   if (T.pending && T.pending.got == null) T.pending = null;
   T.tool = 'walk'; T.mA = null; T.tA = null; T.roomIds = null;
@@ -4939,6 +4956,7 @@ function tapeDown(e, w) {
     const e1 = T.tA, e2 = ed.e; T.tA = null; if (e1 === e2) return;
     makePending({ type: 'thick', a: e1.a, b: e1.b, c: e2.a, d: e2.b }); return;
   }
+  if (t === 'photo' || t === 'scan') { T.mk = { type: t, p: w.slice(), q: w.slice() }; draw(); return; }
   if (t === 'box') { T.box = { w0: w.slice(), w1: w.slice() }; draw(); return; }
   if (t === 'note') {
     if (!T.noteTip) { const p = nearestPoint(w); T.noteTip = { tip: p ? PX(p) : w.slice(), pt: p ? p.id : null }; stat('Теперь коснитесь места, где будет текст (в ту же точку — подпись без стрелки)'); draw(); renderTape(); return; }
@@ -4967,6 +4985,8 @@ function insertBetween(arr, a, b, p, cyclic) {
 function pendLabel(p) { return p.type === 'thick' ? `толщины стены ${pname(p.a)}–${pname(p.b)} ↔ ${pname(p.c)}–${pname(p.d)}` : `${pname(p.a)} → ${pname(p.b)}`; }
 function approxOf(p) { if (p.type !== 'dist') return null; const a = PX(ptById(p.a)), b = PX(ptById(p.b)); return Math.hypot(b[0] - a[0], b[1] - a[1]); }
 function tapeMove(w) {
+  if (T.mk) { T.mk.q = w.slice(); draw(); return true; }
+  if (T.dragMark) { const d = T.dragMark; d.m.p = [w[0] + d.off[0], w[1] + d.off[1]]; draw(); return true; }
   if (T.box) { T.box.w1 = w.slice(); draw(); return true; }
   if (T.dragNote) { const d = T.dragNote; d.n.at = [w[0] + d.off[0], w[1] + d.off[1]]; draw(); return true; }
   if (T.dragPt) { const o = T.dragOff || [0, 0], x = w[0] + o[0], y = w[1] + o[1]; T.dragPt.x0 = x; T.dragPt.y0 = y; T.dragPt.x = x; T.dragPt.y = y; adjust(); draw(); return true; }
@@ -4974,7 +4994,8 @@ function tapeMove(w) {
   T.mouse = (T.tool === 'walk' && T.chain) ? snap90(T.chain[T.chain.length - 1], w) : w; if (T.tool === 'walk' && T.chain) draw();
   return false;
 }
-function tapeUp() { if (T.box) { const b = T.box; T.box = null; const big = Math.hypot(b.w1[0] - b.w0[0], b.w1[1] - b.w0[1]) * S.view.s > 15;
+function tapeUp() { if (T.dragMark) { T.dragMark = null; asSoon(); draw(); }
+  if (T.mk) { const k = T.mk; T.mk = null; const L = Math.hypot(k.q[0] - k.p[0], k.q[1] - k.p[1]) * S.view.s; const dir = L > 18 ? Math.atan2(k.q[1] - k.p[1], k.q[0] - k.p[0]) : null; addMark(k.type, k.p, dir); return; } if (T.box) { const b = T.box; T.box = null; const big = Math.hypot(b.w1[0] - b.w0[0], b.w1[1] - b.w0[1]) * S.view.s > 15;
     if (big) { const x0 = Math.min(b.w0[0], b.w1[0]), x1 = Math.max(b.w0[0], b.w1[0]), y0 = Math.min(b.w0[1], b.w1[1]), y1 = Math.max(b.w0[1], b.w1[1]); selectPts(M.pts.filter(p => { const q = PX(p); return q[0] >= x0 && q[0] <= x1 && q[1] >= y0 && q[1] <= y1; }).map(p => p.id)); } else { selectPts([]); } return; } if (T.dragNote) { T.dragNote = null; asSoon(); renderTape(); draw(); } if (T.dragPt || T.dragU) { asSoon(); T.dragPt = null; T.dragOff = null; T.dragU = null; renderTape(); draw(); } }
 function tapeDelete() {
   if (!T.sel) return; tPush();
@@ -4989,6 +5010,7 @@ function tapeDelete() {
     (M.objs || []).forEach(o => o.ids = o.ids.filter(x => x !== id)); M.objs = (M.objs || []).filter(o => o.ids.length >= 3); markObjEdges();
   } else if (T.sel.edge) { const e = T.sel.edge; M.edges = M.edges.filter(x => x !== e); }
   else if (T.sel.meas) { const m = T.sel.meas; M.meas = M.meas.filter(x => x !== m); }
+  else if (T.sel.mark) { const m = T.sel.mark; M.marks = M.marks.filter(x => x !== m); }
   else if (T.sel.note) { const n = T.sel.note; M.notes = M.notes.filter(x => x !== n); }
   else if (T.sel.obj) { const o = T.sel.obj; M.objs = M.objs.filter(x => x !== o); markObjEdges(); }
   T.sel = null; adjust(); renderTape();
@@ -5047,6 +5069,19 @@ function drawTape() {
     const tw = ctx.measureText(g.label.s).width; ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fillRect(lp[0] - tw / 2 - 4 * dpr, lp[1] - 12 * dpr, tw + 8 * dpr, 17 * dpr);
     ctx.fillStyle = '#5b3aa8'; ctx.fillText(g.label.s, lp[0], lp[1]); ctx.textAlign = 'start';
   }
+  // фото и сканы
+  T.markRects = [];
+  const drawMark = (m, ghost) => { const c = W2S(...m.p), col = m.type === 'photo' ? '#1f6feb' : '#0f8a8a', r = 8 * dpr; ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 2 * dpr; ctx.globalAlpha = ghost ? 0.6 : 1;
+    if (m.dir != null) { const a = -m.dir, L = 34 * dpr, tip = [c[0] + Math.cos(a) * L, c[1] + Math.sin(a) * L]; ctx.beginPath(); ctx.moveTo(c[0] + Math.cos(a) * r, c[1] + Math.sin(a) * r); ctx.lineTo(...tip); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(...tip); ctx.lineTo(tip[0] - 9 * dpr * Math.cos(a - 0.45), tip[1] - 9 * dpr * Math.sin(a - 0.45)); ctx.lineTo(tip[0] - 9 * dpr * Math.cos(a + 0.45), tip[1] - 9 * dpr * Math.sin(a + 0.45)); ctx.closePath(); ctx.fill();
+      if (m.type === 'photo') { ctx.lineWidth = 1 * dpr; ctx.setLineDash([3 * dpr, 3 * dpr]); for (const s0 of [-0.45, 0.45]) { ctx.beginPath(); ctx.moveTo(...c); ctx.lineTo(c[0] + Math.cos(a + s0) * L * 0.9, c[1] + Math.sin(a + s0) * L * 0.9); ctx.stroke(); } ctx.setLineDash([]); ctx.lineWidth = 2 * dpr; } }
+    if (m.type === 'scan') { ctx.beginPath(); for (let i = 0; i < 3; i++) { const a = -Math.PI / 2 + i * 2 * Math.PI / 3; ctx[i ? 'lineTo' : 'moveTo'](c[0] + Math.cos(a) * r * 1.2, c[1] + Math.sin(a) * r * 1.2); } ctx.closePath(); ctx.fillStyle = '#fff'; ctx.fill(); ctx.stroke(); }
+    else { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(c[0] - r, c[1] - r * 0.7, 2 * r, 1.4 * r, 3 * dpr) : ctx.rect(c[0] - r, c[1] - r * 0.7, 2 * r, 1.4 * r); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.arc(c[0], c[1], r * 0.38, 0, 7); ctx.stroke(); }
+    if (m.num != null) { const t = (m.type === 'photo' ? 'Ф ' : 'Скан ') + m.num; ctx.font = `bold ${11.5 * dpr}px Golos Text, Segoe UI`; const tw = ctx.measureText(t).width; const ang = m.dir != null ? -m.dir : -Math.PI / 4; const ox = Math.cos(ang) < 0 ? 14 * dpr : -tw - 14 * dpr, oy = Math.sin(ang) < 0 ? 18 * dpr : -10 * dpr;
+      ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.fillRect(c[0] + ox - 3 * dpr, c[1] + oy - 12 * dpr, tw + 6 * dpr, 16 * dpr); ctx.fillStyle = col; ctx.fillText(t, c[0] + ox, c[1] + oy); }
+    ctx.globalAlpha = 1; if (!ghost) T.markRects.push({ m, x: c[0] / dpr, y: c[1] / dpr }); };
+  for (const m of M.marks || []) drawMark(m, false);
+  if (T.mk) { const L = Math.hypot(T.mk.q[0] - T.mk.p[0], T.mk.q[1] - T.mk.p[1]) * S.view.s; drawMark({ type: T.mk.type, p: T.mk.p, dir: L > 18 ? Math.atan2(T.mk.q[1] - T.mk.p[1], T.mk.q[0] - T.mk.p[0]) : null, num: null }, true); }
   // выноски
   T.noteRects = [];
   for (const n of M.notes || []) {
@@ -5146,6 +5181,8 @@ const TTOOLS = [['walk', 'Обход', 'щёлкайте углы по поря�
   ['room', 'Помещение', 'щёлкните точки контура по порядку и снова первую'],
   ['obj', 'Объект', 'лестница, пандус, шахта, колонна: коснитесь углов по порядку (первые две точки — НИЗ лестницы или пандуса) и снова первой точки, затем выберите тип'],
   ['note', 'Выноска', 'коснитесь места, на которое указывает стрелка, затем места для текста и введите комментарий. Коснуться дважды в одно место — подпись без стрелки. Текст выноски можно двигать пальцем'],
+  ['photo', 'Фото', 'встаньте пальцем туда, откуда снимали, и проведите в сторону съёмки — появится стрелка; затем номер фото (по умолчанию следующий)'],
+  ['scan', 'Скан', 'коснитесь места станции сканера (можно провести — направление); номер скана подставится следующий'],
   ['box', 'Выделить', 'проведите пальцем рамку вокруг части чертежа (или «Выделить всё») — появится проверка невязок и кнопка «Уравнять»'],
   ['drag', 'Двигать точку', 'перетащите точку, если начальное положение по БТИ сильно неверно (Shift + перетаскивание фона — сдвиг подложки)'],
   ['select', '✎ Правка', 'коснитесь точки, стены или размера — откроется меню: перемерить, изменить число, выключить, удалить. В любом инструменте то же меню — долгое нажатие или правый щелчок']];
@@ -5156,8 +5193,8 @@ function renderTape() {
   const R = T.result || {};
   const rows = M.meas.filter(m => m.type !== 'line' && m.type !== 'angle').slice().reverse();
   const warn = m => Math.abs(m.res || 0) > 0.015 ? 'bad' : Math.abs(m.res || 0) > 0.005 ? 'warn' : 'ok';
-  const TICON = { walk: '⬠', meas: '↔', online: '⊸', open: '🚪', thick: '▥', room: '▢', obj: '◆', note: '💬', box: '⬚', drag: '✥', select: '✎' };
-  const TSHORT = { walk: 'Обход', meas: 'Замер', online: 'На стене', open: 'Дверь', thick: 'Толщина', room: 'Помещ.', obj: 'Объект', note: 'Выноска', box: 'Выделить', drag: 'Двигать', select: 'Правка' };
+  const TICON = { walk: '⬠', meas: '↔', online: '⊸', open: '🚪', thick: '▥', room: '▢', obj: '◆', note: '💬', photo: '📷', scan: '◬', box: '⬚', drag: '✥', select: '✎' };
+  const TSHORT = { walk: 'Обход', meas: 'Замер', online: 'На стене', open: 'Дверь', thick: 'Толщина', room: 'Помещ.', obj: 'Объект', note: 'Выноска', photo: 'Фото', scan: 'Скан', box: 'Выделить', drag: 'Двигать', select: 'Правка' };
   // панель инструментов на чертеже — всегда под рукой
   let rail = document.getElementById('trail'); if (!rail) { rail = document.createElement('div'); rail.id = 'trail'; $('#main').appendChild(rail); }
   rail.innerHTML = TTOOLS.map(t => `<button data-tt="${t[0]}" class="${T.tool === t[0] ? 'on' : ''}" title="${escH(t[1] + ': ' + t[2])}"><i>${TICON[t[0]] || '•'}</i><span>${TSHORT[t[0]] || t[1]}</span></button>`).join('');
@@ -5280,7 +5317,7 @@ async function exportOverlayPdf() {
       if (!drawn && U.srcPage === curPg) { const cv2 = document.createElement('canvas'); cv2.width = U.img.width; cv2.height = U.img.height; const x = cv2.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, cv2.width, cv2.height); x.drawImage(U.img, 0, 0);
         const jb = await (await fetch(cv2.toDataURL('image/jpeg', 0.92))).arrayBuffer(); page.drawImage(await doc.embedJpg(jb), { x: 0, y: 0, width: W, height: H }); }
     } else {
-      const xs = M.pts.map(PX).concat((M.notes || []).map(n => n.at)); const x0 = Math.min(...xs.map(q => q[0])), y0 = Math.min(...xs.map(q => q[1])), x1 = Math.max(...xs.map(q => q[0])), y1 = Math.max(...xs.map(q => q[1]));
+      const xs = M.pts.map(PX).concat((M.notes || []).map(n => n.at), (M.marks || []).map(m => m.p)); const x0 = Math.min(...xs.map(q => q[0])), y0 = Math.min(...xs.map(q => q[1])), x1 = Math.max(...xs.map(q => q[0])), y1 = Math.max(...xs.map(q => q[1]));
       const k = 72 / 0.0254 / 100; W = (x1 - x0) * k + 240; H = (y1 - y0) * k + 160; toPt = (X, Y) => [(X - x0) * k + 120, (Y - y0) * k + 80]; page = doc.addPage([W, H]);
     }
     const P2 = p => toPt(...PX(p));
@@ -5317,6 +5354,14 @@ async function exportOverlayPdf() {
     for (const R of M.rooms) { const pts = R.ids.map(ptById).filter(Boolean).map(P2); if (pts.length < 3) continue; const c = [pts.reduce((s0, q) => s0 + q[0], 0) / pts.length, pts.reduce((s0, q) => s0 + q[1], 0) / pts.length];
       let area = 0; try { area = TAPE.roomInfo(M, R).area; } catch (e) { }
       text(`${R.num}. ${R.name}`, [c[0], c[1] + fs * 0.7], fs * 1.05, BLUE); text(SHEET.fmtArea(area) + ' м²', [c[0], c[1] - fs * 0.7], fs, BLUE); }
+    // фото и сканы
+    for (const m of M.marks || []) { const c = toPt(...m.p), col = m.type === 'photo' ? rgb(0.12, 0.43, 0.92) : rgb(0.06, 0.54, 0.54), r = fs * 0.55;
+      if (m.dir != null) { const q = toPt(m.p[0] + Math.cos(m.dir), m.p[1] + Math.sin(m.dir)); const a = Math.atan2(q[1] - c[1], q[0] - c[0]), L = fs * 2.6, tip = [c[0] + Math.cos(a) * L, c[1] + Math.sin(a) * L];
+        page.drawLine({ start: { x: c[0] + Math.cos(a) * r, y: c[1] + Math.sin(a) * r }, end: { x: tip[0], y: tip[1] }, thickness: lw, color: col });
+        page.drawSvgPath(`M0 0L${-fs * 0.7 * Math.cos(a - 0.45)} ${fs * 0.7 * Math.sin(a - 0.45)}L${-fs * 0.7 * Math.cos(a + 0.45)} ${fs * 0.7 * Math.sin(a + 0.45)}Z`, { x: tip[0], y: tip[1], color: col, borderWidth: 0 }); }
+      if (m.type === 'scan') page.drawSvgPath(`M0 ${-r * 1.2}L${r * 1.04} ${r * 0.6}L${-r * 1.04} ${r * 0.6}Z`, { x: c[0], y: c[1], color: rgb(1, 1, 1), borderColor: col, borderWidth: lw });
+      else { page.drawRectangle({ x: c[0] - r, y: c[1] - r * 0.7, width: 2 * r, height: 1.4 * r, color: rgb(1, 1, 1), borderColor: col, borderWidth: lw }); page.drawCircle({ x: c[0], y: c[1], size: r * 0.38, borderColor: col, borderWidth: lw * 0.8 }); }
+      const lab = (m.type === 'photo' ? 'Ф ' : 'Скан ') + m.num; if (m.dir != null) { const q = toPt(m.p[0] + Math.cos(m.dir), m.p[1] + Math.sin(m.dir)); const a = Math.atan2(q[1] - c[1], q[0] - c[0]); text(lab, [c[0] - Math.cos(a) * r * 2.6, c[1] - Math.sin(a) * r * 2.6 - fs * 0.3], fs * 0.85, col); } else text(lab, [c[0] + r * 1.4, c[1] + r * 1.2], fs * 0.85, col, 0, 'l'); }
     // выноски
     const ORG = rgb(0.85, 0.28, 0.06);
     for (const n of M.notes || []) { const at = toPt(...n.at), ls = noteLines(n.text), fsn = fs * 0.95;
@@ -5366,6 +5411,12 @@ function tapePlan() {
     for (const [a, b, w] of g.lines) extra.push({ a, b, w });
     for (const d of g.dots) { const r = 0.04; for (let i = 0; i < 6; i++) { const a1 = i * Math.PI / 3, a2 = (i + 1) * Math.PI / 3; extra.push({ a: [d[0] + r * Math.cos(a1), d[1] + r * Math.sin(a1)], b: [d[0] + r * Math.cos(a2), d[1] + r * Math.sin(a2)], w: 0.35 }); } }
     texts.push({ p: g.label.p, s: g.label.s, h: 2.2, rot: 0 }); }
+  for (const m of M.marks || []) { const c = PR({ x0: m.p[0], y0: m.p[1], x: m.p[0], y: m.p[1] }); const r = 0.12;
+    if (m.type === 'scan') { const v = [0, 1, 2].map(i => { const a = Math.PI / 2 + i * 2 * Math.PI / 3; return [c[0] + Math.cos(a) * r * 1.2, c[1] + Math.sin(a) * r * 1.2]; }); for (let i = 0; i < 3; i++) extra.push({ a: v[i], b: v[(i + 1) % 3], w: 0.25, layer: 'FOTO_SKAN' }); }
+    else { const q = [[-r, -r * 0.7], [r, -r * 0.7], [r, r * 0.7], [-r, r * 0.7]].map(d => [c[0] + d[0], c[1] + d[1]]); for (let i = 0; i < 4; i++) extra.push({ a: q[i], b: q[(i + 1) % 4], w: 0.25, layer: 'FOTO_SKAN' }); }
+    if (m.dir != null) { const t0 = PR({ x0: m.p[0] + Math.cos(m.dir), y0: m.p[1] + Math.sin(m.dir), x: m.p[0] + Math.cos(m.dir), y: m.p[1] + Math.sin(m.dir) }); const a = Math.atan2(t0[1] - c[1], t0[0] - c[0]), L = 0.55, tip = [c[0] + Math.cos(a) * L, c[1] + Math.sin(a) * L];
+      extra.push({ a: [c[0] + Math.cos(a) * r, c[1] + Math.sin(a) * r], b: tip, w: 0.25, layer: 'FOTO_SKAN' }, { a: tip, b: [tip[0] - 0.15 * Math.cos(a - 0.4), tip[1] - 0.15 * Math.sin(a - 0.4)], w: 0.25, layer: 'FOTO_SKAN' }, { a: tip, b: [tip[0] - 0.15 * Math.cos(a + 0.4), tip[1] - 0.15 * Math.sin(a + 0.4)], w: 0.25, layer: 'FOTO_SKAN' }); }
+    texts.push({ p: [c[0] + 0.25, c[1] + 0.25], s: (m.type === 'photo' ? 'Ф ' : 'Скан ') + m.num, h: 2.0, rot: 0 }); }
   for (const n of M.notes || []) { const at = PR({ x0: n.at[0], y0: n.at[1], x: n.at[0], y: n.at[1] }); const ls = noteLines(n.text);
     ls.forEach((l, i) => texts.push({ p: [at[0], at[1] - (i - (ls.length - 1) / 2) * 0.32], s: l, h: 2.2, rot: 0 }));
     if (n.arrow && (n.tip || n.pt != null)) { const tq = noteTip(n), tp = PR({ x0: tq[0], y0: tq[1], x: tq[0], y: tq[1] }); const dx = tp[0] - at[0], dy = tp[1] - at[1], L = Math.hypot(dx, dy) || 1; const st = [at[0] + dx / L * 0.35, at[1] + dy / L * 0.35];
