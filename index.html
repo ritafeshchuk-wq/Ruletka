@@ -211,7 +211,7 @@ header{overflow-x:auto;scrollbar-width:none}header::-webkit-scrollbar{display:no
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 1.3 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 1.4 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -1822,7 +1822,7 @@ const SHEET = (() => {
       line([A[0] - dx, A[1] - dy], [A[0] + dx, A[1] + dy], 'RAZMERY', 0.35);
       line([B[0] - dx, B[1] - dy], [B[0] + dx, B[1] + dy], 'RAZMERY', 0.35);
       let rot = Math.atan2(uy, ux) * 180 / Math.PI; if (rot > 90.5) rot -= 180; if (rot <= -89.5) rot += 180;
-      const val = String(Math.round((d.val != null ? d.val : len) * 1000));
+      const val = (d.val != null ? d.val : len).toFixed(3).replace('.', ',');
       const h = d.kind === 'overall' ? 3.0 : 2.5;
       const tw = val.length * h * 0.6 * k;
       // text above line (on side away from object if possible): use normal direction
@@ -2709,6 +2709,7 @@ const stat = t => $('#stat').textContent = t;
 const help = t => $('#help-line').textContent = t || '';
 function busy(t) { busyEl.style.display = t ? 'block' : 'none'; busyEl.textContent = t || ''; }
 const nf = (v, d = 2) => Number(v).toFixed(d);
+const fm = v => Number(v).toFixed(3).replace('.', ','); // метры, 3 знака после запятой
 const escH = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 // ---------- worker ----------
@@ -4165,7 +4166,7 @@ function tapeMenu(w, cx, cy) {
   closeTapeMenu();
   const h = hitTape(w); if (!h) { stat('Здесь нечего править: коснитесь точки, стены или размера'); return false; }
   T.sel = h.pt ? { pt: h.pt } : h.edge ? { edge: h.edge } : { meas: h.meas }; draw();
-  const mv = m => m ? Math.round(m.v * 1000) + ' мм' : '';
+  const mv = m => m ? fm(m.v) + ' м' : '';
   let title, items = [];
   const remeasure = m => ['↻ Перемерить', () => { tPush(); M.meas = M.meas.filter(x => x !== m); adjust(); makePending({ type: m.type, a: m.a, b: m.b, c: m.c, d: m.d, re: true }); stat('Сделайте замер заново: ' + pendLabel(T.pending)); }];
   const edit = m => ['✎ Изменить число…', () => { uiAsk('Новое значение (м или мм):', nf(m.v, 3)).then(s => { const v = parseManual(s || ''); if (v) { tPush(); m.v = v; adjust(); renderTape(); } }); }];
@@ -4407,7 +4408,7 @@ function onReading(v, src) {
   if (T.pending) {
     T.pending.got = v;
     if (T.auto) acceptPending(); else renderTape();
-  } else { T.buffer = T.last; stat(`Замер ${nf(v, 3)} м в буфере — укажите на плане, откуда и куда он.`); renderTape(); }
+  } else { T.buffer = T.last; stat(`Замер ${fm(v)} м в буфере — укажите на плане, откуда и куда он.`); renderTape(); }
 }
 let ACTX = null;
 function actx() { try { if (!ACTX) ACTX = new (window.AudioContext || window.webkitAudioContext)(); if (ACTX.state === 'suspended') ACTX.resume(); } catch (e) { } return ACTX; }
@@ -4592,8 +4593,8 @@ function drawTape() {
     if (L * S.view.s > 35) {
       ctx.save(); ctx.translate((sa[0] + sb[0]) / 2, (sa[1] + sb[1]) / 2); let r = Math.atan2(sb[1] - sa[1], sb[0] - sa[0]); if (r > Math.PI / 2) r -= Math.PI; if (r < -Math.PI / 2) r += Math.PI; ctx.rotate(r);
       ctx.textAlign = 'center'; ctx.font = `bold ${12 * dpr}px Golos Text, Segoe UI`;
-      if (m) { const bad = !M.cond && Math.abs(m.res || 0) > 0.005; ctx.fillStyle = bad ? '#c4372f' : '#111'; ctx.fillText(Math.round(m.v * 1000) + (bad ? ` (${m.res > 0 ? '+' : ''}${Math.round(m.res * 1000)})` : ''), 0, -7 * dpr); }
-      else { ctx.fillStyle = '#9aa3b2'; ctx.font = `${11 * dpr}px Golos Text, Segoe UI`; ctx.fillText('≈' + Math.round(L * 1000), 0, -7 * dpr); }
+      if (m) { const bad = !M.cond && Math.abs(m.res || 0) > 0.005; ctx.fillStyle = bad ? '#c4372f' : '#111'; ctx.fillText(fm(m.v) + (bad ? ` (${m.res > 0 ? '+' : ''}${Math.round(m.res * 1000)} мм)` : ''), 0, -7 * dpr); }
+      else { ctx.fillStyle = '#9aa3b2'; ctx.font = `${11 * dpr}px Golos Text, Segoe UI`; ctx.fillText('≈' + fm(L), 0, -7 * dpr); }
       ctx.restore();
     }
   }
@@ -4605,12 +4606,12 @@ function drawTape() {
     ctx.strokeStyle = m.on === false ? '#ccc' : bad ? '#c4372f' : '#7b4bd6'; ctx.lineWidth = 1.2 * dpr; ctx.setLineDash([3 * dpr, 3 * dpr]);
     ctx.beginPath(); ctx.moveTo(...sa); ctx.lineTo(...sb); ctx.stroke(); ctx.setLineDash([]);
     ctx.fillStyle = ctx.strokeStyle; ctx.font = `${11 * dpr}px Golos Text, Segoe UI`; ctx.textAlign = 'center';
-    ctx.fillText(Math.round(m.v * 1000) + (bad ? ` (${m.res > 0 ? '+' : ''}${Math.round(m.res * 1000)})` : ''), (sa[0] + sb[0]) / 2, (sa[1] + sb[1]) / 2 - 5 * dpr); ctx.textAlign = 'start';
+    ctx.fillText(fm(m.v) + (bad ? ` (${m.res > 0 ? '+' : ''}${Math.round(m.res * 1000)} мм)` : ''), (sa[0] + sb[0]) / 2, (sa[1] + sb[1]) / 2 - 5 * dpr); ctx.textAlign = 'start';
   }
   for (const m of M.meas) if (m.type === 'thick') {
     const a = PX(ptById(m.a)), b = PX(ptById(m.b)), c = PX(ptById(m.c)), d = PX(ptById(m.d));
     const [x, y] = W2S((a[0] + b[0] + c[0] + d[0]) / 4, (a[1] + b[1] + c[1] + d[1]) / 4);
-    ctx.fillStyle = Math.abs(m.res || 0) > 0.005 ? '#c4372f' : '#c4372f'; ctx.font = `bold ${11 * dpr}px Golos Text, Segoe UI`; ctx.textAlign = 'center'; ctx.fillText('δ' + Math.round(m.v * 1000), x, y); ctx.textAlign = 'start';
+    ctx.fillStyle = Math.abs(m.res || 0) > 0.005 ? '#c4372f' : '#c4372f'; ctx.font = `bold ${11 * dpr}px Golos Text, Segoe UI`; ctx.textAlign = 'center'; ctx.fillText('δ ' + fm(m.v), x, y); ctx.textAlign = 'start';
   }
   // pending
   const pd = T.pending;
@@ -4665,12 +4666,12 @@ function renderTape() {
   <div class="chk"><input type="checkbox" id="auto" ${T.auto ? 'checked' : ''}><label for="auto">Принимать замер сразу, без подтверждения</label></div>
   ${pd ? `<div class="pend">
      <div><b>Замер ${pendLabel(pd)}</b>${ap ? ` <span class="hint">(по подложке ≈ ${nf(ap, 2)} м)</span>` : ''}</div>
-     ${pd.got != null ? `<div class="big">${nf(pd.got, 3)} м</div>
+     ${pd.got != null ? `<div class="big">${fm(pd.got)} м</div>
        ${ap && Math.abs(pd.got - ap) / ap > 0.2 ? '<div class="bad">Сильно отличается от подложки — та ли стена?</div>' : ''}
        <div class="row"><button class="pri" id="pAcc">Принять (Enter)</button><button id="pRej">Отклонить</button></div>`
       : `<div class="hint">Ожидаю замер с рулетки или ввод вручную… <a href="#" id="pSkip">пропустить (Esc)</a></div>`}</div>`
-    : (T.buffer ? `<div class="hint">В буфере: <b>${nf(T.buffer.v, 3)} м</b> — укажите точки на плане</div>` : '')}
-  ${T.last ? `<div class="hint">Последний замер: ${nf(T.last.v, 3)} м (${T.last.src === 'bt' ? 'DISTO' : 'вручную'})</div>` : ''}
+    : (T.buffer ? `<div class="hint">В буфере: <b>${fm(T.buffer.v)} м</b> — укажите точки на плане</div>` : '')}
+  ${T.last ? `<div class="hint">Последний замер: ${fm(T.last.v)} м (${T.last.src === 'bt' ? 'DISTO' : 'вручную'})</div>` : ''}
   ${T.tool === 'walk' && T.chain ? `<div class="row"><span class="hint" style="margin:0;flex:1">Обход идёт от <b>${pname(T.chain[T.chain.length - 1])}</b></span><button id="bEnd" class="pri">■ Закончить обход</button></div>` : T.tool === 'walk' ? '<p class="hint">Обход не начат: коснитесь точки — продолжить от неё; пустого места — новая точка.</p>' : ''}
   <h3>Отрисовка</h3>
   <div class="row seg2"><button id="mFact" class="${M.cond ? '' : 'on'}">Факт по замерам</button><button id="mCond" class="${M.cond ? 'on' : ''}">Условно по чертежу</button></div>
@@ -4686,7 +4687,7 @@ function renderTape() {
   <div class="hint">Точек ${M.pts.length} · замеров ${M.meas.filter(m => m.type !== 'line').length} · помещений ${M.rooms.length}<br>
   Наибольшая невязка: <b class="${(R.maxR || 0) > 0.015 ? 'bad' : (R.maxR || 0) > 0.005 ? 'warn' : 'ok'}">${Math.round((R.maxR || 0) * 1000)} мм</b> ${(R.maxR || 0) > 0.005 ? '— замеры не сходятся, проверьте красные' : '— длины сходятся'}</div>
   ${M.rooms.map(Rm => { const i = TAPE.roomInfo(M, Rm); return `<div class="item" data-room="${Rm.num}"><input type="text" value="${escH(Rm.name)}" data-rn="${Rm.num}" style="width:120px">${Rm.num}<span class="q ${i.diags < i.need ? 'warn' : 'ok'}">${SHEET.fmtArea(i.area)} м² · стороны ${i.sides}/${i.k} · диаг. ${i.diags}${i.diags < i.need ? ' (нужно ' + i.need + ')' : ''}</span></div>`; }).join('')}
-  <div class="list" style="margin-top:6px">${rows.map(m => `<div class="item"><input type="checkbox" data-mon="${m.id}" ${m.on !== false ? 'checked' : ''}><span>${m.type === 'thick' ? 'δ ' : ''}${pname(m.a)}–${pname(m.type === 'thick' ? m.c : m.b)}</span><input type="text" data-mv="${m.id}" value="${nf(m.v, 3)}" style="width:62px"><span class="q ${warn(m)}">${m.res != null ? (m.res > 0 ? '+' : '') + Math.round(m.res * 1000) + ' мм' : ''}</span><button data-mdel="${m.id}" style="padding:1px 6px">×</button></div>`).join('') || '<div class="hint" style="padding:6px">Замеров пока нет</div>'}</div>
+  <div class="list" style="margin-top:6px">${rows.map(m => `<div class="item"><input type="checkbox" data-mon="${m.id}" ${m.on !== false ? 'checked' : ''}><span>${m.type === 'thick' ? 'δ ' : ''}${pname(m.a)}–${pname(m.type === 'thick' ? m.c : m.b)}</span><input type="text" data-mv="${m.id}" value="${fm(m.v)}" style="width:72px"><span class="q ${warn(m)}">${m.res != null ? (m.res > 0 ? '+' : '') + Math.round(m.res * 1000) + ' мм' : ''}</span><button data-mdel="${m.id}" style="padding:1px 6px">×</button></div>`).join('') || '<div class="hint" style="padding:6px">Замеров пока нет</div>'}</div>
   <div class="row next"><button class="pri" id="toSheetT" ${M.rooms.length || M.edges.length ? '' : 'disabled'}>Оформить листы</button></div>`;
   $('#uLoad').onclick = () => $('#uFile').click();
   $('#uFile').onchange = e => e.target.files[0] && loadUnderlay(e.target.files[0]);
