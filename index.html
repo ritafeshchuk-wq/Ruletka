@@ -211,7 +211,7 @@ header{overflow-x:auto;scrollbar-width:none}header::-webkit-scrollbar{display:no
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 1.4 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 1.5 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -2030,7 +2030,9 @@ const TAPE = (() => {
       for (const ch of M.chains || []) for (let j = 1; j + 1 < ch.length; j++) angCons.push([ch[j - 1], ch[j], ch[j + 1]]);
     }
     const seenA = new Set(); const AC = [];
-    for (const c of angCons) { const key = c.join(','); if (!seenA.has(key) && idx.has(c[0]) && idx.has(c[1]) && idx.has(c[2])) { seenA.add(key); AC.push(c); } }
+    const fixedAng = new Set((M.meas || []).filter(m => m.type === 'angle' && m.on !== false).map(m => m.b));
+    const freeIds = new Set((M.pts || []).filter(p => p.free).map(p => p.id));
+    for (const c of angCons) { const key = c.join(','); if (!seenA.has(key) && idx.has(c[0]) && idx.has(c[1]) && idx.has(c[2]) && !freeIds.has(c[1]) && !fixedAng.has(c[1])) { seenA.add(key); AC.push(c); } }
     const meas = (M.meas || []).filter(m => m.on !== false && [m.a, m.b, m.c, m.d, m.p].filter(v => v !== undefined).every(id => idx.has(id)));
     let iter = 0;
     const N = 2 * n;
@@ -2046,6 +2048,8 @@ const TAPE = (() => {
           const i = idx.get(m.a), j = idx.get(m.b);
           const dx = X[2 * j] - X[2 * i], dy = X[2 * j + 1] - X[2 * i + 1], L = Math.hypot(dx, dy) || 1e-9;
           add([[2 * i, -dx / L], [2 * i + 1, -dy / L], [2 * j, dx / L], [2 * j + 1, dy / L]], m.v - L, 1 / (SIG.dist ** 2));
+        } else if (m.type === 'angle') { // заданный угол в вершине b (от b→c против часовой до b→a), m.v в градусах
+          const r = angleResJ(X, idx.get(m.a), idx.get(m.b), idx.get(m.c)); if (r) add(r.J, m.v * Math.PI / 180 - r.f, 1 / ((0.05 * Math.PI / 180) ** 2));
         } else if (m.type === 'line' || m.type === 'thick') {
           const pairs = m.type === 'line' ? [[m.p, 0]] : [[m.c, m.v * (m.side || 1)], [m.d, m.v * (m.side || 1)]];
           for (const [pid, target] of pairs) {
@@ -2079,6 +2083,7 @@ const TAPE = (() => {
       m.res = null; if (m.on === false || !meas.includes(m)) continue;
       if (m.type === 'dist') { const a = P[idx.get(m.a)], b = P[idx.get(m.b)]; m.calc = Math.hypot(b.x - a.x, b.y - a.y); m.res = m.v - m.calc; }
       else if (m.type === 'line') { const r = lineResJ(X, idx.get(m.a), idx.get(m.b), idx.get(m.p)); m.calc = r.f; m.res = -r.f; }
+      else if (m.type === 'angle') { const r = angleResJ(X, idx.get(m.a), idx.get(m.b), idx.get(m.c)); m.calc = r ? r.f * 180 / Math.PI : null; m.res = null; continue; }
       else if (m.type === 'thick') { const r1 = lineResJ(X, idx.get(m.a), idx.get(m.b), idx.get(m.c)), r2 = lineResJ(X, idx.get(m.a), idx.get(m.b), idx.get(m.d)); m.calc = (Math.abs(r1.f) + Math.abs(r2.f)) / 2; m.res = m.v - m.calc; }
       maxR = Math.max(maxR, Math.abs(m.res));
     }
@@ -2131,11 +2136,12 @@ const TAPE = (() => {
     const has = (a, b) => (M.meas || []).some(m => m.type === 'dist' && m.on !== false && ((m.a === a && m.b === b) || (m.a === b && m.b === a)));
     let sides = 0; for (let j = 0; j < k; j++) if (has(ids[j], ids[(j + 1) % k])) sides++;
     let diags = 0; for (let i = 0; i < k; i++) for (let j = i + 2; j < k; j++) if (!(i === 0 && j === k - 1) && has(ids[i], ids[j])) diags++;
+    diags += (M.meas || []).filter(m => m.type === 'angle' && m.on !== false && ids.includes(m.b)).length;
     const P = ids.map(id => M.pts.find(p => p.id === id));
     let area = 0; for (let i = 0; i < k; i++) { const a = P[i], b = P[(i + 1) % k]; area += a.x * b.y - b.x * a.y; }
     return { sides, k, diags, need: Math.max(0, k - 3), area: Math.abs(area / 2) };
   }
-  return { solve, roomInfo, SIG };
+  return { solve, roomInfo, SIG, angleAt: (X, i, j, k) => { const r = angleResJ(X, i, j, k); return r ? r.f * 180 / Math.PI : null; } };
 })();
 
 // ---- core.js ----
@@ -4176,6 +4182,12 @@ function tapeMenu(w, cx, cy) {
     const id = h.pt.id, nm = M.meas.filter(m => m.type !== 'line' && [m.a, m.b, m.c, m.d].includes(id)).length;
     title = `Точка ${pname(id)}` + (nm ? ` · замеров: ${nm}` : '');
     items.push(['▶ Продолжить обход от этой точки', () => continueFrom(h.pt)]);
+    { const tri = cornerTriple(id), am = M.meas.find(m => m.type === 'angle' && m.b === id), cur = tri ? angDeg(tri.a, tri.b, tri.c) : null;
+      if (tri) {
+        items.push([`∠ Задать угол…${am ? ' (задан ' + fdeg(am.v) + ')' : cur != null ? ' (сейчас ' + fdeg(cur) + ')' : ''}`, () => setAngle(id)]);
+        if (am) items.push(['∠ Убрать заданный угол', () => { tPush(); M.meas = M.meas.filter(m => m !== am); adjust(); renderTape(); draw(); }]);
+        items.push([h.pt.free ? '∟ Угол около 90° считать прямым' : '∠ Угол не прямой — не выравнивать', () => { tPush(); h.pt.free = !h.pt.free; adjust(); renderTape(); draw(); }]);
+      } }
     items.push(['✥ Передвинуть', () => { stat('Просто ведите точку ' + pname(id) + ' пальцем'); }]);
     items.push([nm ? `🗑 Удалить точку и её замеры (${nm})` : '🗑 Удалить точку', () => { T.sel = { pt: h.pt }; tapeDelete(); stat('Точка удалена. ↶ Отменить — вернуть'); }, 'danger']);
   } else if (h.edge) {
@@ -4196,6 +4208,31 @@ function tapeMenu(w, cx, cy) {
   el.style.left = x + 'px'; el.style.top = y + 'px';
   el.querySelectorAll('button').forEach(b => b[window.PointerEvent ? 'onpointerup' : 'onclick'] = ev => { ev.stopPropagation(); ev.preventDefault(); const i = b.dataset.i; closeTapeMenu(); if (i !== 'x') items[+i][1](); T.sel = null; renderTape(); draw(); });
   return true;
+}
+// соседи точки по контуру помещения (обход против часовой — угол внутренний) или по цепочке/стенам
+function cornerTriple(id) {
+  for (const R of M.rooms) { const k = R.ids.length, j = R.ids.indexOf(id); if (j < 0 || k < 3) continue;
+    let a = R.ids[(j - 1 + k) % k], c = R.ids[(j + 1) % k];
+    const poly = R.ids.map(x => ptById(x)).filter(Boolean).map(p => [p.x ?? p.x0, p.y ?? p.y0]); let ar = 0; for (let i = 0; i < poly.length; i++) { const u = poly[i], v = poly[(i + 1) % poly.length]; ar += u[0] * v[1] - v[0] * u[1]; }
+    if (ar < 0) [a, c] = [c, a]; return { a, b: id, c, room: R };
+  }
+  for (const ch of M.chains) { const j = ch.indexOf(id); if (j > 0 && j + 1 < ch.length) return { a: ch[j - 1], b: id, c: ch[j + 1] }; }
+  const nb = M.edges.filter(e => e.a === id || e.b === id).map(e => e.a === id ? e.b : e.a); if (nb.length === 2) return { a: nb[0], b: id, c: nb[1] };
+  return null;
+}
+function angDeg(a, b, c) { const P = [a, b, c].map(i => ptById(i)); if (P.some(p => !p)) return null; const X = P.flatMap(p => [p.x ?? p.x0, p.y ?? p.y0]); return TAPE.angleAt(X, 0, 1, 2); }
+const fdeg = v => Number(v).toFixed(1).replace('.', ',') + '°';
+function setAngle(id) {
+  const t = cornerTriple(id); if (!t) { uiAlert('У точки нет двух соседних стен — угол не определён.'); return; }
+  const cur = angDeg(t.a, t.b, t.c), old = M.meas.find(m => m.type === 'angle' && m.b === id);
+  uiAsk(`Угол в точке ${pname(id)}, градусы${t.room ? ' (внутренний угол помещения)' : ''}. Сейчас ${cur != null ? fdeg(cur) : '—'}:`, old ? String(old.v).replace('.', ',') : (cur != null ? cur.toFixed(1).replace('.', ',') : '')).then(sv => {
+    const v = parseFloat(String(sv || '').replace(',', '.')); if (!(v > 0 && v < 360)) return;
+    let { a, c } = t;
+    if (!t.room && cur != null && Math.abs((360 - cur) - v) < Math.abs(cur - v)) [a, c] = [c, a];
+    tPush(); M.meas = M.meas.filter(m => !(m.type === 'angle' && m.b === id));
+    M.meas.push({ id: M.nextMeas++, type: 'angle', a, b: id, c, v, on: true });
+    adjust(); renderTape(); draw(); stat(`Угол в ${pname(id)} задан: ${fdeg(v)}`);
+  });
 }
 function continueFrom(p) { // начать (продолжить) обход от существующей точки
   if (T.pending && T.pending.got == null) T.pending = null;
@@ -4577,7 +4614,7 @@ function drawTape() {
     const [x, y] = W2S(cx, cy);
     ctx.fillStyle = '#1d3f8f'; ctx.font = `bold ${13 * dpr}px Golos Text, Segoe UI`; ctx.textAlign = 'center';
     ctx.fillText(`${R.num}. ${R.name}`, x, y - 9 * dpr); ctx.font = `${12 * dpr}px Golos Text, Segoe UI`; ctx.fillText(SHEET.fmtArea(info.area) + ' м²', x, y + 7 * dpr);
-    if (info.diags < info.need) { ctx.fillStyle = '#c27c0e'; ctx.font = `${11 * dpr}px Golos Text, Segoe UI`; ctx.fillText(`нет диагонали: углы приняты 90°`, x, y + 22 * dpr); }
+    if (info.diags < info.need) { ctx.fillStyle = '#c27c0e'; ctx.font = `${11 * dpr}px Golos Text, Segoe UI`; ctx.fillText(`нет диагонали или угла: углы около 90° приняты прямыми`, x, y + 22 * dpr); }
     ctx.textAlign = 'start';
   }
   // edges
@@ -4612,6 +4649,18 @@ function drawTape() {
     const a = PX(ptById(m.a)), b = PX(ptById(m.b)), c = PX(ptById(m.c)), d = PX(ptById(m.d));
     const [x, y] = W2S((a[0] + b[0] + c[0] + d[0]) / 4, (a[1] + b[1] + c[1] + d[1]) / 4);
     ctx.fillStyle = Math.abs(m.res || 0) > 0.005 ? '#c4372f' : '#c4372f'; ctx.font = `bold ${11 * dpr}px Golos Text, Segoe UI`; ctx.textAlign = 'center'; ctx.fillText('δ ' + fm(m.v), x, y); ctx.textAlign = 'start';
+  }
+  // углы: заданные — фиолетовым, свободные — серым с текущим значением
+  for (const p of M.pts) {
+    const am = M.meas.find(m => m.type === 'angle' && m.b === p.id && m.on !== false);
+    if (!am && !p.free) continue;
+    const tri = am || cornerTriple(p.id); if (!tri) continue;
+    const val = am ? am.v : angDeg(tri.a, tri.b, tri.c); if (val == null) continue;
+    const A = PX(ptById(tri.a)), B = PX(p), C = PX(ptById(tri.c)); if (!ptById(tri.a) || !ptById(tri.c)) continue;
+    const u2 = Math.atan2(C[1] - B[1], C[0] - B[0]);
+    const mid = u2 + val * Math.PI / 360, sb = W2S(...B), dir = [Math.cos(mid), -Math.sin(mid)];
+    ctx.fillStyle = am ? '#7b4bd6' : '#8a95a3'; ctx.font = `bold ${11 * dpr}px Golos Text, Segoe UI`; ctx.textAlign = 'center';
+    ctx.fillText((am ? '∠' : '≈') + fdeg(val), sb[0] + dir[0] * 26 * dpr, sb[1] + dir[1] * 26 * dpr + 4 * dpr); ctx.textAlign = 'start';
   }
   // pending
   const pd = T.pending;
@@ -4651,7 +4700,7 @@ function renderTape() {
   if (S.step !== 'tape') return;
   const pd = T.pending, ap = pd && approxOf(pd);
   const R = T.result || {};
-  const rows = M.meas.filter(m => m.type !== 'line').slice().reverse();
+  const rows = M.meas.filter(m => m.type !== 'line' && m.type !== 'angle').slice().reverse();
   const warn = m => Math.abs(m.res || 0) > 0.015 ? 'bad' : Math.abs(m.res || 0) > 0.005 ? 'warn' : 'ok';
   side.innerHTML = `<h3>Подложка (план БТИ)</h3>
   <div class="row"><button id="uLoad">${U.img ? 'Заменить' : 'Загрузить PDF / картинку'}</button><input type="file" id="uFile" accept=".pdf,.png,.jpg,.jpeg" hidden>
