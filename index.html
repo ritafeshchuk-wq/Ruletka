@@ -211,7 +211,7 @@ header{overflow-x:auto;scrollbar-width:none}header::-webkit-scrollbar{display:no
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 1.6 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 1.7 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -1781,6 +1781,7 @@ const SHEET = (() => {
     const text = (p, s, h, rot, layer, anchor = 'middle') => T.push({ p, s, h: h * k, rot, layer, anchor });
     for (const s of plan.segs || []) { const [a, b] = segXY(s); line(a, b, 'STENY', 0.5); }
     for (const o of plan.openings || []) { const [a, b] = opXY(o); line(a, b, 'PROEMY', 0.18); }
+    for (const l of plan.extra || []) line(l.a, l.b, 'OBJEKTY', l.w || 0.25);
     if (show.thick) for (const w of plan.walls || []) {
       if (w.p) { text(w.p, String(Math.round(w.t * 1000)), 1.8, w.rot || 0, 'TOLSCH'); continue; }
       const m = (w.a + w.b) / 2, u = (w.u1 + w.u2) / 2;
@@ -1929,7 +1930,7 @@ const SHEET = (() => {
         }
         g += `<path d="${d}" stroke="#bbb" stroke-width="0.12" fill="none"/>`;
       }
-      const colors = { STENY: '#000', PROEMY: '#0a7', POMESCH: '#36c', RAZMERY: '#000', TOLSCH: '#c00', TEKST: '#000' };
+      const colors = { STENY: '#000', PROEMY: '#0a7', POMESCH: '#36c', RAZMERY: '#000', TOLSCH: '#c00', TEKST: '#000', OBJEKTY: '#000' };
       const byLayer = {};
       for (const l of prim.lines) (byLayer[l.layer + '|' + l.w] = byLayer[l.layer + '|' + l.w] || []).push(l);
       for (const key in byLayer) {
@@ -1985,7 +1986,7 @@ const SHEET = (() => {
     const o = [];
     const p = (c, v) => { o.push(String(c)); o.push(String(v)); };
     p(999, 'Скан-План 1.1. (c) d1sco, 2026. ' + 'sha256:328908ed1181127a9f21b77d19d70a47e4ad0be284785c97777810ddff0d519a'); p(0, 'SECTION'); p(2, 'HEADER'); p(9, '$ACADVER'); p(1, 'AC1009'); p(9, '$DWGCODEPAGE'); p(3, 'ANSI_1251'); p(9, '$INSUNITS'); p(70, opt.units === 'm' ? 6 : 4); p(0, 'ENDSEC');
-    const layers = { SREZ: 8, STENY: 7, PROEMY: 3, POMESCH: 5, RAZMERY: 7, TOLSCH: 1, TEKST: 7, STANCII: 4 };
+    const layers = { SREZ: 8, STENY: 7, PROEMY: 3, POMESCH: 5, RAZMERY: 7, TOLSCH: 1, TEKST: 7, STANCII: 4, OBJEKTY: 6 };
     p(0, 'SECTION'); p(2, 'TABLES'); p(0, 'TABLE'); p(2, 'LAYER'); p(70, Object.keys(layers).length);
     for (const [n, c] of Object.entries(layers)) { p(0, 'LAYER'); p(2, n); p(70, 0); p(62, c); p(6, 'CONTINUOUS'); }
     p(0, 'ENDTAB'); p(0, 'ENDSEC');
@@ -3723,7 +3724,7 @@ function renderTouchBar() {
     plan && TB.shown ? btn('del', 'Удалить') : '',
     btn('fit', '⤢'),
     pend ? btn('esc', 'Пропустить') : (TB.shown && !tape ? btn('esc', 'Esc') : ''),
-    tape && T.chain ? btn('endc', '■ Закончить обход') : (tape && (T.mA || T.tA || T.roomIds)) ? btn('esc', 'Стоп') : '',
+    tape && T.chain ? btn('endc', '■ Закончить обход') : (tape && (T.mA || T.tA || T.roomIds || T.objIds)) ? btn('esc', 'Стоп') : '',
     pend && T.pending.got != null ? btn('ok', '✓ Принять', 'pri') : ''
   ].join('');
 }
@@ -3939,7 +3940,7 @@ window.addEventListener('keydown', e => {
   else if (S.step === 'tape') {
     if (e.key === 'Enter' && T.pending && T.pending.got != null) { acceptPending(); e.preventDefault(); }
     else if (e.key === 'Escape' && document.getElementById('tmenu')) { closeTapeMenu(); draw(); }
-    else if (e.key === 'Escape') { if (T.pending) skipPending(); else { T.chain = null; T.mA = null; T.tA = null; T.roomIds = null; T.calMode = false; renderTape(); } }
+    else if (e.key === 'Escape') { if (T.pending) skipPending(); else { T.chain = null; T.mA = null; T.tA = null; T.roomIds = null; T.objIds = null; T.calMode = false; renderTape(); } }
     else if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { tRedo(); e.preventDefault(); }
     else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { tUndo(); e.preventDefault(); }
     else if (e.key === 'Delete' || e.key === 'Backspace') tapeDelete();
@@ -4144,7 +4145,7 @@ resize();
 /* Программа для ЭВМ «Скан → План». © d1sco, 2026. Все права защищены. */
 // ================== Вкладка «Рулетка»: подложка БТИ + DISTO + обход ==================
 const DISTO_SVC = '3ab10100-f831-4395-b29d-570977d5bf94', DISTO_DIST = '3ab10101-f831-4395-b29d-570977d5bf94', DISTO_UNIT = '3ab10102-f831-4395-b29d-570977d5bf94';
-const M = { pts: [], meas: [], edges: [], rooms: [], chains: [], ortho: true, nextId: 1, nextMeas: 1 };
+const M = { pts: [], meas: [], edges: [], rooms: [], chains: [], objs: [], ortho: true, nextId: 1, nextMeas: 1 };
 const U = { img: null, name: '', s: 0.01, rot: 0, tx: 0, ty: 0, alpha: 0.55, pdf: null, page: 1, pages: 0 }; // underlay: world = t + s*R*(u,-v)
 const T = { tool: 'walk', chain: null, pending: null, buffer: null, auto: false, bt: null, btName: '', btState: 'нет', last: null, sel: null, cal: [], undo: [], redo: [] };
 
@@ -4152,8 +4153,8 @@ const T = { tool: 'walk', chain: null, pending: null, buffer: null, auto: false,
 const ptById = id => M.pts.find(p => p.id === id);
 const PX = p => M.cond ? [p.x0, p.y0] : [p.x !== undefined ? p.x : p.x0, p.y !== undefined ? p.y : p.y0];
 const pname = id => 'Т' + id;
-function tSnap() { return JSON.stringify({ pts: M.pts, meas: M.meas, edges: M.edges, rooms: M.rooms, chains: M.chains, nextId: M.nextId, nextMeas: M.nextMeas }); }
-function tPush() { T.redo = []; T.undo.push(JSON.stringify({ pts: M.pts, meas: M.meas, edges: M.edges, rooms: M.rooms, chains: M.chains, nextId: M.nextId, nextMeas: M.nextMeas })); if (T.undo.length > 100) T.undo.shift(); }
+function tSnap() { return JSON.stringify({ pts: M.pts, meas: M.meas, edges: M.edges, rooms: M.rooms, chains: M.chains, objs: M.objs || [], nextId: M.nextId, nextMeas: M.nextMeas }); }
+function tPush() { T.redo = []; T.undo.push(JSON.stringify({ pts: M.pts, meas: M.meas, edges: M.edges, rooms: M.rooms, chains: M.chains, objs: M.objs || [], nextId: M.nextId, nextMeas: M.nextMeas })); if (T.undo.length > 100) T.undo.shift(); }
 function tUndo() { if (T.pending && T.pending.got == null && !T.pending.re) { skipPending(); } if (!T.undo.length) { renderTape(); return; } T.redo.push(tSnap()); Object.assign(M, JSON.parse(T.undo.pop())); T.pending = null; T.chain = null; T.sel = null; closeTapeMenu(); adjust(); renderTape(); stat('Отменено. ↷ Вернуть — если отменили лишнее.'); }
 function tRedo() { if (!T.redo.length) return; T.undo.push(tSnap()); Object.assign(M, JSON.parse(T.redo.pop())); T.pending = null; T.chain = null; T.sel = null; closeTapeMenu(); adjust(); renderTape(); }
 // ---------- edit menu: tap (Правка), long press, right click ----------
@@ -4165,13 +4166,14 @@ function hitTape(w) {
   for (const m of M.meas) { if (m.type !== 'thick') continue; const pts = [m.a, m.b, m.c, m.d].map(id => PX(ptById(id))); const c = [pts.reduce((s, q) => s + q[0], 0) / 4, pts.reduce((s, q) => s + q[1], 0) / 4]; const d = Math.hypot(w[0] - c[0], w[1] - c[1]); if (d < bd) { bd = d; best = { meas: m }; } }
   if (best) return best;
   const ed = nearestEdge(w, 10); if (ed) return { edge: ed.e, meas: distMeas(ed.e.a, ed.e.b) };
+  const ob = objAt(w); if (ob) return { obj: ob };
   return null;
 }
 function closeTapeMenu() { const m = document.getElementById('tmenu'); if (m) m.remove(); T.menuSel = null; }
 function tapeMenu(w, cx, cy) {
   closeTapeMenu();
   const h = hitTape(w); if (!h) { stat('Здесь нечего править: коснитесь точки, стены или размера'); return false; }
-  T.sel = h.pt ? { pt: h.pt } : h.edge ? { edge: h.edge } : { meas: h.meas }; draw();
+  T.sel = h.pt ? { pt: h.pt } : h.edge ? { edge: h.edge } : h.obj ? { obj: h.obj } : { meas: h.meas }; draw();
   const mv = m => m ? fm(m.v) + ' м' : '';
   let title, items = [];
   const remeasure = m => ['↻ Перемерить', () => { tPush(); M.meas = M.meas.filter(x => x !== m); adjust(); makePending({ type: m.type, a: m.a, b: m.b, c: m.c, d: m.d, re: true }); stat('Сделайте замер заново: ' + pendLabel(T.pending)); }];
@@ -4196,6 +4198,14 @@ function tapeMenu(w, cx, cy) {
     else items.push(['📏 Замерить эту стену', () => makePending({ type: 'dist', a: h.edge.a, b: h.edge.b })]);
     items.push([h.edge.open ? '▭ Это не проём' : '▯ Сделать проёмом', () => { tPush(); h.edge.open = !h.edge.open; renderTape(); }]);
     items.push(['🗑 Удалить стену', () => { tPush(); M.edges = M.edges.filter(x => x !== h.edge); M.meas = M.meas.filter(x => !(x.type === 'dist' && ((x.a === h.edge.a && x.b === h.edge.b) || (x.a === h.edge.b && x.b === h.edge.a)))); adjust(); renderTape(); }, 'danger']);
+  } else if (h.obj) {
+    const o = h.obj; title = objLabel(o);
+    items.push(['✎ Тип объекта…', async () => { const t = await chooseObjType(o.type); if (t) { tPush(); o.type = t; o.text = null; await askObjParams(o); renderTape(); draw(); } }]);
+    if (o.type === 'stair') items.push(['№ Число ступеней…', async () => { tPush(); await askObjParams(o); renderTape(); draw(); }]);
+    if (o.type === 'ramp') items.push(['% Уклон…', async () => { tPush(); await askObjParams(o); renderTape(); draw(); }]);
+    if (o.type === 'stair' || o.type === 'ramp') items.push(['↻ Сменить направление (низ — другая сторона)', () => { tPush(); o.base = ((o.base || 0) + 1) % o.ids.length; renderTape(); draw(); }]);
+    items.push(['Aa Подпись…', async () => { const v = await uiAsk('Подпись на плане:', objLabel(o)); if (v != null) { tPush(); o.text = v.trim() || null; renderTape(); draw(); } }]);
+    items.push(['🗑 Удалить объект (точки и замеры останутся)', () => { tPush(); M.objs = M.objs.filter(x => x !== o); markObjEdges(); renderTape(); draw(); }, 'danger']);
   } else {
     const m = h.meas; title = (m.type === 'thick' ? 'Толщина ' : 'Замер ') + `${pname(m.a)}–${pname(m.type === 'thick' ? m.c : m.b)} · ${mv(m)}`;
     items.push(remeasure(m), edit(m), toggle(m), delM(m));
@@ -4234,14 +4244,77 @@ function setAngle(id) {
     adjust(); renderTape(); draw(); stat(`Угол в ${pname(id)} задан: ${fdeg(v)}`);
   });
 }
+// ---------- объекты: лестница, пандус, шахта, колонна, приямок, подпись ----------
+const OBJT = { stair: 'Лестница', ramp: 'Пандус', shaft: 'Шахта', column: 'Колонна', pit: 'Приямок', note: 'Подпись' };
+function objLabel(o) {
+  if (o.text) return o.text;
+  if (o.type === 'stair') return 'Лестница' + (o.steps ? ', ' + o.steps + ' ст.' : '');
+  if (o.type === 'ramp') return 'Пандус' + (o.slope ? ', i=' + String(o.slope).replace('.', ',') + '%' : '');
+  return OBJT[o.type] || 'Объект';
+}
+function polyClip(poly, A, u, n, t) { // пересечение прямой A+n·t+u·s с многоугольником → [s0,s1]
+  const ss = [];
+  for (let i = 0; i < poly.length; i++) { const P = poly[i], Q = poly[(i + 1) % poly.length];
+    const dp = (P[0] - A[0]) * n[0] + (P[1] - A[1]) * n[1] - t, dq = (Q[0] - A[0]) * n[0] + (Q[1] - A[1]) * n[1] - t;
+    if ((dp > 0) === (dq > 0) || dp === dq) continue; const k = dp / (dp - dq);
+    const X = [P[0] + (Q[0] - P[0]) * k, P[1] + (Q[1] - P[1]) * k]; ss.push((X[0] - A[0]) * u[0] + (X[1] - A[1]) * u[1]); }
+  if (ss.length < 2) return null; return [Math.min(...ss), Math.max(...ss)];
+}
+function objGeom(o, PXf) { // всё в метрах модели: lines [[a,b,w]], dots, label {p,s}
+  const poly = o.ids.map(id => ptById(id)).filter(Boolean).map(PXf); const nn = poly.length; if (nn < 3) return null;
+  const L = [], add = (a, b, w = 0.25) => L.push([a, b, w]);
+  for (let i = 0; i < nn; i++) add(poly[i], poly[(i + 1) % nn], 0.35);
+  const c = [poly.reduce((s, q) => s + q[0], 0) / nn, poly.reduce((s, q) => s + q[1], 0) / nn];
+  const bi = ((o.base || 0) % nn + nn) % nn, A = poly[bi], B = poly[(bi + 1) % nn];
+  const bl = Math.hypot(B[0] - A[0], B[1] - A[1]) || 1e-9, u = [(B[0] - A[0]) / bl, (B[1] - A[1]) / bl]; let n = [-u[1], u[0]];
+  if ((c[0] - A[0]) * n[0] + (c[1] - A[1]) * n[1] < 0) n = [-n[0], -n[1]];
+  const depth = Math.max(...poly.map(q => (q[0] - A[0]) * n[0] + (q[1] - A[1]) * n[1]));
+  const at = (t, s) => [A[0] + n[0] * t + u[0] * s, A[1] + n[1] * t + u[1] * s];
+  const hatch = (ang, step) => { const hu = [Math.cos(ang), Math.sin(ang)], hn = [-hu[1], hu[0]]; const pr = poly.map(q => q[0] * hn[0] + q[1] * hn[1]); const lo = Math.min(...pr), hi = Math.max(...pr);
+    for (let t = lo + step / 2; t < hi; t += step) { const r = polyClip(poly, [0, 0], hu, hn, t); if (r) add([hn[0] * t + hu[0] * r[0], hn[1] * t + hu[1] * r[0]], [hn[0] * t + hu[0] * r[1], hn[1] * t + hu[1] * r[1]], 0.13); } };
+  const dots = []; let arrow = null;
+  if (o.type === 'stair' || o.type === 'ramp') {
+    if (o.type === 'stair') { const N = Math.max(2, o.steps || Math.max(3, Math.round(depth / 0.3))); for (let k = 1; k < N; k++) { const t = depth * k / N, r = polyClip(poly, A, u, n, t); if (r) add(at(t, r[0]), at(t, r[1]), 0.18); } }
+    const r = polyClip(poly, A, u, n, depth / 2) || [0, bl]; const sm = (r[0] + r[1]) / 2;
+    const p0 = at(depth * 0.08, sm), p1 = at(depth * 0.92, sm); arrow = [p0, p1]; add(p0, p1, 0.25);
+    const h = Math.min(0.35, depth * 0.15, (r[1] - r[0]) * 0.3), back = [p1[0] - n[0] * h, p1[1] - n[1] * h];
+    add(p1, [back[0] + u[0] * h * 0.45, back[1] + u[1] * h * 0.45], 0.25); add(p1, [back[0] - u[0] * h * 0.45, back[1] - u[1] * h * 0.45], 0.25);
+    if (o.type === 'stair') dots.push(p0);
+  } else if (o.type === 'shaft') { if (nn === 4) { add(poly[0], poly[2], 0.18); add(poly[1], poly[3], 0.18); } else hatch(Math.PI / 4, Math.max(depth / 6, 0.05)); }
+  else if (o.type === 'column') hatch(Math.PI / 4, Math.max(Math.min(depth, bl) / 8, 0.03));
+  else if (o.type === 'pit') hatch(Math.PI / 4, Math.max(depth / 5, 0.1));
+  return { lines: L, dots, arrow, label: { p: c, s: objLabel(o) }, poly, u, n, depth };
+}
+function markObjEdges() { for (const e of M.edges) delete e.obj; for (const o of M.objs || []) { const k = o.ids.length; for (let i = 0; i < k; i++) { const e = hasEdge(o.ids[i], o.ids[(i + 1) % k]); if (e) e.obj = o.id; } } }
+function chooseObjType(cur) {
+  return new Promise(res => {
+    closeTapeMenu(); const el = document.createElement('div'); el.id = 'tmenu'; el.style.left = '50%'; el.style.top = '30%'; el.style.transform = 'translate(-50%,0)';
+    el.innerHTML = '<div class="tm-h">Что это?</div>' + Object.entries(OBJT).map(([k, v]) => `<button data-k="${k}" class="${cur === k ? 'on' : ''}">${v}</button>`).join('') + '<button data-k="" class="tm-x">Отмена</button>';
+    $('#main').appendChild(el);
+    el.querySelectorAll('button').forEach(b => b[window.PointerEvent ? 'onpointerup' : 'onclick'] = ev => { ev.stopPropagation(); ev.preventDefault(); el.remove(); res(b.dataset.k || null); });
+  });
+}
+async function askObjParams(o) {
+  if (o.type === 'stair') { const v = await uiAsk('Число ступеней (можно оставить пустым):', o.steps ? String(o.steps) : ''); const k = parseInt(v); o.steps = k > 0 ? k : null; }
+  if (o.type === 'ramp') { const v = await uiAsk('Уклон пандуса, % (например 8; можно пусто):', o.slope ? String(o.slope).replace('.', ',') : ''); const k = parseFloat(String(v || '').replace(',', '.')); o.slope = k > 0 ? k : null; }
+  if (o.type === 'note' || o.type === 'pit' || o.type === 'shaft' || o.type === 'column') { const v = await uiAsk('Подпись на плане:', objLabel(o)); if (v != null) o.text = v.trim() && v.trim() !== OBJT[o.type] ? v.trim() : null; }
+}
+async function createObj(ids) {
+  const type = await chooseObjType(); if (!type) { renderTape(); draw(); return; }
+  tPush(); const o = { id: (M.objs || []).reduce((m, x) => Math.max(m, x.id), 0) + 1, type, ids: ids.slice(), base: 0 };
+  (M.objs = M.objs || []).push(o); await askObjParams(o); markObjEdges(); renderTape(); draw();
+  stat(`Отмечено: ${objLabel(o)}. ${type === 'stair' || type === 'ramp' ? 'Стрелка — направление подъёма; если наоборот: долгое нажатие на объект → «Сменить направление».' : ''}`);
+}
+function objAt(w) { for (const o of (M.objs || []).slice().reverse()) { const g = objGeom(o, PX); if (g && SHEET_inside(g.poly, w)) return o; } return null; }
+function SHEET_inside(P, w) { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const a = P[i], b = P[j]; if ((a[1] > w[1]) !== (b[1] > w[1]) && w[0] < (b[0] - a[0]) * (w[1] - a[1]) / (b[1] - a[1]) + a[0]) c = !c; } return c; }
 function continueFrom(p) { // начать (продолжить) обход от существующей точки
   if (T.pending && T.pending.got == null) T.pending = null;
   T.tool = 'walk'; T.mA = null; T.tA = null; T.roomIds = null;
   T.chain = [p.id]; M.chains.push(T.chain); T.sel = null;
   stat(`Обход продолжается от ${pname(p.id)}. Касайтесь следующего угла (на пустом месте — новая точка).`); renderTape(); draw();
 }
-function endChain() { if (T.pending && T.pending.got == null) T.pending = null; T.chain = null; T.mA = null; T.tA = null; T.roomIds = null; stat('Обход закончен. Коснитесь любой точки — продолжить от неё, или пустого места — начать с новой точки.'); renderTape(); draw(); }
-function setTapeTool(t) { T.tool = t; T.chain = null; T.mA = null; T.tA = null; T.roomIds = null; renderTape(); }
+function endChain() { if (T.pending && T.pending.got == null) T.pending = null; T.chain = null; T.mA = null; T.tA = null; T.roomIds = null; T.objIds = null; stat('Обход закончен. Коснитесь любой точки — продолжить от неё, или пустого места — начать с новой точки.'); renderTape(); draw(); }
+function setTapeTool(t) { T.tool = t; T.chain = null; T.mA = null; T.tA = null; T.roomIds = null; T.objIds = null; renderTape(); }
 function addPoint(w) { const p = { id: M.nextId++, x0: w[0], y0: w[1] }; M.pts.push(p); return p; }
 function nearestPoint(w, px = 7) { let best = null, bd = px * HITK() / S.view.s; for (const p of M.pts) { const [x, y] = PX(p); const d = Math.hypot(x - w[0], y - w[1]); if (d < bd) { bd = d; best = p; } } return best; }
 function nearestEdge(w, px = 8) { let best = null, bd = px * HITK() / S.view.s, bt = 0; for (const e of M.edges) { const a = PX(ptById(e.a)), b = PX(ptById(e.b)); const [d, t] = distSeg(w, a, b); if (d < bd) { bd = d; best = e; bt = t; } } return best ? { e: best, t: bt } : null; }
@@ -4542,6 +4615,12 @@ function tapeDown(e, w) {
     const e1 = T.tA, e2 = ed.e; T.tA = null; if (e1 === e2) return;
     makePending({ type: 'thick', a: e1.a, b: e1.b, c: e2.a, d: e2.b }); return;
   }
+  if (t === 'obj') {
+    let p = e.altKey ? null : nearestPoint(w);
+    if (!T.objIds) { tPush(); if (!p) p = addPoint(w); T.objIds = [p.id]; stat('Объект: коснитесь следующего угла; в конце — снова первой точки'); renderTape(); draw(); return; }
+    if (p && p.id === T.objIds[0] && T.objIds.length >= 3) { const ids = T.objIds; T.objIds = null; createObj(ids); return; }
+    if (!p) p = addPoint(w); if (!T.objIds.includes(p.id)) T.objIds.push(p.id); renderTape(); draw(); return;
+  }
   if (t === 'room') {
     const p = nearestPoint(w); if (!p) return;
     if (!T.roomIds) { T.roomIds = [p.id]; renderTape(); return; }
@@ -4571,8 +4650,10 @@ function tapeDelete() {
     M.meas = M.meas.filter(m => ![m.a, m.b, m.c, m.d, m.p].includes(id));
     M.rooms.forEach(R => R.ids = R.ids.filter(x => x !== id)); M.rooms = M.rooms.filter(R => R.ids.length >= 3);
     M.chains.forEach(c => { const i = c.indexOf(id); if (i >= 0) c.splice(i, 1); });
+    (M.objs || []).forEach(o => o.ids = o.ids.filter(x => x !== id)); M.objs = (M.objs || []).filter(o => o.ids.length >= 3); markObjEdges();
   } else if (T.sel.edge) { const e = T.sel.edge; M.edges = M.edges.filter(x => x !== e); }
   else if (T.sel.meas) { const m = T.sel.meas; M.meas = M.meas.filter(x => x !== m); }
+  else if (T.sel.obj) { const o = T.sel.obj; M.objs = M.objs.filter(x => x !== o); markObjEdges(); }
   T.sel = null; adjust(); renderTape();
 }
 
@@ -4617,13 +4698,26 @@ function drawTape() {
     if (info.diags < info.need) { ctx.fillStyle = '#c27c0e'; ctx.font = `${11 * dpr}px Golos Text, Segoe UI`; ctx.fillText(`нет диагонали или угла: углы около 90° приняты прямыми`, x, y + 22 * dpr); }
     ctx.textAlign = 'start';
   }
+  // объекты
+  for (const o of M.objs || []) {
+    const g = objGeom(o, PX); if (!g) continue; const sel = T.sel && T.sel.obj === o;
+    ctx.beginPath(); g.poly.forEach((q, i) => { const sp = W2S(...q); i ? ctx.lineTo(...sp) : ctx.moveTo(...sp); }); ctx.closePath();
+    ctx.fillStyle = sel ? 'rgba(31,111,235,.16)' : o.type === 'column' ? 'rgba(60,60,60,.18)' : 'rgba(123,75,214,.07)'; ctx.fill();
+    ctx.strokeStyle = sel ? '#1f6feb' : '#5b3aa8';
+    for (const [a, b, w] of g.lines) { ctx.lineWidth = Math.max(1, w * 5) * dpr; ctx.beginPath(); ctx.moveTo(...W2S(...a)); ctx.lineTo(...W2S(...b)); ctx.stroke(); }
+    ctx.fillStyle = ctx.strokeStyle; for (const d of g.dots) { const sp = W2S(...d); ctx.beginPath(); ctx.arc(sp[0], sp[1], 3.5 * dpr, 0, 7); ctx.fill(); }
+    const lp = W2S(...g.label.p); ctx.font = `bold ${12 * dpr}px Golos Text, Segoe UI`; ctx.textAlign = 'center';
+    const tw = ctx.measureText(g.label.s).width; ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fillRect(lp[0] - tw / 2 - 4 * dpr, lp[1] - 12 * dpr, tw + 8 * dpr, 17 * dpr);
+    ctx.fillStyle = '#5b3aa8'; ctx.fillText(g.label.s, lp[0], lp[1]); ctx.textAlign = 'start';
+  }
+  if (T.objIds && T.objIds.length) { ctx.strokeStyle = '#7b4bd6'; ctx.lineWidth = 2 * dpr; ctx.setLineDash([6 * dpr, 4 * dpr]); ctx.beginPath(); T.objIds.forEach((id, i) => { const sp = W2S(...PX(ptById(id))); i ? ctx.lineTo(...sp) : ctx.moveTo(...sp); }); ctx.stroke(); ctx.setLineDash([]); }
   // edges
   for (const e of M.edges) {
     const A = ptById(e.a), B = ptById(e.b); if (!A || !B) continue;
     const a = PX(A), b = PX(B), sa = W2S(...a), sb = W2S(...b);
     const m = distMeas(e.a, e.b);
     const sel = T.sel && T.sel.edge === e;
-    ctx.strokeStyle = sel ? '#1f6feb' : e.open ? '#12a35a' : (m ? '#111' : '#9aa3b2'); ctx.lineWidth = (e.open ? 5 : m ? 3 : 2) * dpr;
+    ctx.strokeStyle = sel ? '#1f6feb' : e.obj ? '#5b3aa8' : e.open ? '#12a35a' : (m ? '#111' : '#9aa3b2'); ctx.lineWidth = (e.obj ? 1.5 : e.open ? 5 : m ? 3 : 2) * dpr;
     if (!m && !e.open) ctx.setLineDash([7 * dpr, 5 * dpr]);
     ctx.beginPath(); ctx.moveTo(...sa); ctx.lineTo(...sb); ctx.stroke(); ctx.setLineDash([]);
     const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
@@ -4678,7 +4772,7 @@ function drawTape() {
   // points
   for (const p of M.pts) {
     const [x, y] = W2S(...PX(p));
-    const sel = T.sel && T.sel.pt === p, inCh = T.chain && T.chain[0] === p.id, isA = T.mA === p.id || (T.roomIds && T.roomIds.includes(p.id));
+    const sel = T.sel && T.sel.pt === p, inCh = T.chain && T.chain[0] === p.id, isA = T.mA === p.id || (T.roomIds && T.roomIds.includes(p.id)) || (T.objIds && T.objIds.includes(p.id));
     ctx.fillStyle = sel ? '#1f6feb' : inCh ? '#e07000' : isA ? '#7b4bd6' : '#fff'; ctx.strokeStyle = '#111'; ctx.lineWidth = 1.5 * dpr;
     ctx.beginPath(); ctx.arc(x, y, 5 * dpr, 0, 7); ctx.fill(); ctx.stroke();
     ctx.fillStyle = '#333'; ctx.font = `${10 * dpr}px Golos Text, Segoe UI`; ctx.fillText(pname(p.id), x + 7 * dpr, y - 6 * dpr);
@@ -4693,6 +4787,7 @@ const TTOOLS = [['walk', 'Обход', 'щёлкайте углы по поря�
   ['open', 'Проём', 'щелчок по участку стены между двумя точками помечает его как проём'],
   ['thick', 'Толщина', 'щёлкните сторону стены в одном помещении, затем в соседнем — и введите толщину'],
   ['room', 'Помещение', 'щёлкните точки контура по порядку и снова первую'],
+  ['obj', 'Объект', 'лестница, пандус, шахта, колонна: коснитесь углов по порядку (первые две точки — НИЗ лестницы или пандуса) и снова первой точки, затем выберите тип'],
   ['drag', 'Двигать точку', 'перетащите точку, если начальное положение по БТИ сильно неверно (Shift + перетаскивание фона — сдвиг подложки)'],
   ['select', '✎ Правка', 'коснитесь точки, стены или размера — откроется меню: перемерить, изменить число, выключить, удалить. В любом инструменте то же меню — долгое нажатие или правый щелчок']];
 function renderTape() {
@@ -4757,7 +4852,7 @@ function renderTape() {
   $('#auto').onchange = e => T.auto = e.target.checked;
   const pa = $('#pAcc'); if (pa) pa.onclick = acceptPending; const pr = $('#pRej'); if (pr) pr.onclick = rejectPending;
   const ps = $('#pSkip'); if (ps) ps.onclick = e => { e.preventDefault(); skipPending(); };
-  side.querySelectorAll('[data-tt]').forEach(b => b.onclick = () => { T.tool = b.dataset.tt; T.mA = null; T.tA = null; T.roomIds = null; if (T.tool !== 'walk') T.chain = null; renderTape(); });
+  side.querySelectorAll('[data-tt]').forEach(b => b.onclick = () => { T.tool = b.dataset.tt; T.mA = null; T.tA = null; T.roomIds = null; T.objIds = null; if (T.tool !== 'walk') T.chain = null; renderTape(); });
   $('#tUndo').onclick = tUndo; $('#tRedo').onclick = tRedo;
   $('#orth').onchange = e => { M.ortho = e.target.checked; adjust(); renderTape(); };
   side.querySelectorAll('[data-mon]').forEach(c => c.onchange = () => { const m = M.meas.find(x => x.id === +c.dataset.mon); tPush(); m.on = c.checked; adjust(); renderTape(); });
@@ -4778,6 +4873,7 @@ function tapePlan() {
   const PR = p => { const q = PX(p); return [ca * q[0] - sa * q[1], sa * q[0] + ca * q[1]]; };
   for (const e of M.edges) {
     const A = ptById(e.a), B = ptById(e.b); if (!A || !B) continue; const a = PR(A), b = PR(B);
+    if (e.obj) continue;
     if (e.open) openings.push({ dir: 2, x1: a[0], y1: a[1], x2: b[0], y2: b[1] });
     else segs.push({ dir: 2, x1: a[0], y1: a[1], x2: b[0], y2: b[1] });
   }
@@ -4792,14 +4888,19 @@ function tapePlan() {
     let area = Math.abs(VEC.polyArea(poly)); if (M.cond) { try { area = TAPE.roomInfo(M, R).area; } catch (e) { } }
     rooms.push({ num: R.num, name: R.name, poly, area, lens });
   }
-  return { gid: 'tape', XY: new Float32Array(0), stations: [], segs, openings, walls, rooms, dims: [], texts: [] };
+  const extra = [], texts = [];
+  for (const o of M.objs || []) { const g = objGeom(o, PR); if (!g) continue;
+    for (const [a, b, w] of g.lines) extra.push({ a, b, w });
+    for (const d of g.dots) { const r = 0.04; for (let i = 0; i < 6; i++) { const a1 = i * Math.PI / 3, a2 = (i + 1) * Math.PI / 3; extra.push({ a: [d[0] + r * Math.cos(a1), d[1] + r * Math.sin(a1)], b: [d[0] + r * Math.cos(a2), d[1] + r * Math.sin(a2)], w: 0.35 }); } }
+    texts.push({ p: g.label.p, s: g.label.s, h: 2.2, rot: 0 }); }
+  return { gid: 'tape', XY: new Float32Array(0), stations: [], segs, openings, walls, rooms, dims: [], texts, extra };
 }
 function tapeProject() { return { M: JSON.parse(JSON.stringify(M)), U: U.img ? { s: U.s, rot: U.rot, tx: U.tx, ty: U.ty, alpha: U.alpha, name: U.name, data: imgToData() } : null }; }
 function imgToData() { if (U._dataFor === U.img && U._data) return U._data; const r = imgToData0(); if (r) { U._dataFor = U.img; U._data = r; } return r; }
 function imgToData0() { try { const c = document.createElement('canvas'); const k = Math.min(1, 3000 / Math.max(U.img.width, U.img.height)); c.width = U.img.width * k; c.height = U.img.height * k; c.getContext('2d').drawImage(U.img, 0, 0, c.width, c.height); U._k = k; return { url: c.toDataURL('image/jpeg', 0.8), k }; } catch (e) { return null; } }
 async function tapeRestore(j) {
   if (!j) return;
-  Object.assign(M, j.M); T.undo = []; T.pending = null; T.chain = null;
+  Object.assign(M, j.M); M.objs = M.objs || []; markObjEdges(); T.undo = []; T.pending = null; T.chain = null;
   if (j.U && j.U.data) { const img = new Image(); img.src = j.U.data.url; await img.decode(); const bmp = await createImageBitmap(img); Object.assign(U, j.U); U.img = bmp; U.s = j.U.s / j.U.data.k; U.pdf = null; U.pages = 0; }
   adjust();
 }
