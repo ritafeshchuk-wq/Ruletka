@@ -186,6 +186,8 @@ header{overflow-x:auto;scrollbar-width:none}header::-webkit-scrollbar{display:no
 .btbig{font-size:17px;padding:12px 18px!important}
 .btdot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle;background:#C4372F}.btdot.on{background:#2E8B57}.btdot.wait{background:#E3A21A}
 .seg2 button{flex:1}.seg2 button.on{background:var(--tape,#E3A21A);border-color:var(--tape,#E3A21A);color:#1B2430;font-weight:600}
+html,body{overscroll-behavior:none}
+.asind{display:inline!important}
 </style>
 </head>
 <body>
@@ -206,12 +208,12 @@ header{overflow-x:auto;scrollbar-width:none}header::-webkit-scrollbar{display:no
   <button class="hb" id="bHelp">Справка</button>
   <button class="hb" id="bAbout" title="О программе, авторство, лицензии">О программе</button>
   <button class="hb" id="bOpen">Открыть проект</button>
-  <span id="asInd" class="asind"></span><button class="hb" id="bSave">Сохранить проект</button>
+  <span id="asInd" class="asind"></span><button class="hb" id="bSnaps" title="Вернуться к копии, сделанной раньше">Копии</button><button class="hb" id="bSave">Сохранить проект</button>
   <input type="file" id="fProj" accept=".json" hidden>
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 1.7 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 1.8 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -4039,65 +4041,124 @@ async function applyProject(j) {
     if (j.tape) await tapeRestore(j.tape);
     stat(Object.keys(S.plans).length ? 'Проект открыт. Правка плана и листы доступны сразу; для нового среза загрузите E57 заново.' : 'Проект открыт.');
     const P = S.plans[S.active];
-    if (P) { setMode('scan'); fitBounds(boundsXY(P.XY)); setStep('plan'); } else if (M.pts.length || U.img) { T.fitted = true; setMode('tape'); fitTape(); draw(); } else setMode('scan');
+    T.fitted = true; setMode('tape'); fitTape(); draw();
   }
 }
 // ---------- автосохранение в браузере (IndexedDB): обновление страницы, закрытие вкладки или вылет Safari не стирают работу ----------
-const AS = { db: null, last: '', savedAt: 0, fileAt: 0, busy: false, off: false };
+const AS = { db: null, last: '', savedAt: 0, fileAt: 0, busy: false, off: false, snapAt: 0, sid: Date.now(), dirty: false };
+const SNAP_EVERY = 120000, SNAP_KEEP = 40; // копия каждые 2 минуты, хранится 40 последних (~1,5 часа работы) + последнее состояние каждого сеанса
 function asDB() { return new Promise(res => { try { const r = indexedDB.open('scan2plan', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => res(r.result); r.onerror = () => res(null); r.onblocked = () => res(null); } catch (e) { res(null); } }); }
 async function asTx(mode, fn) { try { const db = AS.db || (AS.db = await asDB()); if (!db) return null; return await new Promise(res => { const tx = db.transaction('kv', mode), st = tx.objectStore('kv'); let out = null; const r = fn(st); if (r) r.onsuccess = () => { out = r.result; }; tx.oncomplete = () => res(out === null ? true : out); tx.onerror = tx.onabort = () => res(null); }); } catch (e) { return null; } }
-const asGet = () => asTx('readonly', st => st.get('last'));
-const asDel = () => asTx('readwrite', st => st.delete('last'));
-function hasWork() { return !!(S.scans.length || Object.keys(S.plans).length || M.pts.length || M.meas.length || U.img); }
+const asGetK = k => asTx('readonly', st => st.get(k));
+const asPutK = (k, v) => asTx('readwrite', st => st.put(v, k));
+const asDelK = k => asTx('readwrite', st => st.delete(k));
+const asGet = () => asGetK('last');
+const asDel = () => asDelK('last');
+function hasWork() { return !!(M.pts.length || M.meas.length || U.img); }
 function workSummary() {
   const a = [];
-  if (S.scans.length) a.push(`сканов ${S.scans.length}`);
-  if (S.groups.length && S.scans.length) a.push(`групп ${S.groups.length}`);
-  if (Object.keys(S.plans).length) a.push(`планов ${Object.keys(S.plans).length}`);
-  if (M.pts.length) a.push(`точек рулетки ${M.pts.length}, замеров ${M.meas.length}`);
+  if (M.pts.length) a.push(`точек ${M.pts.length}, замеров ${M.meas.filter(m => m.type === 'dist' || m.type === 'thick').length}`);
+  if (M.rooms.length) a.push(`помещений ${M.rooms.length}`);
   if (U.img) a.push('подложка ' + (U.name || 'БТИ'));
   return a.join(', ') || 'пусто';
 }
+const tfmt = d => new Date(d).toLocaleString('ru', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 function showAS() {
   const el = $('#asInd'); if (!el) return;
-  const t = d => new Date(d).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' });
-  el.textContent = AS.off ? 'Автосохранение недоступно' : AS.savedAt ? `Сохранено в браузере ${t(AS.savedAt)}` : '';
-  el.title = 'Работа сохраняется в памяти этого браузера каждые 15 секунд и при сворачивании. После обновления страницы её можно восстановить на главном экране. Файл проекта («Сохранить проект») — копия на диске, её стоит сохранять в конце дня.';
+  const t = d => new Date(d).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  el.textContent = AS.off ? '⚠ Автосохранение не работает — сохраните проект файлом' : AS.savedAt ? `✓ Сохранено ${t(AS.savedAt)}` : '';
+  el.style.color = AS.off ? '#ff8a80' : '';
+  el.title = 'Работа сохраняется в памяти iPad через пару секунд после каждого изменения; каждые 2 минуты — отдельная копия (40 последних). После обновления страницы работа восстанавливается сама. Файл проекта («Сохранить проект») — копия вне браузера, её стоит сохранять в конце дня.';
 }
-async function autosave() {
-  if (AS.busy || AS.restoring || AS.off || !hasWork()) return;
+// подложка хранится один раз отдельно, в копиях — только ссылка на неё
+async function packProj() {
+  const proj = buildProject(); const d = proj.tape && proj.tape.U && proj.tape.U.data;
+  if (d && d.url) { if (U._imgKeyFor !== U.img) { U._imgKey = 'img:' + Date.now(); U._imgKeyFor = U.img; U._imgSaved = false; }
+    if (!U._imgSaved) { const ok = await asPutK(U._imgKey, d.url); if (!ok) return null; U._imgSaved = true; }
+    proj.tape.U.data = { k: d.k, ref: U._imgKey }; }
+  return JSON.stringify(proj);
+}
+async function unpackProj(txt) {
+  const j = JSON.parse(txt); const d = j.tape && j.tape.U && j.tape.U.data;
+  if (d && d.ref && !d.url) { const url = await asGetK(d.ref); if (url && url !== true) d.url = url; else j.tape.U = null; }
+  return j;
+}
+function quickSave() { try { localStorage.setItem('ruletka_quick', JSON.stringify({ when: Date.now(), M, U: U.img ? { s: U.s, rot: U.rot, tx: U.tx, ty: U.ty, alpha: U.alpha, name: U.name } : null })); } catch (e) { } }
+async function autosave(force) {
+  if (AS.busy || AS.restoring || !hasWork()) return;
   AS.busy = true;
   try {
-    let txt; try { txt = JSON.stringify(buildProject()); } catch (e) { return; }
-    if (txt === AS.last) return;
-    const ok = await asTx('readwrite', st => st.put({ when: Date.now(), summary: workSummary(), proj: txt }, 'last'));
-    if (ok) { AS.last = txt; AS.savedAt = Date.now(); } else AS.off = true;
+    quickSave();
+    let txt; try { txt = await packProj(); } catch (e) { txt = null; }
+    if (!txt) { AS.off = true; showAS(); return; }
+    const now = Date.now(), changed = txt !== AS.last;
+    if (changed || force) {
+      const ok = await asPutK('last', { when: now, summary: workSummary(), proj: txt, sid: AS.sid });
+      if (ok) { AS.last = txt; AS.savedAt = now; AS.off = false; } else AS.off = true;
+    }
+    if (changed && now - AS.snapAt >= SNAP_EVERY) await addSnap({ when: now, summary: workSummary(), proj: txt, sid: AS.sid });
     showAS();
-  } finally { AS.busy = false; }
+  } finally { AS.busy = false; AS.dirty = false; }
 }
+async function addSnap(r) {
+  const idx = (await asGetK('snaps')) || []; const list = Array.isArray(idx) ? idx : [];
+  if (list.some(x => x.when === r.when)) return;
+  const ok = await asPutK('snap:' + r.when, r.proj); if (!ok) return;
+  list.push({ when: r.when, summary: r.summary, sid: r.sid });
+  // оставляем 40 последних + последнюю копию каждого старого сеанса
+  list.sort((a, b) => a.when - b.when);
+  const keepSid = new Map(); list.forEach(x => keepSid.set(x.sid, x.when));
+  const recent = new Set(list.slice(-SNAP_KEEP).map(x => x.when));
+  const out = [];
+  for (const x of list) { if (recent.has(x.when) || keepSid.get(x.sid) === x.when) out.push(x); else await asDelK('snap:' + x.when); }
+  while (out.length > SNAP_KEEP + 20) { const x = out.shift(); await asDelK('snap:' + x.when); }
+  await asPutK('snaps', out); AS.snapAt = r.when;
+}
+let asTimer = 0;
+setInterval(() => { if (!hasWork() || S.step !== 'tape') return; const since = Date.now() - Math.max(AS.fileAt || 0, AS.remindAt || AS.sid); if (since > 30 * 60000) { AS.remindAt = Date.now(); stat('Напоминание: сохраните копию файлом — «Сохранить проект» → «Сохранить в Файлы».'); const b = $('#bSave'); if (b) { b.classList.add('pri'); setTimeout(() => b.classList.remove('pri'), 20000); } } }, 60000);
+function asSoon() { AS.dirty = true; clearTimeout(asTimer); asTimer = setTimeout(autosave, 1500); }
 setInterval(autosave, 15000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') autosave(); });
-addEventListener('pagehide', () => { autosave(); });
-addEventListener('beforeunload', e => { if (hasWork() && (!AS.savedAt || Date.now() - AS.savedAt > 20000)) { e.preventDefault(); e.returnValue = ''; } });
+addEventListener('pagehide', () => { quickSave(); autosave(); });
+addEventListener('beforeunload', e => { quickSave(); if (hasWork() && (AS.dirty || !AS.savedAt || Date.now() - AS.savedAt > 20000)) { e.preventDefault(); e.returnValue = ''; } });
+async function restoreFrom(r, label) {
+  AS.restoring = true; busy('Восстанавливаю…');
+  try { const j = await unpackProj(r.proj); await applyProject(j); AS.last = ''; AS.savedAt = r.when; stat(`Работа восстановлена (${label || tfmt(r.when)}). Можно продолжать.`); }
+  catch (err) { uiAlert('Не удалось восстановить: ' + err.message); }
+  AS.restoring = false; busy(''); showAS(); autosave(true);
+}
+async function snapsDialog() {
+  const list = ((await asGetK('snaps')) || []).slice().reverse();
+  closeTapeMenu(); const el = document.createElement('div'); el.id = 'pagePick';
+  el.innerHTML = `<div class="pp-box" style="max-width:560px"><div class="pp-head"><div><b>Сохранённые копии</b><div class="hint" style="margin:2px 0 0">Копия делается каждые 2 минуты работы. Выберите, к какой вернуться — текущее состояние тоже останется в списке.</div></div><button id="snX">Закрыть</button></div><div class="row" style="margin:0 0 10px"><button id="snNew">＋ Начать новый обмер</button><span class="hint" style="margin:0">текущая работа останется в копиях</span></div><div style="display:flex;flex-direction:column;gap:6px;max-height:60vh;overflow:auto">${list.length ? list.map(x => `<button data-w="${x.when}" style="text-align:left;padding:10px 12px"><b>${tfmt(x.when)}</b> · ${escH(x.summary || '')}</button>`).join('') : '<p class="hint">Копий пока нет.</p>'}</div></div>`;
+  document.body.appendChild(el);
+  el.querySelector('#snX').onclick = () => el.remove();
+  el.querySelector('#snNew').onclick = async () => { el.remove(); if (!(await uiDialog({ title: 'Начать новый обмер?', text: 'Текущая работа сохранится в «Копиях», к ней можно вернуться.', ok: 'Начать новый', cancel: 'Отмена' }))) return;
+    await autosave(true); if (hasWork()) await addSnap({ when: Date.now(), summary: workSummary(), proj: AS.last, sid: AS.sid });
+    Object.assign(M, { pts: [], meas: [], edges: [], rooms: [], chains: [], objs: [], nextId: 1, nextMeas: 1, cond: M.cond, scaleFit: false, scaleAsked: false });
+    U.img = null; U.pdf = null; U.pages = 0; U.name = ''; T.undo = []; T.redo = []; T.pending = null; T.chain = null; T.sel = null;
+    AS.sid = Date.now(); AS.last = ''; AS.snapAt = 0; try { localStorage.removeItem('ruletka_quick'); } catch (e) { }
+    await asDel(); adjust(); fitTape(); draw(); renderTape(); stat('Новый обмер. Прошлая работа — в «Копиях».'); }; el.onclick = e => { if (e.target === el) el.remove(); };
+  el.querySelectorAll('[data-w]').forEach(b => b.onclick = async () => { const w = +b.dataset.w; el.remove(); await autosave(true); if (hasWork()) await addSnap({ when: Date.now(), summary: workSummary() + ' (до возврата)', proj: AS.last, sid: AS.sid }); const proj = await asGetK('snap:' + w); if (!proj || proj === true) { uiAlert('Эта копия не найдена.'); return; } restoreFrom({ when: w, proj }, 'копия ' + tfmt(w)); });
+}
 (async () => {
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) { }
-  const r = await asGet(); if (!r || !r.proj) return;
-  const box = document.createElement('div'); box.className = 'asbox';
-  const when = new Date(r.when).toLocaleString('ru', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-  box.innerHTML = `<div><b>Есть несохранённая работа</b> от ${when}: ${escH(r.summary || '')}.</div><div class="row"><button class="pri" id="asRestore">Восстановить</button><button id="asDrop">Удалить</button></div><div class="hint" style="margin:0">Замеры, точки, помещения и подложка восстановятся.</div>`;
-  const home = document.querySelector('.homefoot'); if (home) home.parentNode.insertBefore(box, home); else document.body.appendChild(box);
-  $('#asRestore').onclick = async () => {
-    AS.restoring = true; busy('Восстанавливаю…');
-    try { await applyProject(JSON.parse(r.proj)); AS.last = r.proj; AS.savedAt = r.when; box.remove(); stat('Работа восстановлена из памяти браузера (' + when + ').'); }
-    catch (err) { uiAlert('Не удалось восстановить: ' + err.message); }
-    AS.restoring = false; busy(''); showAS();
-  };
-  $('#asDrop').onclick = async () => { if (!(await uiDialog({ title: 'Удалить сохранённую работу?', text: 'Её нельзя будет восстановить. Если нужна копия — сначала «Восстановить», затем «Сохранить проект».', ok: 'Удалить', cancel: 'Отмена' }))) return; await asDel(); box.remove(); };
+  let r = await asGet();
+  // прошлый сеанс сначала кладём в копии — новая работа его уже не перезапишет
+  if (r && r.proj) { const list = (await asGetK('snaps')) || []; if (!list.some(x => x.when === r.when)) await addSnap({ when: r.when, summary: r.summary, proj: r.proj, sid: r.sid || 0 }); AS.snapAt = 0; }
+  if (!r || !r.proj) { // запасной слой: localStorage (без картинки подложки)
+    let q = null; try { q = JSON.parse(localStorage.getItem('ruletka_quick') || 'null'); } catch (e) { }
+    if (q && q.M && q.M.pts && q.M.pts.length) { Object.assign(M, q.M); M.objs = M.objs || []; if (typeof markObjEdges === 'function') markObjEdges(); adjust(); T.fitted = true; setMode('tape'); fitTape(); draw(); stat('Замеры восстановлены из запасной копии (' + tfmt(q.when) + '). Подложку загрузите заново.'); }
+    if (AS.db === null) { AS.off = true; showAS(); }
+    return;
+  }
+  // сразу возвращаем последнюю работу — ничего нажимать не нужно
+  await restoreFrom(r);
 })();
-
 function fitTape() { if (M.pts.length) { const xs = M.pts.map(p => PX(p)); fitBounds([Math.min(...xs.map(p => p[0])) - 1, Math.min(...xs.map(p => p[1])) - 1, Math.max(...xs.map(p => p[0])) + 1, Math.max(...xs.map(p => p[1])) + 1]); } else if (U.img) fitUnderlay(); else fitBounds([-2, -2, 10, 8]); }
 if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([document.getElementById('pdfworker').textContent], { type: 'text/javascript' }));
 $('#bOpen2').onclick = () => $('#fProj').click();
+$('#bSnaps').onclick = snapsDialog;
 (function () { const b = $('#btSup'); if (!b) return; b.style.display = 'flex';
   if (navigator.bluetooth) { b.classList.add('ok'); b.innerHTML = '<div><b>Bluetooth доступен ✓</b> — включите DISTO, нажмите «Начать с рулетки», затем «Подключить DISTO».</div>'; }
   else { b.classList.add('no'); b.innerHTML = '<div><b>В этом браузере нет Bluetooth.</b> ' + btSupportNote() + '</div><div class="row"><button id="cpUrl">Скопировать ссылку для Bluefy</button></div>';
@@ -4154,7 +4215,7 @@ const ptById = id => M.pts.find(p => p.id === id);
 const PX = p => M.cond ? [p.x0, p.y0] : [p.x !== undefined ? p.x : p.x0, p.y !== undefined ? p.y : p.y0];
 const pname = id => 'Т' + id;
 function tSnap() { return JSON.stringify({ pts: M.pts, meas: M.meas, edges: M.edges, rooms: M.rooms, chains: M.chains, objs: M.objs || [], nextId: M.nextId, nextMeas: M.nextMeas }); }
-function tPush() { T.redo = []; T.undo.push(JSON.stringify({ pts: M.pts, meas: M.meas, edges: M.edges, rooms: M.rooms, chains: M.chains, objs: M.objs || [], nextId: M.nextId, nextMeas: M.nextMeas })); if (T.undo.length > 100) T.undo.shift(); }
+function tPush() { asSoon(); T.redo = []; T.undo.push(JSON.stringify({ pts: M.pts, meas: M.meas, edges: M.edges, rooms: M.rooms, chains: M.chains, objs: M.objs || [], nextId: M.nextId, nextMeas: M.nextMeas })); if (T.undo.length > 100) T.undo.shift(); }
 function tUndo() { if (T.pending && T.pending.got == null && !T.pending.re) { skipPending(); } if (!T.undo.length) { renderTape(); return; } T.redo.push(tSnap()); Object.assign(M, JSON.parse(T.undo.pop())); T.pending = null; T.chain = null; T.sel = null; closeTapeMenu(); adjust(); renderTape(); stat('Отменено. ↷ Вернуть — если отменили лишнее.'); }
 function tRedo() { if (!T.redo.length) return; T.undo.push(tSnap()); Object.assign(M, JSON.parse(T.redo.pop())); T.pending = null; T.chain = null; T.sel = null; closeTapeMenu(); adjust(); renderTape(); }
 // ---------- edit menu: tap (Правка), long press, right click ----------
@@ -4541,7 +4602,7 @@ function acceptPending() {
   T.pending = null;
   adjust();
   if (p.after) p.after();
-  renderTape(); offerScaleFit();
+  renderTape(); offerScaleFit(); asSoon();
 }
 function rejectPending() { if (T.pending) { T.pending.got = null; renderTape(); } }
 function skipPending() { const p = T.pending; T.pending = null; if (p && p.after) p.after(); renderTape(); }
@@ -4640,7 +4701,7 @@ function tapeMove(w) {
   T.mouse = w; if (T.tool === 'walk' && T.chain) draw();
   return false;
 }
-function tapeUp() { if (T.dragPt || T.dragU) { T.dragPt = null; T.dragOff = null; T.dragU = null; renderTape(); draw(); } }
+function tapeUp() { if (T.dragPt || T.dragU) { asSoon(); T.dragPt = null; T.dragOff = null; T.dragU = null; renderTape(); draw(); } }
 function tapeDelete() {
   if (!T.sel) return; tPush();
   if (T.sel.pt) {
