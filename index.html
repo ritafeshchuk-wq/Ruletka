@@ -211,7 +211,7 @@ header{overflow-x:auto;scrollbar-width:none}header::-webkit-scrollbar{display:no
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 1.5 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 1.6 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -4711,7 +4711,7 @@ function renderTape() {
   <h3>Рулетка</h3>
   <div class="row"><span class="btdot ${T.btState === 'подключена' ? 'on' : /…/.test(T.btState) ? 'wait' : ''}"></span><button class="btbig ${T.btState === 'подключена' ? 'on' : 'pri'}" id="bBt">${T.btState === 'подключена' ? '✓ ' + escH(T.btName) : 'Подключить DISTO'}</button>${T.btState === 'отключена' ? '<button id="bRe" class="pri">Переподключить</button>' : ''}${T.cmd && T.btState === 'подключена' ? '<button id="bMeas" class="btbig">◉ Замер</button>' : ''}<span class="hint" style="margin:0">${escH(T.btState)}${T.batt != null ? ' · батарея ' + T.batt + '%' : ''}</span></div>
   ${!navigator.bluetooth ? `<p class="hint" style="color:#C4372F">${btSupportNote()}</p>` : ''}
-  <div class="row"><input type="text" id="mIn" placeholder="ввод вручную: 4.237 или 4237" style="flex:1"><button id="mOk">↵</button></div>
+  <div class="row"><input type="text" id="mIn" inputmode="decimal" enterkeyhint="done" autocomplete="off" placeholder="${T.pending && T.pending.got == null ? 'введите замер ' + pendLabel(T.pending) : 'ввод вручную: 4,237 или 4237'}" style="flex:1;${T.pending && T.pending.got == null && T.btState !== 'подключена' ? 'border-color:var(--tape,#E3A21A);box-shadow:0 0 0 3px rgba(227,162,26,.25)' : ''}"><button id="mOk">↵</button></div>
   <div class="chk"><input type="checkbox" id="auto" ${T.auto ? 'checked' : ''}><label for="auto">Принимать замер сразу, без подтверждения</label></div>
   ${pd ? `<div class="pend">
      <div><b>Замер ${pendLabel(pd)}</b>${ap ? ` <span class="hint">(по подложке ≈ ${nf(ap, 2)} м)</span>` : ''}</div>
@@ -4746,12 +4746,13 @@ function renderTape() {
   const ua = $('#uA'); if (ua) ua.oninput = e => { U.alpha = +e.target.value; draw(); };
   $('#bBt').onclick = async () => { if (T.btState !== 'подключена') return connectDisto(); if (await uiDialog({ title: 'Отключить DISTO?', text: 'Рулетка перестанет передавать замеры, пока не подключите её снова.', ok: 'Отключить', cancel: 'Оставить' })) disconnectDisto(); };
   const bm = $('#bMeas'); if (bm) bm.onclick = distoMeasure;
+  if (T.pending && T.pending.got == null && T.btState !== 'подключена' && !T.dragPt) { const f = $('#mIn'); if (f && document.activeElement !== f) try { f.focus({ preventScroll: true }); } catch (e) { } }
   const be = $('#bEnd'); if (be) be.onclick = endChain;
   const setCond = v => { M.cond = v; adjust(); draw(); renderTape(); };
   $('#mFact').onclick = () => setCond(false); $('#mCond').onclick = () => setCond(true);
   const mf = $('#mFit'); if (mf) mf.onclick = () => { const r = scaleRatio(); if (r) fitScale(r.k); };
   const br = $('#bRe'); if (br) br.onclick = reconnectDisto;
-  const mi = $('#mIn'), mo = () => { const v = parseManual(mi.value); if (v) { mi.value = ''; onReading(v, 'key'); } };
+  const mi = $('#mIn'), mo = () => { const v = parseManual(mi.value); if (v) { mi.value = ''; onReading(v, 'key'); if (T.pending && T.pending.got != null) acceptPending(); } };
   $('#mOk').onclick = mo; mi.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); if (mi.value.trim()) mo(); else if (T.pending && T.pending.got != null) acceptPending(); } };
   $('#auto').onchange = e => T.auto = e.target.checked;
   const pa = $('#pAcc'); if (pa) pa.onclick = acceptPending; const pr = $('#pRej'); if (pr) pr.onclick = rejectPending;
