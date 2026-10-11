@@ -203,6 +203,9 @@ html,body{overscroll-behavior:none}
 header .modes,#bOpen,.homein .lead{display:none!important}
 #projName{min-width:0;flex:0 1 auto}
 .projname{color:#fff;font-weight:600;font-size:14px;align-self:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;padding:0 6px}
+#selbox{position:absolute;left:50%;transform:translateX(-50%);bottom:150px;max-height:calc(100% - 170px);overflow:auto;width:min(560px,calc(100% - 24px));background:#fff;border:2px solid #1f6feb;border-radius:14px;box-shadow:0 8px 28px rgba(15,23,36,.25);padding:12px 14px;display:flex;flex-direction:column;gap:8px;z-index:7;font-size:14px}
+#selbox.ok{border-color:#1E8A55}#selbox.warn{border-color:#E3A21A}#selbox.bad{border-color:#C4372F}
+#selbox .sb-h{font-weight:700}#selbox .row{display:flex;flex-wrap:wrap;gap:6px}#selbox button{min-height:40px}
 </style>
 </head>
 <body>
@@ -228,7 +231,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 2.4 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 2.5 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -3740,7 +3743,7 @@ var TB = { alt: false, shift: false, shown: false };
 var TP = { pts: new Map(), tap: null, pinch: null, pan: null, toolDrag: false, pen: null, lp: null };
 const fakeEv = (ev, x, y) => ({ clientX: x != null ? x : ev.clientX, clientY: y != null ? y : ev.clientY, button: 0, buttons: 1, altKey: ev.altKey || TB.alt, shiftKey: ev.shiftKey || TB.shift, ctrlKey: ev.ctrlKey || TB.shift, metaKey: ev.metaKey, target: cv, pointerType: ev.pointerType, preventDefault() { } });
 function toolDrags() {
-  if (S.step === 'tape') return T.tool === 'drag';
+  if (S.step === 'tape') return T.tool === 'drag' || T.tool === 'box';
   if (S.step === 'plan') return ['select', 'erase'].includes(S.tool);
   if (S.step === 'reg') return S.regTool === 'move' && S.sel.size > 0;
   return false;
@@ -4193,7 +4196,7 @@ function showProjName() { const el = $('#projName'); if (el) el.textContent = AS
 function resetWork() {
   Object.assign(M, { axis: null, snap90: true, pts: [], meas: [], edges: [], rooms: [], chains: [], objs: [], notes: [], nextId: 1, nextMeas: 1, cond: false, scaleFit: false, scaleAsked: false });
   Object.assign(U, { img: null, pdf: null, pages: 0, page: 1, name: '', src: null, ptPerPx: null, srcPage: 1, _imgKey: null, _imgKeyFor: null, _imgSaved: false, _srcKey: null, _data: null, _dataFor: null, mip: null, mipSrc: null, s: 0.01, rot: 0, tx: 0, ty: 0 });
-  Object.assign(T, { noteTip: null, undo: [], redo: [], pending: null, chain: null, sel: null, buffer: null, objIds: null, roomIds: null, mA: null, tA: null, fitted: false });
+  Object.assign(T, { selSet: null, box: null, noteTip: null, undo: [], redo: [], pending: null, chain: null, sel: null, buffer: null, objIds: null, roomIds: null, mA: null, tA: null, fitted: false });
   AS.last = ''; AS.savedAt = 0; try { localStorage.removeItem('ruletka_quick'); } catch (e) { }
   adjust();
 }
@@ -4531,6 +4534,54 @@ function cycleOpening(e) { // стена → дверь (4 положения) �
   const nm = { door: 'Дверь' + (e.dor ? ` (положение ${e.dor + 1} из 4)` : ''), window: 'Окно' }[e.kind] || (e.open ? 'Пустой проём' : 'Снова стена');
   stat(nm + '. Коснитесь ещё раз — ' + (e.kind === 'door' && e.dor < 3 ? 'повернуть дверь' : e.kind === 'door' ? 'окно' : e.kind === 'window' ? 'пустой проём' : e.open ? 'снова стена' : 'дверь') + '.');
 }
+// ---------- выделение и уравнивание ----------
+const TOL = () => M.tol || 0.01; // допуск на замер, м
+function selectPts(ids) { T.selSet = ids.length ? new Set(ids) : null; draw(); showSelBox(); }
+function selMeas() { const S0 = T.selSet; return M.meas.filter(m => (m.type === 'dist' || m.type === 'thick') && m.on !== false && [m.a, m.b, m.c, m.d].filter(v => v !== undefined).every(id => S0.has(id))); }
+function angIssues() { // углы, принятые прямыми, но замеры тянут их в сторону → линейная неувязка
+  const out = []; for (const g of (T.result && T.result.angles) || []) { if (g.deg == null || !T.selSet.has(g.b)) continue; const t = Math.round(g.deg / 90) * 90; const dv = Math.abs(g.deg - t); if (dv < 0.05 || dv > (M.orthoTol || 15) || t % 360 === 0 || t === 180) continue; const pt = ptById(g.b); if (pt && pt.free) continue;
+    const B = ptById(g.b), A = ptById(g.a), C = ptById(g.c); const L = Math.min(Math.hypot(A.x - B.x, A.y - B.y), Math.hypot(C.x - B.x, C.y - B.y)); out.push({ b: g.b, deg: g.deg, lin: dv * Math.PI / 180 * L }); }
+  const best = new Map(); for (const x of out) if (!best.has(x.b) || best.get(x.b).lin < x.lin) best.set(x.b, x); return [...best.values()].sort((a, b) => b.lin - a.lin);
+}
+function misfit(list) { const r = list.filter(x => x.on !== false && x.res != null).map(x => Math.abs(x.res)); const a = angIssues().map(x => x.lin); return Math.max(0, ...r, ...a); }
+function findBlunder(list) { // какой замер «тянет» сильнее всего: выключаем по очереди трёх главных подозреваемых
+  const ai = angIssues(); const near = ai.length ? new Set([ai[0].b, ...M.edges.filter(e => e.a === ai[0].b || e.b === ai[0].b).flatMap(e => [e.a, e.b])]) : new Set();
+  const cand = [...new Set([...list.filter(m => m.type === 'dist').slice().sort((a, b) => Math.abs(b.res) - Math.abs(a.res)).slice(0, 3), ...list.filter(m => m.type === 'dist' && (near.has(m.a) || near.has(m.b)))])]; let best = null;
+  for (const m of cand) {
+    const sv = JSON.stringify(M.pts.map(p => [p.x, p.y])); m.on = false;
+    try { T.result = TAPE.solve(M); const mx = misfit(list.filter(x => x !== m)); const A = ptById(m.a), B = ptById(m.b); const exp = Math.hypot(B.x - A.x, B.y - A.y);
+      if (!best || mx < best.mx) best = { m, mx, exp }; } finally { m.on = true; const P0 = JSON.parse(sv); M.pts.forEach((p, i) => { p.x = P0[i][0]; p.y = P0[i][1]; }); }
+  }
+  adjust(); return best;
+}
+function showSelBox() {
+  let el = document.getElementById('selbox'); if (!T.selSet) { if (el) el.remove(); return; }
+  adjust(); const list = selMeas(), rs = list.filter(m => m.res != null).map(m => Math.abs(m.res)); const ai = angIssues(); const mx = Math.max(0, ...rs, ...ai.map(x => x.lin)), mean = rs.length ? rs.reduce((a, b) => a + b, 0) / rs.length : 0;
+  const rooms = M.rooms.filter(R => R.ids.every(id => T.selSet.has(id))).length;
+  const free = list.length < 1 ? 'Замеров внутри выделения нет.' : '';
+  let verdict, cls; const tol = TOL();
+  if (!list.length) { verdict = free; cls = ''; }
+  else if (mx <= tol) { verdict = `Невязки в допуске: наибольшая ${Math.round(mx * 1000)} мм, средняя ${Math.round(mean * 1000)} мм (допуск ${Math.round(tol * 1000)} мм). Можно уравнять.`; cls = 'ok'; }
+  else if (mx <= 3 * tol) { verdict = `Небольшая неувязка: наибольшая ${Math.round(mx * 1000)} мм (допуск ${Math.round(tol * 1000)} мм). Уравнять можно — расхождение разойдётся по всем замерам.`; cls = 'warn'; }
+  else { verdict = `⚠ Большая неувязка: ${Math.round(mx * 1000)} мм — похоже на ошибку в замере.`; cls = 'bad'; }
+  let blunder = null; if (cls === 'bad') { blunder = findBlunder(list); adjust(); }
+  const angTxt = ai.filter(x => x.lin > tol).slice(0, 3).map(x => `${pname(x.b)}: ${fdeg(x.deg)}`).join(', ');
+  if (!el) { el = document.createElement('div'); el.id = 'selbox'; $('#main').appendChild(el); }
+  el.className = cls;
+  el.innerHTML = `<div class="sb-h">Выделено: точек ${T.selSet.size}, замеров ${list.length}${rooms ? ', помещений ' + rooms : ''}</div><div class="sb-v">${verdict}</div>${angTxt ? `<div class="sb-v">Углы, которые должны быть прямыми, по замерам выходят: ${angTxt}.</div>` : ''}
+    ${blunder ? `<div class="sb-v">Вероятно, ошибка в замере <b>${pname(blunder.m.a)}–${pname(blunder.m.b)}</b>: записано ${fm(blunder.m.v)} м, а по остальным замерам выходит ≈ ${fm(blunder.exp)} м${blunder.mx <= tol ? ' (без него всё сходится)' : ''}.</div>
+      <div class="row"><button id="sbShow">Показать</button><button id="sbRe">↻ Перемерить</button><button id="sbOff">Не учитывать этот замер</button></div>` : ''}
+    <div class="row">${list.length ? `<button class="pri" id="sbAdj" ${cls === 'bad' ? '' : ''}>✓ Уравнять${cls === 'bad' ? ' всё равно' : ''}</button>` : ''}<button id="sbKeep">Оставить как есть</button><button id="sbAll">Выделить всё</button></div>`;
+  const q = id => el.querySelector(id);
+  q('#sbKeep').onclick = () => selectPts([]);
+  q('#sbAll').onclick = () => selectPts(M.pts.map(p => p.id));
+  if (q('#sbAdj')) q('#sbAdj').onclick = () => { tPush(); adjust(); for (const p of M.pts) if (T.selSet.has(p.id) && p.x != null) { p.x0 = p.x; p.y0 = p.y; } adjust(); stat(`Уравнено: ${T.selSet.size} точек, чертёж совпал с замерами.`); selectPts([]); renderTape(); };
+  if (blunder) {
+    q('#sbShow').onclick = () => { const A = PX(ptById(blunder.m.a)), B = PX(ptById(blunder.m.b)); fitBounds([Math.min(A[0], B[0]) - 1.5, Math.min(A[1], B[1]) - 1.5, Math.max(A[0], B[0]) + 1.5, Math.max(A[1], B[1]) + 1.5]); T.sel = hasEdge(blunder.m.a, blunder.m.b) ? { edge: hasEdge(blunder.m.a, blunder.m.b) } : { meas: blunder.m }; draw(); };
+    q('#sbRe').onclick = () => { const m = blunder.m; tPush(); M.meas = M.meas.filter(x => x !== m); adjust(); selectPts([]); makePending({ type: 'dist', a: m.a, b: m.b, re: true }); stat('Перемерьте ' + pname(m.a) + '–' + pname(m.b)); };
+    q('#sbOff').onclick = () => { tPush(); blunder.m.on = false; adjust(); showSelBox(); renderTape(); };
+  }
+}
 function continueFrom(p) { // начать (продолжить) обход от существующей точки
   if (T.pending && T.pending.got == null) T.pending = null;
   T.tool = 'walk'; T.mA = null; T.tA = null; T.roomIds = null;
@@ -4538,7 +4589,7 @@ function continueFrom(p) { // начать (продолжить) обход о�
   stat(`Обход продолжается от ${pname(p.id)}. Касайтесь следующего угла (на пустом месте — новая точка).`); renderTape(); draw();
 }
 function endChain() { if (T.pending && T.pending.got == null) T.pending = null; T.chain = null; T.mA = null; T.tA = null; T.roomIds = null; T.objIds = null; stat('Обход закончен. Коснитесь любой точки — продолжить от неё, или пустого места — начать с новой точки.'); renderTape(); draw(); }
-function setTapeTool(t) { T.tool = t; T.chain = null; T.mA = null; T.tA = null; T.roomIds = null; T.objIds = null; T.noteTip = null; renderTape(); }
+function setTapeTool(t) { if (T.selSet && t !== 'box') { T.selSet = null; showSelBox(); } T.tool = t; T.chain = null; T.mA = null; T.tA = null; T.roomIds = null; T.objIds = null; T.noteTip = null; renderTape(); }
 function addPoint(w) { const p = { id: M.nextId++, x0: w[0], y0: w[1] }; M.pts.push(p); return p; }
 function nearestPoint(w, px = 7) { let best = null, bd = px * HITK() / S.view.s; for (const p of M.pts) { const [x, y] = PX(p); const d = Math.hypot(x - w[0], y - w[1]); if (d < bd) { bd = d; best = p; } } return best; }
 function nearestEdge(w, px = 8) { let best = null, bd = px * HITK() / S.view.s, bt = 0; for (const e of M.edges) { const a = PX(ptById(e.a)), b = PX(ptById(e.b)); const [d, t] = distSeg(w, a, b); if (d < bd) { bd = d; best = e; bt = t; } } return best ? { e: best, t: bt } : null; }
@@ -4840,6 +4891,7 @@ function tapeDown(e, w) {
     const e1 = T.tA, e2 = ed.e; T.tA = null; if (e1 === e2) return;
     makePending({ type: 'thick', a: e1.a, b: e1.b, c: e2.a, d: e2.b }); return;
   }
+  if (t === 'box') { T.box = { w0: w.slice(), w1: w.slice() }; draw(); return; }
   if (t === 'note') {
     if (!T.noteTip) { const p = nearestPoint(w); T.noteTip = { tip: p ? PX(p) : w.slice(), pt: p ? p.id : null }; stat('Теперь коснитесь места, где будет текст (в ту же точку — подпись без стрелки)'); draw(); renderTape(); return; }
     const tp = T.noteTip; T.noteTip = null; const same = Math.hypot(w[0] - tp.tip[0], w[1] - tp.tip[1]) * S.view.s < 12;
@@ -4867,13 +4919,15 @@ function insertBetween(arr, a, b, p, cyclic) {
 function pendLabel(p) { return p.type === 'thick' ? `толщины стены ${pname(p.a)}–${pname(p.b)} ↔ ${pname(p.c)}–${pname(p.d)}` : `${pname(p.a)} → ${pname(p.b)}`; }
 function approxOf(p) { if (p.type !== 'dist') return null; const a = PX(ptById(p.a)), b = PX(ptById(p.b)); return Math.hypot(b[0] - a[0], b[1] - a[1]); }
 function tapeMove(w) {
+  if (T.box) { T.box.w1 = w.slice(); draw(); return true; }
   if (T.dragNote) { const d = T.dragNote; d.n.at = [w[0] + d.off[0], w[1] + d.off[1]]; draw(); return true; }
   if (T.dragPt) { const o = T.dragOff || [0, 0], x = w[0] + o[0], y = w[1] + o[1]; T.dragPt.x0 = x; T.dragPt.y0 = y; T.dragPt.x = x; T.dragPt.y = y; adjust(); draw(); return true; }
   if (T.dragU) { U.tx = T.dragU.tx + w[0] - T.dragU.w0[0]; U.ty = T.dragU.ty + w[1] - T.dragU.w0[1]; draw(); return true; }
   T.mouse = (T.tool === 'walk' && T.chain) ? snap90(T.chain[T.chain.length - 1], w) : w; if (T.tool === 'walk' && T.chain) draw();
   return false;
 }
-function tapeUp() { if (T.dragNote) { T.dragNote = null; asSoon(); renderTape(); draw(); } if (T.dragPt || T.dragU) { asSoon(); T.dragPt = null; T.dragOff = null; T.dragU = null; renderTape(); draw(); } }
+function tapeUp() { if (T.box) { const b = T.box; T.box = null; const big = Math.hypot(b.w1[0] - b.w0[0], b.w1[1] - b.w0[1]) * S.view.s > 15;
+    if (big) { const x0 = Math.min(b.w0[0], b.w1[0]), x1 = Math.max(b.w0[0], b.w1[0]), y0 = Math.min(b.w0[1], b.w1[1]), y1 = Math.max(b.w0[1], b.w1[1]); selectPts(M.pts.filter(p => { const q = PX(p); return q[0] >= x0 && q[0] <= x1 && q[1] >= y0 && q[1] <= y1; }).map(p => p.id)); } else { selectPts([]); } return; } if (T.dragNote) { T.dragNote = null; asSoon(); renderTape(); draw(); } if (T.dragPt || T.dragU) { asSoon(); T.dragPt = null; T.dragOff = null; T.dragU = null; renderTape(); draw(); } }
 function tapeDelete() {
   if (!T.sel) return; tPush();
   if (T.sel.pt) {
@@ -4960,6 +5014,8 @@ function drawTape() {
     ctx.fillStyle = col; ctx.textAlign = 'center'; lines.forEach((l, i) => ctx.fillText(l, at[0], y0 + 4 * dpr + lh * (i + 0.8))); ctx.textAlign = 'start';
     T.noteRects.push({ n, x0: x0 / dpr, y0: y0 / dpr, x1: x1 / dpr, y1: y1 / dpr });
   }
+  if (T.box) { const a = W2S(...T.box.w0), b = W2S(...T.box.w1); ctx.strokeStyle = '#1f6feb'; ctx.lineWidth = 1.5 * dpr; ctx.setLineDash([6 * dpr, 4 * dpr]); ctx.fillStyle = 'rgba(31,111,235,.08)'; ctx.fillRect(a[0], a[1], b[0] - a[0], b[1] - a[1]); ctx.strokeRect(a[0], a[1], b[0] - a[0], b[1] - a[1]); ctx.setLineDash([]); }
+  if (T.selSet) for (const p of M.pts) if (T.selSet.has(p.id)) { const sp = W2S(...PX(p)); ctx.strokeStyle = '#1f6feb'; ctx.lineWidth = 2.5 * dpr; ctx.beginPath(); ctx.arc(sp[0], sp[1], 9 * dpr, 0, 7); ctx.stroke(); }
   if (T.noteTip) { const sp = W2S(...T.noteTip.tip); ctx.fillStyle = '#d9480f'; ctx.beginPath(); ctx.arc(sp[0], sp[1], 5 * dpr, 0, 7); ctx.fill(); }
   if (T.objIds && T.objIds.length) { ctx.strokeStyle = '#7b4bd6'; ctx.lineWidth = 2 * dpr; ctx.setLineDash([6 * dpr, 4 * dpr]); ctx.beginPath(); T.objIds.forEach((id, i) => { const sp = W2S(...PX(ptById(id))); i ? ctx.lineTo(...sp) : ctx.moveTo(...sp); }); ctx.stroke(); ctx.setLineDash([]); }
   // edges
@@ -5042,6 +5098,7 @@ const TTOOLS = [['walk', 'Обход', 'щёлкайте углы по поря�
   ['room', 'Помещение', 'щёлкните точки контура по порядку и снова первую'],
   ['obj', 'Объект', 'лестница, пандус, шахта, колонна: коснитесь углов по порядку (первые две точки — НИЗ лестницы или пандуса) и снова первой точки, затем выберите тип'],
   ['note', 'Выноска', 'коснитесь места, на которое указывает стрелка, затем места для текста и введите комментарий. Коснуться дважды в одно место — подпись без стрелки. Текст выноски можно двигать пальцем'],
+  ['box', 'Выделить', 'проведите пальцем рамку вокруг части чертежа (или «Выделить всё») — появится проверка невязок и кнопка «Уравнять»'],
   ['drag', 'Двигать точку', 'перетащите точку, если начальное положение по БТИ сильно неверно (Shift + перетаскивание фона — сдвиг подложки)'],
   ['select', '✎ Правка', 'коснитесь точки, стены или размера — откроется меню: перемерить, изменить число, выключить, удалить. В любом инструменте то же меню — долгое нажатие или правый щелчок']];
 function renderTape() {
@@ -5074,6 +5131,7 @@ function renderTape() {
   <h3>Отрисовка</h3>
   <div class="row seg2"><button id="mFact" class="${M.cond ? '' : 'on'}">Факт по замерам</button><button id="mCond" class="${M.cond ? 'on' : ''}">Условно по чертежу</button></div>
   <p class="hint">${M.cond ? 'Точки стоят там, где вы их поставили на чертеже; замеры подписываются числами и идут в листы, площади — по замерам.' : 'Точки сдвигаются под замеры рулетки (уравнивание), чертёж — только подсказка.'}</p>
+  ${M.meas.length ? `<div class="row"><button id="bSelAll">⬚ Выделить всё и проверить невязки</button></div>` : ''}
   ${M.pts.length > 2 ? `<div class="row"><button id="bStr">▦ Выровнять углы до 90°</button><span class="hint" style="margin:0">исправит кривые углы на чертеже</span></div>` : ''}
   ${M.meas.length ? `<div class="row"><button id="mFit">Масштаб по замерам</button><span class="hint" style="margin:0">${(() => { const r = scaleRatio(); return r ? 'замер / чертёж ≈ ' + nf(r.k, 3) : ''; })()}</span></div>` : ''}
   <div class="row"><button id="bOvPdf" class="pri" ${M.pts.length ? '' : 'disabled'}>📄 PDF: замеры на подложке</button></div>
@@ -5101,6 +5159,7 @@ function renderTape() {
   const be = $('#bEnd'); if (be) be.onclick = endChain;
   const bo = $('#bOvPdf'); if (bo) bo.onclick = exportOverlayPdf;
   const bs = $('#bStr'); if (bs) bs.onclick = straighten;
+  const bsa = $('#bSelAll'); if (bsa) bsa.onclick = () => selectPts(M.pts.map(p => p.id));
   const setCond = v => { M.cond = v; adjust(); draw(); renderTape(); };
   $('#mFact').onclick = () => setCond(false); $('#mCond').onclick = () => setCond(true);
   const mf = $('#mFit'); if (mf) mf.onclick = () => { const r = scaleRatio(); if (r) fitScale(r.k); };
@@ -5110,7 +5169,7 @@ function renderTape() {
   $('#auto').onchange = e => T.auto = e.target.checked;
   const pa = $('#pAcc'); if (pa) pa.onclick = acceptPending; const pr = $('#pRej'); if (pr) pr.onclick = rejectPending;
   const ps = $('#pSkip'); if (ps) ps.onclick = e => { e.preventDefault(); skipPending(); };
-  side.querySelectorAll('[data-tt]').forEach(b => b.onclick = () => { T.tool = b.dataset.tt; T.mA = null; T.tA = null; T.roomIds = null; T.objIds = null; T.noteTip = null; if (T.tool !== 'walk') T.chain = null; renderTape(); });
+  side.querySelectorAll('[data-tt]').forEach(b => b.onclick = () => { if (T.selSet && b.dataset.tt !== 'box') { T.selSet = null; showSelBox(); } T.tool = b.dataset.tt; T.mA = null; T.tA = null; T.roomIds = null; T.objIds = null; T.noteTip = null; if (T.tool !== 'walk') T.chain = null; renderTape(); });
   $('#tUndo').onclick = tUndo; $('#tRedo').onclick = tRedo;
   $('#orth').onchange = e => { M.ortho = e.target.checked; adjust(); renderTape(); };
   side.querySelectorAll('[data-mon]').forEach(c => c.onchange = () => { const m = M.meas.find(x => x.id === +c.dataset.mon); tPush(); m.on = c.checked; adjust(); renderTape(); });
