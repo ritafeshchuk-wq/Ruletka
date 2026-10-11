@@ -211,7 +211,7 @@ header{overflow-x:auto;scrollbar-width:none}header::-webkit-scrollbar{display:no
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 1.1 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 1.2 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -3779,7 +3779,11 @@ function pMove(ev) {
   if (TP.tap) {
     if (Math.hypot(ev.clientX - TP.tap.x, ev.clientY - TP.tap.y) < 10) return;
     lpCancel(); const t0 = TP.tap; TP.tap = null;
-    if (toolDrags()) { TP.toolDrag = true; onDown(fakeEv(t0.ev, t0.x, t0.y)); }
+    // «Рулетка»: палец лёг на точку и повёл — двигаем точку (линии идут за ней, замеры не меняются)
+    if (S.step === 'tape' && !T.calMode) { const w0 = S2W(t0.x - r.left, t0.y - r.top), p = nearestPoint(w0, 11);
+      if (p) { tPush(); const q = PX(p); T.dragPt = p; T.dragOff = [q[0] - w0[0], q[1] - w0[1]]; T.sel = { pt: p }; TP.toolDrag = true; if (navigator.vibrate) navigator.vibrate(10); stat(`Двигаю ${pname(p.id)}${M.cond ? '' : ' — в режиме «Факт» итоговое место точки определяют замеры'}`); } }
+    if (TP.toolDrag) { }
+    else if (toolDrags()) { TP.toolDrag = true; onDown(fakeEv(t0.ev, t0.x, t0.y)); }
     else TP.pan = { px: t0.x, py: t0.y, cx: S.view.cx, cy: S.view.cy };
   }
   if (TP.toolDrag) { onMove(fakeEv(ev)); return; }
@@ -4207,7 +4211,7 @@ function fitScale(k) { // масштабировать подложку и то�
   stat('Масштаб подложки подогнан по замерам (×' + nf(k, 4) + ').');
 }
 async function offerScaleFit() {
-  if (M.scaleFit || M.scaleAsked || M.cond) return; const r = scaleRatio(); if (!r || Math.abs(r.k - 1) < 0.08) return;
+  if (!U.img || M.scaleFit || M.scaleAsked || M.cond) return; const r = scaleRatio(); if (!r || Math.abs(r.k - 1) < 0.08) return;
   M.scaleAsked = true;
   if (await uiDialog({ title: 'Масштаб чертежа не совпадает с замером', text: `Замер рулеткой ${r.k > 1 ? 'длиннее' : 'короче'}, чем та же линия на подложке, в ${nf(r.k > 1 ? r.k : 1 / r.k, 2)} раза — подложка открыта не в том масштабе. Подогнать масштаб подложки под замеры? Тогда отрисовка совпадёт с чертежом. (Потом — кнопка «Масштаб по замерам».)`, ok: 'Подогнать', cancel: 'Не сейчас' })) fitScale(r.k);
 }
@@ -4504,12 +4508,12 @@ function insertBetween(arr, a, b, p, cyclic) {
 function pendLabel(p) { return p.type === 'thick' ? `толщины стены ${pname(p.a)}–${pname(p.b)} ↔ ${pname(p.c)}–${pname(p.d)}` : `${pname(p.a)} → ${pname(p.b)}`; }
 function approxOf(p) { if (p.type !== 'dist') return null; const a = PX(ptById(p.a)), b = PX(ptById(p.b)); return Math.hypot(b[0] - a[0], b[1] - a[1]); }
 function tapeMove(w) {
-  if (T.dragPt) { T.dragPt.x0 = w[0]; T.dragPt.y0 = w[1]; T.dragPt.x = w[0]; T.dragPt.y = w[1]; adjust(); draw(); return true; }
+  if (T.dragPt) { const o = T.dragOff || [0, 0], x = w[0] + o[0], y = w[1] + o[1]; T.dragPt.x0 = x; T.dragPt.y0 = y; T.dragPt.x = x; T.dragPt.y = y; adjust(); draw(); return true; }
   if (T.dragU) { U.tx = T.dragU.tx + w[0] - T.dragU.w0[0]; U.ty = T.dragU.ty + w[1] - T.dragU.w0[1]; draw(); return true; }
   T.mouse = w; if (T.tool === 'walk' && T.chain) draw();
   return false;
 }
-function tapeUp() { if (T.dragPt || T.dragU) { T.dragPt = null; T.dragU = null; renderTape(); } }
+function tapeUp() { if (T.dragPt || T.dragU) { T.dragPt = null; T.dragOff = null; T.dragU = null; renderTape(); draw(); } }
 function tapeDelete() {
   if (!T.sel) return; tPush();
   if (T.sel.pt) {
@@ -4578,7 +4582,7 @@ function drawTape() {
     if (L * S.view.s > 35) {
       ctx.save(); ctx.translate((sa[0] + sb[0]) / 2, (sa[1] + sb[1]) / 2); let r = Math.atan2(sb[1] - sa[1], sb[0] - sa[0]); if (r > Math.PI / 2) r -= Math.PI; if (r < -Math.PI / 2) r += Math.PI; ctx.rotate(r);
       ctx.textAlign = 'center'; ctx.font = `bold ${12 * dpr}px Golos Text, Segoe UI`;
-      if (m) { const bad = Math.abs(m.res || 0) > 0.005; ctx.fillStyle = bad ? '#c4372f' : '#111'; ctx.fillText(Math.round(m.v * 1000) + (bad ? ` (${m.res > 0 ? '+' : ''}${Math.round(m.res * 1000)})` : ''), 0, -7 * dpr); }
+      if (m) { const bad = !M.cond && Math.abs(m.res || 0) > 0.005; ctx.fillStyle = bad ? '#c4372f' : '#111'; ctx.fillText(Math.round(m.v * 1000) + (bad ? ` (${m.res > 0 ? '+' : ''}${Math.round(m.res * 1000)})` : ''), 0, -7 * dpr); }
       else { ctx.fillStyle = '#9aa3b2'; ctx.font = `${11 * dpr}px Golos Text, Segoe UI`; ctx.fillText('≈' + Math.round(L * 1000), 0, -7 * dpr); }
       ctx.restore();
     }
@@ -4587,7 +4591,7 @@ function drawTape() {
   for (const m of M.meas) {
     if (m.type !== 'dist' || hasEdge(m.a, m.b)) continue;
     const A = ptById(m.a), B = ptById(m.b); if (!A || !B) continue; const sa = W2S(...PX(A)), sb = W2S(...PX(B));
-    const bad = Math.abs(m.res || 0) > 0.005;
+    const bad = !M.cond && Math.abs(m.res || 0) > 0.005;
     ctx.strokeStyle = m.on === false ? '#ccc' : bad ? '#c4372f' : '#7b4bd6'; ctx.lineWidth = 1.2 * dpr; ctx.setLineDash([3 * dpr, 3 * dpr]);
     ctx.beginPath(); ctx.moveTo(...sa); ctx.lineTo(...sb); ctx.stroke(); ctx.setLineDash([]);
     ctx.fillStyle = ctx.strokeStyle; ctx.font = `${11 * dpr}px Golos Text, Segoe UI`; ctx.textAlign = 'center';
