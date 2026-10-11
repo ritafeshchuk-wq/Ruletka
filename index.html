@@ -115,7 +115,7 @@ input[type=range]{accent-color:var(--acc)}
 #pagePick .pp-t small{flex-basis:100%;color:var(--mute);font-size:11.5px;line-height:1.3}
 #pagePick .pp-n{font-weight:700;color:var(--acc-text)}
 /* tablet / touch */
-#tbar{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;white-space:nowrap;max-width:calc(100% - 24px);padding:6px;background:rgba(27,36,48,.92);border-radius:14px;box-shadow:0 6px 20px rgba(15,23,36,.3);z-index:6}
+#tbar{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);display:flex;gap:6px;flex-wrap:wrap;justify-content:center;white-space:nowrap;max-width:calc(100% - 24px);padding:6px;background:rgba(27,36,48,.92);border-radius:14px;box-shadow:0 6px 20px rgba(15,23,36,.3);z-index:6}
 #tbar[hidden]{display:none}
 #tbar button{min-height:44px;padding:8px 14px;font-size:14px;border:0;border-radius:10px;background:#34404F;color:#fff}
 #tbar button.on{background:var(--acc);color:var(--acc-ink)}
@@ -211,7 +211,7 @@ header{overflow-x:auto;scrollbar-width:none}header::-webkit-scrollbar{display:no
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 1.2 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 1.3 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -3715,7 +3715,8 @@ function renderTouchBar() {
     (plan || reg) && TB.shown ? btn('shift', reg ? 'Поворот' : 'Добавлять к выбору', TB.shift ? 'on' : '') : '',
     plan && TB.shown ? btn('del', 'Удалить') : '',
     btn('fit', '⤢'),
-    pend ? btn('esc', 'Пропустить') : (tape && (T.chain || T.mA || T.tA || T.roomIds)) ? btn('esc', 'Стоп') : (TB.shown && !tape ? btn('esc', 'Esc') : ''),
+    pend ? btn('esc', 'Пропустить') : (TB.shown && !tape ? btn('esc', 'Esc') : ''),
+    tape && T.chain ? btn('endc', '■ Закончить обход') : (tape && (T.mA || T.tA || T.roomIds)) ? btn('esc', 'Стоп') : '',
     pend && T.pending.got != null ? btn('ok', '✓ Принять', 'pri') : ''
   ].join('');
 }
@@ -3734,6 +3735,7 @@ function tbAct(e) {
   else if (k === 'edit') setTapeTool(T.tool === 'select' ? 'walk' : 'select');
   else if (k === 'del') tbKey('Delete');
   else if (k === 'esc') tbKey('Escape');
+  else if (k === 'endc') endChain();
   else if (k === 'ok') tbKey('Enter');
   renderTouchBar(); return true;
 }
@@ -4172,7 +4174,8 @@ function tapeMenu(w, cx, cy) {
   if (h.pt) {
     const id = h.pt.id, nm = M.meas.filter(m => m.type !== 'line' && [m.a, m.b, m.c, m.d].includes(id)).length;
     title = `Точка ${pname(id)}` + (nm ? ` · замеров: ${nm}` : '');
-    items.push(['✥ Передвинуть', () => { setTapeTool('drag'); stat('Перетащите точку ' + pname(id)); }]);
+    items.push(['▶ Продолжить обход от этой точки', () => continueFrom(h.pt)]);
+    items.push(['✥ Передвинуть', () => { stat('Просто ведите точку ' + pname(id) + ' пальцем'); }]);
     items.push([nm ? `🗑 Удалить точку и её замеры (${nm})` : '🗑 Удалить точку', () => { T.sel = { pt: h.pt }; tapeDelete(); stat('Точка удалена. ↶ Отменить — вернуть'); }, 'danger']);
   } else if (h.edge) {
     const m = h.meas; title = `Стена ${pname(h.edge.a)}–${pname(h.edge.b)}` + (m ? ` · ${mv(m)}` : ' · без замера');
@@ -4193,6 +4196,13 @@ function tapeMenu(w, cx, cy) {
   el.querySelectorAll('button').forEach(b => b[window.PointerEvent ? 'onpointerup' : 'onclick'] = ev => { ev.stopPropagation(); ev.preventDefault(); const i = b.dataset.i; closeTapeMenu(); if (i !== 'x') items[+i][1](); T.sel = null; renderTape(); draw(); });
   return true;
 }
+function continueFrom(p) { // начать (продолжить) обход от существующей точки
+  if (T.pending && T.pending.got == null) T.pending = null;
+  T.tool = 'walk'; T.mA = null; T.tA = null; T.roomIds = null;
+  T.chain = [p.id]; M.chains.push(T.chain); T.sel = null;
+  stat(`Обход продолжается от ${pname(p.id)}. Касайтесь следующего угла (на пустом месте — новая точка).`); renderTape(); draw();
+}
+function endChain() { if (T.pending && T.pending.got == null) T.pending = null; T.chain = null; T.mA = null; T.tA = null; T.roomIds = null; stat('Обход закончен. Коснитесь любой точки — продолжить от неё, или пустого места — начать с новой точки.'); renderTape(); draw(); }
 function setTapeTool(t) { T.tool = t; T.chain = null; T.mA = null; T.tA = null; T.roomIds = null; renderTape(); }
 function addPoint(w) { const p = { id: M.nextId++, x0: w[0], y0: w[1] }; M.pts.push(p); return p; }
 function nearestPoint(w, px = 7) { let best = null, bd = px * HITK() / S.view.s; for (const p of M.pts) { const [x, y] = PX(p); const d = Math.hypot(x - w[0], y - w[1]); if (d < bd) { bd = d; best = p; } } return best; }
@@ -4661,6 +4671,7 @@ function renderTape() {
       : `<div class="hint">Ожидаю замер с рулетки или ввод вручную… <a href="#" id="pSkip">пропустить (Esc)</a></div>`}</div>`
     : (T.buffer ? `<div class="hint">В буфере: <b>${nf(T.buffer.v, 3)} м</b> — укажите точки на плане</div>` : '')}
   ${T.last ? `<div class="hint">Последний замер: ${nf(T.last.v, 3)} м (${T.last.src === 'bt' ? 'DISTO' : 'вручную'})</div>` : ''}
+  ${T.tool === 'walk' && T.chain ? `<div class="row"><span class="hint" style="margin:0;flex:1">Обход идёт от <b>${pname(T.chain[T.chain.length - 1])}</b></span><button id="bEnd" class="pri">■ Закончить обход</button></div>` : T.tool === 'walk' ? '<p class="hint">Обход не начат: коснитесь точки — продолжить от неё; пустого места — новая точка.</p>' : ''}
   <h3>Отрисовка</h3>
   <div class="row seg2"><button id="mFact" class="${M.cond ? '' : 'on'}">Факт по замерам</button><button id="mCond" class="${M.cond ? 'on' : ''}">Условно по чертежу</button></div>
   <p class="hint">${M.cond ? 'Точки стоят там, где вы их поставили на чертеже; замеры подписываются числами и идут в листы, площади — по замерам.' : 'Точки сдвигаются под замеры рулетки (уравнивание), чертёж — только подсказка.'}</p>
@@ -4685,6 +4696,7 @@ function renderTape() {
   const ua = $('#uA'); if (ua) ua.oninput = e => { U.alpha = +e.target.value; draw(); };
   $('#bBt').onclick = async () => { if (T.btState !== 'подключена') return connectDisto(); if (await uiDialog({ title: 'Отключить DISTO?', text: 'Рулетка перестанет передавать замеры, пока не подключите её снова.', ok: 'Отключить', cancel: 'Оставить' })) disconnectDisto(); };
   const bm = $('#bMeas'); if (bm) bm.onclick = distoMeasure;
+  const be = $('#bEnd'); if (be) be.onclick = endChain;
   const setCond = v => { M.cond = v; adjust(); draw(); renderTape(); };
   $('#mFact').onclick = () => setCond(false); $('#mCond').onclick = () => setCond(true);
   const mf = $('#mFit'); if (mf) mf.onclick = () => { const r = scaleRatio(); if (r) fitScale(r.k); };
