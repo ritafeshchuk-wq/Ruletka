@@ -260,7 +260,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 3.6 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 3.7 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -3802,7 +3802,9 @@ function renderTouchBar() {
     btn('fit', '⤢'),
     pend ? btn('esc', 'Пропустить') : (TB.shown && !tape ? btn('esc', 'Esc') : ''),
     tape && T.chain ? btn('endc', '■ Закончить обход') : (tape && (T.mA || T.tA || T.roomIds || T.objIds || T.noteTip)) ? btn('esc', 'Стоп') : '',
-    pend && T.pending.got != null ? btn('ok', '✓ Принять', 'pri') : ''
+    pend && T.pending.got != null ? btn('ok', '✓ Принять', 'pri') : '',
+    tape && (T.selSet || T.sel) ? btn('trash', '🗑 Удалить', 'danger') : '',
+    tape && CLIP && CLIP.pts && CLIP.pts.length ? btn('paste', '📋 Вставить') : ''
   ].join('');
 }
 function tbKey(key, extra = {}) { window.dispatchEvent(new KeyboardEvent('keydown', Object.assign({ key, bubbles: true }, extra))); }
@@ -3821,6 +3823,8 @@ function tbAct(e) {
   else if (k === 'del') tbKey('Delete');
   else if (k === 'esc') tbKey('Escape');
   else if (k === 'endc') endChain();
+  else if (k === 'trash') { if (T.selSet) selDelete(); else if (T.sel) { tapeDelete(); closeTapeMenu(); } }
+  else if (k === 'paste') clipPaste();
   else if (k === 's90') { M.snap90 = M.snap90 === false; stat(M.snap90 === false ? 'Привязка 90° выключена: точки ставятся как есть.' : 'Привязка 90°: новая стена ложится вдоль или поперёк предыдущей (если отклонение меньше 15°).'); }
   else if (k === 'ok') tbKey('Enter');
   renderTouchBar(); return true;
@@ -4179,7 +4183,7 @@ async function unpackProj(txt) {
   if (j.tape && j.tape.U && j.tape.U.srcRef) { const so = await asGetK(j.tape.U.srcRef); if (so && so.bytes) j.tape.U.srcObj = so; }
   return j;
 }
-function quickSave() { try { if (AS.restoring || AS.restoreFailed || !AS.pid || (!hasWork() && !AS.last)) return; localStorage.setItem('ruletka_quick', JSON.stringify({ when: Date.now(), pid: AS.pid, page: U.srcPage || 1, M, U: U.img ? { s: U.s, rot: U.rot, tx: U.tx, ty: U.ty, alpha: U.alpha, name: U.name } : null })); } catch (e) { } }
+function quickSave() { try { if (AS.hold || AS.restoring || AS.restoreFailed || !AS.pid || (!hasWork() && !AS.last)) return; localStorage.setItem('ruletka_quick', JSON.stringify({ when: Date.now(), pid: AS.pid, page: U.srcPage || 1, M, U: U.img ? { s: U.s, rot: U.rot, tx: U.tx, ty: U.ty, alpha: U.alpha, name: U.name } : null })); } catch (e) { } }
 // сохранения идут строго по очереди: вызов во время записи не теряется, а ставится следом (с самым свежим состоянием)
 let AS_Q = Promise.resolve();
 function autosave(force) {
@@ -4189,6 +4193,7 @@ function autosave(force) {
   return AS_Q;
 }
 async function autosave0(force) {
+  if (AS.hold) { asSoon(); return; }
   if (AS.restoring || AS.restoreFailed || (!hasWork() && !AS.last)) return;
   if (!AS.pid) await projCreate(AS.pname || ('Обмер ' + new Date().toLocaleDateString('ru')), true);
   AS.busy = true; const gen = AS.gen || 0;
@@ -4250,6 +4255,20 @@ async function restoreFrom(r, label) {
   catch (err) { console.error(err); AS.restoreFailed = true; uiAlert('Не удалось открыть: ' + err.message + '\n\nСохранённые данные НЕ тронуты и не перезаписаны. Попробуйте «Копии» — более раннюю копию, или откройте файл проекта. Сделайте снимок экрана с этим сообщением.'); }
   AS.restoring = false; busy(''); showAS(); if (ok) autosave(true); return ok;
 }
+function snapPages(t) { // листы с замерами в копии: [{pg, n, m, u}]
+  const out = []; const cur = t.U && t.U.srcPage || 1;
+  for (const [k, d] of Object.entries(t.pages || {})) { if (+k === cur) continue; try { const m = JSON.parse(d.m); if (m.pts && m.pts.length) out.push({ pg: +k, n: m.pts.length, m, u: d.u }); } catch (e) { } }
+  if (t.M && t.M.pts && t.M.pts.length) { const m = {}; MKEYS.forEach(k => { if (t.M[k] !== undefined) m[k] = t.M[k]; }); out.push({ pg: cur, n: t.M.pts.length, m, u: t.U ? { s: t.U.s, rot: t.U.rot, tx: t.U.tx, ty: t.U.ty, alpha: t.U.alpha, ptPerPx: t.U.ptPerPx, pw: t.U.pw, ph: t.U.ph } : null }); }
+  return out.sort((a, b) => a.pg - b.pg);
+}
+async function restorePageFromSnap(t, pg, w) {
+  const x = snapPages(t).find(v => v.pg === pg); if (!x) return;
+  await autosave(true); if (hasWork()) await addSnap({ when: Date.now(), summary: workSummary() + ` (до возврата листа ${pg})`, proj: AS.last, sid: AS.sid, pid: AS.pid });
+  if (U.srcPage === pg) { tPush(); PGS.data[pg] = { m: JSON.stringify(x.m), u: x.u || (PGS.data[pg] && PGS.data[pg].u) }; const d = loadPageModel(pg); if (d && d.u) Object.assign(U, { s: d.u.ptPerPx && U.ptPerPx ? d.u.s * U.ptPerPx / d.u.ptPerPx : d.u.s, rot: d.u.rot, tx: d.u.tx, ty: d.u.ty }); adjust(); fitTape(); draw(); renderTape(); }
+  else { savePage(); PGS.data[pg] = { m: JSON.stringify(x.m), u: x.u || (PGS.data[pg] && PGS.data[pg].u) }; renderTape(); }
+  asSoon(); await autosave(true);
+  stat(`Лист ${pg} возвращён из копии ${tfmt(w)} (точек ${x.n}). Остальные листы не тронуты. ${U.srcPage === pg ? '' : 'Перейдите на лист ' + pg + ', чтобы посмотреть.'}`);
+}
 async function snapsDialog() {
   const list = ((await asGetK('snaps')) || []).filter(x => !AS.pid || !x.pid || x.pid === AS.pid).slice().reverse();
   closeTapeMenu(); const el = document.createElement('div'); el.id = 'pagePick';
@@ -4257,7 +4276,18 @@ async function snapsDialog() {
   document.body.appendChild(el);
   el.querySelector('#snX').onclick = () => el.remove();
   el.querySelector('#snNew').onclick = () => { el.remove(); goHome(); }; el.onclick = e => { if (e.target === el) el.remove(); };
-  el.querySelectorAll('[data-w]').forEach(b => b.onclick = async () => { const w = +b.dataset.w; el.remove(); await autosave(true); if (hasWork()) await addSnap({ when: Date.now(), summary: workSummary() + ' (до возврата)', proj: AS.last, sid: AS.sid }); const proj = await asGetK('snap:' + w); if (!proj || proj === true) { uiAlert('Эта копия не найдена.'); return; } restoreFrom({ when: w, proj }, 'копия ' + tfmt(w)); });
+  el.querySelectorAll('[data-w]').forEach(b => b.onclick = async () => { const w = +b.dataset.w;
+    const proj = await asGetK('snap:' + w); let j = null; try { j = JSON.parse(proj); } catch (e) { }
+    const pgs = j && j.tape ? snapPages(j.tape) : [];
+    if (pgs.length && (U.src && U.src.kind === 'pdf')) {
+      const box = el.querySelector('.pp-box'); box.innerHTML = `<div class="pp-head"><div><b>Копия ${tfmt(w)}</b><div class="hint" style="margin:2px 0 0">Можно вернуть только один лист — остальные листы и всё сделанное на них после этой копии останутся как есть.</div></div><button id="snX2">Назад</button></div>
+        <div style="display:flex;flex-direction:column;gap:6px">${pgs.map(x => `<button data-pg="${x.pg}" style="text-align:left;padding:10px 12px">↩ Только <b>лист ${x.pg}</b> из этой копии <span class="hint" style="margin:0">точек ${x.n}${U.srcPage === x.pg ? ' · это текущий лист' : ''}${pgHas(x.pg) || (U.srcPage === x.pg && M.pts.length) ? '' : ' · сейчас на листе пусто'}</span></button>`).join('')}
+        <button data-all="1" style="text-align:left;padding:10px 12px">Вернуть <b>весь проект</b> к этой копии</button></div>`;
+      box.querySelector('#snX2').onclick = () => { el.remove(); snapsDialog(); };
+      box.querySelectorAll('[data-pg]').forEach(x => x.onclick = async () => { el.remove(); await restorePageFromSnap(j.tape, +x.dataset.pg, w); });
+      box.querySelector('[data-all]').onclick = async () => { el.remove(); await autosave(true); if (hasWork()) await addSnap({ when: Date.now(), summary: workSummary() + ' (до возврата)', proj: AS.last, sid: AS.sid, pid: AS.pid }); restoreFrom({ when: w, proj }, 'копия ' + tfmt(w)); };
+      return; }
+    el.remove(); await autosave(true); if (hasWork()) await addSnap({ when: Date.now(), summary: workSummary() + ' (до возврата)', proj: AS.last, sid: AS.sid, pid: AS.pid }); if (!proj || proj === true) { uiAlert('Эта копия не найдена.'); return; } restoreFrom({ when: w, proj }, 'копия ' + tfmt(w)); });
 }
 // ---------- проекты ----------
 const PJ = { list: [] };
@@ -4695,7 +4725,52 @@ function tapSelect(w) { const cur = T.selSet ? [...T.selSet] : [], p = nearestPo
   if (R) { selectPts([...new Set(cur.concat(R.ids))]); stat(`Выделено помещение ${R.num || ''} ${R.name || ''} — тащите его пальцем за любое место внутри рамки`); return; }
   const ed = nearestEdge(w, 14); if (ed) { selectPts([...new Set(cur.concat([ed.e.a, ed.e.b]))]); return; }
   selectPts([]); }
-function selectPts(ids) { T.selSet = ids.length ? new Set(ids) : null; draw(); showSelBox(); }
+// ---------- корзина, копировать / вырезать / вставить ----------
+const mIds = m => [m.a, m.b, m.c, m.d, m.p].filter(v => v !== undefined && v !== null);
+function selRectOf(S0) { const q = M.pts.filter(p => S0.has(p.id)).map(PX); if (!q.length) return null; const xs = q.map(v => v[0]), ys = q.map(v => v[1]); return [Math.min(...xs) - 0.3, Math.min(...ys) - 0.3, Math.max(...xs) + 0.3, Math.max(...ys) + 0.3]; }
+function selBundle() {
+  const S0 = T.selSet; if (!S0 || !S0.size) return null; const r = T.selRect || selRectOf(S0); const inR = q => !!(q && r && q[0] >= r[0] && q[0] <= r[2] && q[1] >= r[1] && q[1] <= r[3]);
+  const J = x => JSON.parse(JSON.stringify(x));
+  return J({ pts: M.pts.filter(p => S0.has(p.id)).map(p => { const q = PX(p); return { ...p, x0: q[0], y0: q[1] }; }), edges: M.edges.filter(e => S0.has(e.a) && S0.has(e.b)),
+    meas: M.meas.filter(m => mIds(m).length && mIds(m).every(id => S0.has(id))), rooms: M.rooms.filter(R => R.ids.every(id => S0.has(id))),
+    chains: (M.chains || []).filter(c => c.length > 1 && c.every(id => S0.has(id))), objs: (M.objs || []).filter(o => o.ids.every(id => S0.has(id))),
+    notes: (M.notes || []).filter(n => (n.pt != null && S0.has(n.pt)) || inR(n.at)), marks: (M.marks || []).filter(m => inR(m.p)), rect: r });
+}
+function selDelete(quiet) {
+  const b = selBundle(); if (!b) return false; const S0 = T.selSet; tPush();
+  const nb = new Set(b.notes.map(n => n.id)), mb = new Set(b.marks.map(m => m.id));
+  M.pts = M.pts.filter(p => !S0.has(p.id)); M.edges = M.edges.filter(e => !S0.has(e.a) && !S0.has(e.b)); M.meas = M.meas.filter(m => !mIds(m).some(id => S0.has(id)));
+  M.rooms = M.rooms.map(R => ({ ...R, ids: R.ids.filter(id => !S0.has(id)) })).filter(R => R.ids.length >= 3);
+  M.chains = (M.chains || []).map(c => c.filter(id => !S0.has(id))).filter(c => c.length > 1);
+  M.objs = (M.objs || []).filter(o => !o.ids.some(id => S0.has(id))); M.notes = (M.notes || []).filter(n => !nb.has(n.id)).map(n => n.pt != null && S0.has(n.pt) ? { ...n, pt: null } : n);
+  M.marks = (M.marks || []).filter(m => !mb.has(m.id)); T.hatch = null; T.chain = null; T.sel = null; T.selRect = null; markObjEdges(); selectPts([]); adjust(); draw(); renderTape();
+  if (!quiet) stat(`В корзину: точек ${b.pts.length}, замеров ${b.meas.length}${b.notes.length ? ', выносок ' + b.notes.length : ''}${b.marks.length ? ', отметок ' + b.marks.length : ''}. «↶ Отменить» — вернуть.`);
+  return true;
+}
+let CLIP = null; try { CLIP = JSON.parse(localStorage.getItem('ruletka_clip') || 'null'); } catch (e) { }
+function selCopy(cut) {
+  const b = selBundle(); if (!b) return; b.from = { pid: AS.pid, page: U.srcPage || 1 }; b.when = Date.now(); CLIP = b;
+  try { localStorage.setItem('ruletka_clip', JSON.stringify(b)); } catch (e) { }
+  if (cut) selDelete(true); else { selectPts([]); }
+  stat(`${cut ? 'Вырезано' : 'Скопировано'}: точек ${b.pts.length}, замеров ${b.meas.length}. Перейдите на нужный лист (или проект) и нажмите «📋 Вставить» внизу — вставится в центр экрана.`); renderTape();
+}
+function clipPaste() {
+  const b = CLIP; if (!b || !b.pts || !b.pts.length) return; tPush();
+  const dpr = devicePixelRatio, c = S2W(cv.width / dpr / 2, cv.height / dpr / 2), xs = b.pts.map(p => p.x0), ys = b.pts.map(p => p.y0);
+  const dx = c[0] - (Math.min(...xs) + Math.max(...xs)) / 2, dy = c[1] - (Math.min(...ys) + Math.max(...ys)) / 2;
+  const P = new Map(); for (const p of b.pts) { const id = M.nextId++; P.set(p.id, id); M.pts.push({ ...p, id, x0: p.x0 + dx, y0: p.y0 + dy, x: p.x0 + dx, y: p.y0 + dy }); }
+  const R = id => P.get(id), mx = (arr, k = 'id') => (arr || []).reduce((m, x) => Math.max(m, +x[k] || 0), 0);
+  for (const e of b.edges) M.edges.push({ ...e, a: R(e.a), b: R(e.b) });
+  for (const m of b.meas) { const n = { ...m, id: M.nextMeas++ }; for (const k of ['a', 'b', 'c', 'd', 'p']) if (n[k] !== undefined && n[k] !== null) n[k] = R(n[k]); M.meas.push(n); }
+  let rn = mx(M.rooms, 'num'); for (const r of b.rooms) M.rooms.push({ ...r, num: ++rn, ids: r.ids.map(R) });
+  for (const ch of b.chains) M.chains.push(ch.map(R));
+  let oi = mx(M.objs); for (const o of b.objs) (M.objs = M.objs || []).push({ ...o, id: ++oi, ids: o.ids.map(R) });
+  let ni = mx(M.notes); for (const n of b.notes) (M.notes = M.notes || []).push({ ...n, id: ++ni, at: [n.at[0] + dx, n.at[1] + dy], tip: n.tip ? [n.tip[0] + dx, n.tip[1] + dy] : n.tip, pt: n.pt != null ? (R(n.pt) ?? null) : null });
+  let ki = mx(M.marks); for (const m of b.marks) (M.marks = M.marks || []).push({ ...m, id: ++ki, p: [m.p[0] + dx, m.p[1] + dy] });
+  markObjEdges(); adjust(); setTapeTool('box'); T.selRect = null; selectPts([...P.values()]); draw(); renderTape();
+  stat(`Вставлено: точек ${b.pts.length}, замеров ${b.meas.length}. Перетащите пальцем за рамку на нужное место; «↶ Отменить» — убрать.`);
+}
+function selectPts(ids) { T.selSet = ids.length ? new Set(ids) : null; if (!T.selSet) T.selRect = null; draw(); showSelBox(); renderTouchBar(); }
 function selMeas() { const S0 = T.selSet; return M.meas.filter(m => (m.type === 'dist' || m.type === 'thick' || m.type === 'tie') && m.on !== false && [m.a, m.b, m.c, m.d].filter(v => v !== undefined).every(id => S0.has(id))); }
 function angIssues() { // углы, принятые прямыми, но замеры тянут их в сторону → линейная неувязка
   const out = []; for (const g of (T.result && T.result.angles) || []) { if (g.deg == null || !T.selSet.has(g.b)) continue; const t = Math.round(g.deg / 90) * 90; const dv = Math.abs(g.deg - t); if (dv < 0.05 || dv > (M.orthoTol || 15) || t % 360 === 0 || t === 180) continue; const pt = ptById(g.b); if (pt && pt.free) continue;
@@ -4730,10 +4805,12 @@ function showSelBox() {
   el.innerHTML = `<div class="sb-h">Выделено: точек ${T.selSet.size}, замеров ${list.length}${rooms ? ', помещений ' + rooms : ''}</div><div class="sb-v">${verdict}</div>${angTxt ? `<div class="sb-v">Углы, которые должны быть прямыми, по замерам выходят: ${angTxt}.</div>` : ''}
     ${blunder ? `<div class="sb-v">Вероятно, ошибка в замере <b>${pname(blunder.m.a)}–${pname(blunder.m.b)}</b>: записано ${fm(blunder.m.v)} м, а по остальным замерам выходит ≈ ${fm(blunder.exp)} м${blunder.mx <= tol ? ' (без него всё сходится)' : ''}.</div>
       <div class="row"><button id="sbShow">Показать</button><button id="sbRe">↻ Перемерить</button><button id="sbOff">Не учитывать этот замер</button></div>` : ''}
-    <div class="row">${list.length ? `<button class="pri" id="sbAdj" ${cls === 'bad' ? '' : ''}>✓ Уравнять${cls === 'bad' ? ' всё равно' : ''}</button>` : ''}<button id="sbKeep">Оставить как есть</button><button id="sbAll">Выделить всё</button></div>`;
+    <div class="row">${list.length ? `<button class="pri" id="sbAdj" ${cls === 'bad' ? '' : ''}>✓ Уравнять${cls === 'bad' ? ' всё равно' : ''}</button>` : ''}<button id="sbKeep">Оставить как есть</button><button id="sbAll">Выделить всё</button></div>
+    <div class="row"><button id="sbDel" class="danger">🗑 Удалить</button><button id="sbCopy">⧉ Копировать</button><button id="sbCut">✂ Вырезать</button></div>`;
   const q = id => el.querySelector(id);
   q('#sbKeep').onclick = () => selectPts([]);
-  q('#sbAll').onclick = () => selectPts(M.pts.map(p => p.id));
+  q('#sbAll').onclick = () => { selectPts(M.pts.map(p => p.id)); T.selRect = [-1e9, -1e9, 1e9, 1e9]; };
+  q('#sbDel').onclick = () => selDelete(); q('#sbCopy').onclick = () => selCopy(false); q('#sbCut').onclick = () => selCopy(true);
   if (q('#sbAdj')) q('#sbAdj').onclick = () => { tPush(); adjust(); for (const p of M.pts) if (T.selSet.has(p.id) && p.x != null) { p.x0 = p.x; p.y0 = p.y; } adjust(); stat(`Уравнено: ${T.selSet.size} точек, чертёж совпал с замерами.`); selectPts([]); renderTape(); };
   if (blunder) {
     q('#sbShow').onclick = () => { const A = PX(ptById(blunder.m.a)), B = PX(ptById(blunder.m.b)); fitBounds([Math.min(A[0], B[0]) - 1.5, Math.min(A[1], B[1]) - 1.5, Math.max(A[0], B[0]) + 1.5, Math.max(A[1], B[1]) + 1.5]); T.sel = hasEdge(blunder.m.a, blunder.m.b) ? { edge: hasEdge(blunder.m.a, blunder.m.b) } : { meas: blunder.m }; draw(); };
@@ -4744,14 +4821,17 @@ function showSelBox() {
 // ---------- несколько листов одного PDF в одном проекте ----------
 const PGS = { data: {} };
 const MKEYS = ['pts', 'meas', 'edges', 'rooms', 'chains', 'objs', 'notes', 'marks', 'lastNum', 'nextId', 'nextMeas', 'cond', 'axis', 'snap90', 'scaleFit', 'scaleAsked', 'ortho'];
-function savePage() { if (!U.img || !U.srcPage) return; const m = {}; MKEYS.forEach(k => m[k] = M[k]); PGS.data[U.srcPage] = { m: JSON.stringify(m), u: { s: U.s, rot: U.rot, tx: U.tx, ty: U.ty, alpha: U.alpha, ptPerPx: U.ptPerPx, pw: U.pw || (U.img && U.img.width), ph: U.ph || (U.img && U.img.height) } }; }
+function savePage() { if (!U.img || !U.srcPage || AS.hold) return; const m = {}; MKEYS.forEach(k => m[k] = M[k]); PGS.data[U.srcPage] = { m: JSON.stringify(m), u: { s: U.s, rot: U.rot, tx: U.tx, ty: U.ty, alpha: U.alpha, ptPerPx: U.ptPerPx, pw: U.pw || (U.img && U.img.width), ph: U.ph || (U.img && U.img.height) } }; }
 function pgHas(n) { const d = PGS.data[n]; if (!d) return false; try { return JSON.parse(d.m).pts.length > 0; } catch (e) { return false; } }
 function loadPageModel(pg) { const d = PGS.data[pg]; Object.assign(M, { pts: [], meas: [], edges: [], rooms: [], chains: [], objs: [], notes: [], marks: [], nextId: 1, nextMeas: 1, axis: null, scaleFit: false, scaleAsked: false }); if (d) { Object.assign(M, JSON.parse(d.m)); } M.objs = M.objs || []; M.notes = M.notes || []; M.marks = M.marks || []; markObjEdges(); return d; }
 async function ensurePdf() { if (U.pdf || !U.src || U.src.kind !== 'pdf') return !!U.pdf; U.pdf = await pdfjsLib.getDocument({ data: U.src.bytes.slice(0) }).promise; U.pages = U.pdf.numPages; try { U.titles = await pdfTitles(U.pdf); } catch (e) { } return true; }
 async function switchPage(pg) {
   if (!(await ensurePdf())) return; if (pg === U.srcPage) return;
-  savePage(); busy('Открываю лист ' + pg + '…');
-  try { const d = loadPageModel(pg); U.page = pg; await renderPdfPage(); if (d && d.u) Object.assign(U, { s: d.u.ptPerPx ? d.u.s * U.ptPerPx / d.u.ptPerPx : d.u.s, rot: d.u.rot, tx: d.u.tx, ty: d.u.ty, alpha: d.u.alpha ?? U.alpha });
+  busy('Открываю лист ' + pg + '…'); const ep = AS.epoch || 0; let r;
+  try { r = await rasterPdfPage(pg); } catch (e) { busy(''); uiAlert('Не удалось открыть лист ' + pg + ': ' + (e.message || e)); return; }
+  if ((AS.epoch || 0) !== ep || pg === U.srcPage) { busy(''); return; }
+  // ВАЖНО: от сохранения текущего листа до загрузки нового — ни одного await, чтобы автосохранение не застало «замеры одного листа под номером другого»
+  try { savePage(); const d = loadPageModel(pg); U.page = pg; applyRaster(r); if (d && d.u) Object.assign(U, { s: d.u.ptPerPx ? d.u.s * U.ptPerPx / d.u.ptPerPx : d.u.s, rot: d.u.rot, tx: d.u.tx, ty: d.u.ty, alpha: d.u.alpha ?? U.alpha });
     Object.assign(T, { undo: [], redo: [], pending: null, chain: null, sel: null, selSet: null, objIds: null, roomIds: null, noteTip: null }); showSelBox(); adjust(); savePage(); }
   finally { busy(''); }
   if (M.pts.length) fitTape(); else fitUnderlay(); draw(); renderTape(); asSoon();
@@ -4845,6 +4925,8 @@ function adjust() { try { T.result = TAPE.solve(M); } catch (e) { console.error(
 
 // ---------- underlay ----------
 async function loadUnderlay(file) {
+  { const other = Object.keys(PGS.data || {}).map(Number).filter(n => n !== U.srcPage && pgHas(n));
+    if (other.length && !(await uiDialog({ title: 'Заменить подложку?', text: `В этом проекте есть замеры на других листах: ${other.join(', ')}. Новая подложка заменит PDF целиком — замеры этих листов уйдут из проекта (вернуть можно через «Копии»). Если нужен другой лист того же PDF — используйте переключатель листов.`, ok: 'Заменить всё равно', cancel: 'Отмена' }))) return; }
   busy('Открываю подложку…');
   try {
     if (/\.pdf$/i.test(file.name)) {
@@ -4932,8 +5014,8 @@ async function rasterPdfPage(pg) {
   await page.render({ canvasContext: cx, viewport: vp }).promise;
   return { c, z, page };
 }
-async function renderPdfPage() {
-  const { c, z, page } = await rasterPdfPage(U.page);
+async function renderPdfPage() { applyRaster(await rasterPdfPage(U.page)); }
+function applyRaster({ c, z, page }) {
   U.img = c; U.zoomPdf = z; U.ptPerPx = 1 / z; U.srcPage = U.page; U.pw = c.width; U.ph = c.height; U.pdfPage = page; hqReset();
   // default: assume 1:100 drawing  -> 1 px = 25.4/(72 z) mm paper * 100
   U.s = 25.4 / (72 * z) * 100 / 1000; U.rot = 0; U.tx = 0; U.ty = c.height * U.s;
@@ -5197,7 +5279,7 @@ function tapeUp() { if (T.dragMark) { T.dragMark = null; asSoon(); draw(); }
   if (T.dragSel || T.dragEdge) { const n = T.dragSel ? T.dragSel.pts.length : 0; T.dragSel = null; T.dragEdge = null; T.snapG = null; adjust(); asSoon(); renderTape(); draw(); if (T.selSet) showSelBox(); stat(n ? `Передвинуто точек: ${n}` : 'Стена передвинута'); return; }
   if (T.dragPt) T.snapG = null;
   if (T.mk) { const k = T.mk; T.mk = null; const L = Math.hypot(k.q[0] - k.p[0], k.q[1] - k.p[1]) * S.view.s; const dir = L > 18 ? Math.atan2(k.q[1] - k.p[1], k.q[0] - k.p[0]) : null; addMark(k.type, k.p, dir); return; } if (T.box) { const b = T.box; T.box = null; const big = Math.hypot(b.w1[0] - b.w0[0], b.w1[1] - b.w0[1]) * S.view.s > 15;
-    if (big) { const x0 = Math.min(b.w0[0], b.w1[0]), x1 = Math.max(b.w0[0], b.w1[0]), y0 = Math.min(b.w0[1], b.w1[1]), y1 = Math.max(b.w0[1], b.w1[1]); selectPts(M.pts.filter(p => { const q = PX(p); return q[0] >= x0 && q[0] <= x1 && q[1] >= y0 && q[1] <= y1; }).map(p => p.id)); } else { tapSelect(b.w0); } return; } if (T.dragNote) { T.dragNote = null; asSoon(); renderTape(); draw(); } if (T.dragPt || T.dragU) { asSoon(); T.dragPt = null; T.dragOff = null; T.dragU = null; renderTape(); draw(); } }
+    if (big) { const x0 = Math.min(b.w0[0], b.w1[0]), x1 = Math.max(b.w0[0], b.w1[0]), y0 = Math.min(b.w0[1], b.w1[1]), y1 = Math.max(b.w0[1], b.w1[1]); selectPts(M.pts.filter(p => { const q = PX(p); return q[0] >= x0 && q[0] <= x1 && q[1] >= y0 && q[1] <= y1; }).map(p => p.id)); T.selRect = T.selSet ? [x0, y0, x1, y1] : null; } else { tapSelect(b.w0); } return; } if (T.dragNote) { T.dragNote = null; asSoon(); renderTape(); draw(); } if (T.dragPt || T.dragU) { asSoon(); T.dragPt = null; T.dragOff = null; T.dragU = null; renderTape(); draw(); } }
 function tapeDelete() {
   if (!T.sel) return; tPush();
   if (T.sel.pt) {
@@ -5545,7 +5627,8 @@ function pdfKit() {
 async function exportOverlayPdf() {
   const pages = (U.src && U.src.kind === 'pdf') ? pagesWithWork() : [U.srcPage || 1]; const curPg = U.srcPage || 1;
   if (!M.pts.length && !pages.some(n => pgHas(n))) { uiAlert('Пока нечего сохранять: нет ни одной точки.'); return; }
-  busy('Готовлю PDF…');
+  busy('Готовлю PDF…'); AS.hold = (AS.hold || 0) + 1; let held = true;
+  const back = () => { if (pages.length > 1 || pages[0] !== curPg) { loadPageModel(curPg); const d = PGS.data[curPg]; if (d && d.u) Object.assign(U, { s: d.u.s, rot: d.u.rot, tx: d.u.tx, ty: d.u.ty, ptPerPx: d.u.ptPerPx, pw: d.u.pw, ph: d.u.ph }); U.srcPage = curPg; adjust(); draw(); } };
   try {
     const { L: PL, font } = pdfKit(); const { PDFDocument, rgb, degrees, pushGraphicsState, popGraphicsState, concatTransformationMatrix, drawObject } = PL;
     const doc = await PDFDocument.create(); doc.setTitle((U.name || 'Обмер') + ' — замеры'); doc.setCreator('Рулетка · © d1sco'); doc.setProducer('Рулетка');
@@ -5644,11 +5727,12 @@ async function exportOverlayPdf() {
     const d = new Date(); text(`Обмер рулеткой · ${d.toLocaleDateString('ru')} · ${M.cond ? 'условно по чертежу' : 'факт по замерам'} · размеры в метрах · Рулетка · © d1sco`, [10, 10], Math.max(4, Math.min(8, W / 160)), GRY, 0, 'l');
       })();
     }
-    if (pages.length > 1 || pages[0] !== curPg) { loadPageModel(curPg); const d = PGS.data[curPg]; if (d && d.u) Object.assign(U, { s: d.u.s, rot: d.u.rot, tx: d.u.tx, ty: d.u.ty, ptPerPx: d.u.ptPerPx, pw: d.u.pw, ph: d.u.ph }); U.srcPage = curPg; adjust(); draw(); }
+    back(); AS.hold--; held = false;
     const bytes = await doc.save();
     busy(''); download(((AS.pname || U.name || 'Обмер').replace(/\.[^.]+$/, '').replace(/[\\/:*?"<>|]/g, '_')) + '_замеры.pdf', bytes, 'application/pdf');
     stat(`PDF готов: ${pages.length > 1 ? 'листов ' + pages.length + ' (' + pages.join(', ') + '), ' : ''}подложка в исходном качестве, замеры поверх — векторные.`);
   } catch (e) { busy(''); console.error(e); uiAlert('Не удалось сделать PDF: ' + (e.message || e)); }
+  finally { if (held) { back(); AS.hold = Math.max(0, (AS.hold || 1) - 1); asSoon(); } }
 }
 // ---------- conversion to sheet plan ----------
 function tapePlan() {
