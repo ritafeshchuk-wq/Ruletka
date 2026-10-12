@@ -262,7 +262,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 4.2 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 4.3 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -5780,18 +5780,31 @@ async function exportOverlayPdf(opt = {}) {
     const { L: PL, font } = pdfKit(); const { PDFDocument, rgb, degrees, pushGraphicsState, popGraphicsState, concatTransformationMatrix, drawObject } = PL;
     const doc = await PDFDocument.create(); doc.setTitle((U.name || 'Обмер') + ' — замеры'); doc.setCreator('Рулетка · © d1sco'); doc.setProducer('Рулетка');
     const srcDoc = isPdf ? await PDFDocument.load(U.src.bytes, { ignoreEncryption: true }) : null; let nDone = 0;
+    // все листы исходника — ОДНИМ копированием: общие картинки и шрифты попадают в файл один раз (иначе файл раздувается в разы)
+    let copied = null; if (srcDoc) { try { const cp = await doc.copyPages(srcDoc, pages.map(p => p - 1)); copied = new Map(pages.map((p, i) => [p, cp[i]])); } catch (e) { console.warn('copyPages', e); } }
     for (const pg of pages) {
       busy(`Готовлю PDF… лист ${++nDone} из ${pages.length}`);
-      if (srcDoc && !withWork.has(pg)) { const [cp] = await doc.copyPages(srcDoc, [pg - 1]); doc.addPage(cp); continue; } // лист без замеров — как в исходнике
+      if (srcDoc && !withWork.has(pg)) { if (copied) doc.addPage(copied.get(pg)); else { const [cp] = await doc.copyPages(srcDoc, [pg - 1]); doc.addPage(cp); } continue; } // лист без замеров — как в исходнике
       if (pages.length > 1 || pg !== curPg) { loadPageModel(pg); const d = PGS.data[pg]; if (d && d.u) Object.assign(U, { s: d.u.s, rot: d.u.rot, tx: d.u.tx, ty: d.u.ty, ptPerPx: d.u.ptPerPx, pw: d.u.pw, ph: d.u.ph }); U.srcPage = pg; adjust(); }
       await (async () => {
-    let W, H, toPt, page;
+    let W, H, toPt, page, wrapped = false;
     if (U.img) {
       const ppx = U.ptPerPx || 0.75; W = (U.pw || U.img.width) * ppx; H = (U.ph || U.img.height) * ppx;
       toPt = (X, Y) => { const c = Math.cos(U.rot), sn = Math.sin(U.rot), dx = X - U.tx, dy = Y - U.ty; const x0 = c * dx + sn * dy, y0 = -sn * dx + c * dy; return [x0 / U.s * ppx, H + y0 / U.s * ppx]; };
-      page = doc.addPage([W, H]);
       let drawn = false;
-      if (U.src && U.src.kind === 'pdf') {
+      if (U.src && U.src.kind === 'pdf' && copied && copied.get(pg)) {
+        // лист исходника как есть (векторы и картинки без изменений), замеры — поверх в его же системе координат
+        try {
+          const pi = pg - 1, mb = srcDoc.getPage(pi).getMediaBox(), vp = (await U.pdf.getPage(pi + 1)).getViewport({ scale: 1 });
+          const sx = W / vp.width, sy = H / vp.height; const [a, b, c, d, e, f] = vp.transform;
+          let m = [a * sx, -b * sy, c * sx, -d * sy, e * sx, H - f * sy];
+          m = [m[0], m[1], m[2], m[3], m[0] * mb.x + m[2] * mb.y + m[4], m[1] * mb.x + m[3] * mb.y + m[5]];
+          const det = m[0] * m[3] - m[1] * m[2]; const inv = [m[3] / det, -m[1] / det, -m[2] / det, m[0] / det, (m[2] * m[5] - m[3] * m[4]) / det, (m[1] * m[4] - m[0] * m[5]) / det];
+          page = doc.addPage(copied.get(pg)); page.pushOperators(pushGraphicsState(), concatTransformationMatrix(...inv)); wrapped = true; drawn = true;
+        } catch (e) { console.warn('pdf page', e); page = null; }
+      }
+      if (!page) page = doc.addPage([W, H]);
+      if (!drawn && U.src && U.src.kind === 'pdf') {
         try {
           const src = srcDoc; const pi = (U.srcPage || 1) - 1;
           const [emb] = await doc.embedPdf(src, [pi]); const mb = src.getPage(pi).getMediaBox();
@@ -5926,6 +5939,7 @@ async function exportOverlayPdf(opt = {}) {
       const s0 = pname(p.id), f0 = fs * 0.55, w = font.getAdvanceWidth(s0, f0) / 2 + f0 * 0.5;
       place(s0, rgb(0.3, 0.3, 0.3), 0, [[1, 1], [-1, 1], [1, -1], [-1, -1]].map(([sx, sy]) => ({ c: [q[0] + sx * w, q[1] + sy * f0 * 0.95], size: f0 })), false); }
     const d = new Date(); text(`Обмер рулеткой · ${d.toLocaleDateString('ru')} · ${M.cond ? 'условно по чертежу' : 'факт по замерам'} · размеры в метрах · Рулетка · © d1sco`, [10, 10], Math.max(4, Math.min(8, W / 160)), GRY, 0, 'l');
+    if (wrapped) page.pushOperators(popGraphicsState());
       })();
     }
     back(); AS.hold--; held = false;
