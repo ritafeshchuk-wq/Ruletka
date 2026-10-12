@@ -4,7 +4,7 @@
 <head>
 <meta name="author" content="d1sco">
 <meta name="copyright" content="© d1sco, 2026">
-<meta charset="utf-8">
+<meta charset="utf-8"><meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Рулетка — обмер DISTO</title>
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
@@ -262,7 +262,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 4.1 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 4.2 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -2923,13 +2923,37 @@ function zipStore(name, bytes) {
   return new Blob([lh, nm, bytes, ch, nm, end], { type: 'application/zip' });
 }
 // окно «файл готов» — нажатие на кнопку даёт системное окно сохранения (там выбирается папка и создаётся новая)
-async function saveFileDialog(name, data, type, title) {
+// файл готов: «Сохранить в Файлы» (окно «Поделиться»), «Открыть» (просмотр → Поделиться → Сохранить в Файлы), «Скачать»
+function fileReady(name, data, type, title) {
+  return new Promise(res => {
+    const blob = data instanceof Blob ? data : new Blob([data], { type }); const url = URL.createObjectURL(blob);
+    let canShare = false; try { canShare = !!(navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], name, { type })] })); } catch (e) { }
+    const isPdf = /pdf/.test(type);
+    const ov = document.createElement('div'); ov.className = 'uidlg';
+    ov.innerHTML = `<div class="uidlg-box" role="dialog" style="max-width:560px"><div class="uidlg-t"></div><div class="uidlg-x" style="margin-bottom:6px"><b class="fr-n"></b></div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin:8px 0">
+        ${canShare ? '<button class="pri" data-k="share" style="text-align:left;padding:12px">📤 <b>Сохранить в Файлы</b><br><small>откроется «Поделиться» → «Сохранить в Файлы» → выберите папку (новая папка — значок с «+»)</small></button>' : ''}
+        ${isPdf || IOS ? `<button ${canShare ? '' : 'class="pri"'} data-k="open" style="text-align:left;padding:12px">👁 <b>Открыть ${isPdf ? 'PDF' : 'файл'}</b><br><small>${isPdf ? 'проверьте все листы; затем значок «Поделиться» ⬆ → «Сохранить в Файлы» → папка' : 'затем «Поделиться» ⬆ → «Сохранить в Файлы»'}</small></button>` : ''}
+        <button data-k="dl" style="text-align:left;padding:12px">⬇ <b>Скачать</b><br><small>${IOS ? 'файл попадёт в «Загрузки» браузера (Файлы → На iPad → Загрузки или папка Bluefy)' : 'в папку загрузок или с выбором папки'}</small></button>
+      </div><div class="row"><button data-k="close">Закрыть</button></div></div>`;
+    ov.querySelector('.uidlg-t').textContent = title; ov.querySelector('.fr-n').textContent = '«' + name + '»';
+    const close = () => { ov.remove(); setTimeout(() => URL.revokeObjectURL(url), 120000); res(); };
+    ov.querySelectorAll('[data-k]').forEach(b => b.onclick = async () => { const k = b.dataset.k;
+      if (k === 'close') return close();
+      if (k === 'share') { try { await navigator.share({ files: [new File([blob], name, { type })], title: name }); stat('Файл передан через «Поделиться»: «' + name + '».'); } catch (e) { if (!/abort|cancel/i.test((e && (e.name + e.message)) || '')) uiAlert('«Поделиться» не сработало: ' + (e && e.message || e) + '. Нажмите «Открыть» или «Скачать».'); } return; }
+      if (k === 'open') { const a = document.createElement('a'); a.href = url; a.target = '_blank'; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove(); return; }
+      if (k === 'dl') { await download(name, blob, type, true); return; } });
+    document.body.appendChild(ov);
+  });
+}
+async function saveFileDialog(name, data, type, title) { return fileReady(name, data, type, title); }
+async function saveFileDialogOld(name, data, type, title) {
   const txt = IOS ? 'Нажмите «Сохранить в Файлы…» → в окне «Поделиться» выберите «Сохранить в Файлы» → выберите папку (новая папка — значок папки с «+» вверху) → «Сохранить». Если файл с таким именем уже есть — «Заменить».'
     : 'Нажмите «Сохранить…» — откроется окно, где можно выбрать папку или создать новую.';
   const k = await ask3(title, `«${name}». ${txt}`, [['save', IOS ? '💾 Сохранить в Файлы…' : '💾 Сохранить…', 'pri'], ['no', 'Отмена', '']]);
   if (k === 'save') await download(name, data, type);
 }
-async function download(name, data, type) {
+async function download(name, data, type, direct) {
   if (DLCAP) {
     let blob = data instanceof Blob ? data : new Blob([data], { type });
     if (!/\.(json|txt|csv|pdf|svg|png|jpg|html|zip|md)$/i.test(name)) { blob = zipStore(name, new Uint8Array(await blob.arrayBuffer())); name = name.replace(/\.[^.]+$/, '') + '.zip'; }
@@ -2938,7 +2962,7 @@ async function download(name, data, type) {
     try { const ext = (name.match(/\.([^.]+)$/) || [, 'bin'])[1]; const h = await window.showSaveFilePicker({ suggestedName: name, types: [{ description: ext.toUpperCase(), accept: { [type || 'application/octet-stream']: ['.' + ext] } }] });
       const w = await h.createWritable(); await w.write(data instanceof Blob ? data : new Blob([data], { type })); await w.close(); stat('Сохранено: ' + h.name); return; }
     catch (e) { if (e && e.name === 'AbortError') return; } }
-  if (IOS) { try { const f = new File([data], name, { type: type || 'application/octet-stream' }); if (navigator.canShare && navigator.canShare({ files: [f] })) { navigator.share({ files: [f], title: name }).catch(e => { if (!/abort|cancel/i.test(e && e.message || '')) stat('Не удалось передать файл: ' + (e && e.message || e)); }); return; } } catch (e) { } }
+  if (IOS && !direct) { try { const f = new File([data], name, { type: type || 'application/octet-stream' }); if (navigator.canShare && navigator.canShare({ files: [f] })) { navigator.share({ files: [f], title: name }).catch(e => { if (!/abort|cancel/i.test(e && e.message || '')) stat('Не удалось передать файл: ' + (e && e.message || e)); }); return; } } catch (e) { } }
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data], { type })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
 function b64(f32) { const u = new Uint8Array(f32.buffer, f32.byteOffset, f32.byteLength); let s = ''; for (let i = 0; i < u.length; i += 32768) s += String.fromCharCode.apply(null, u.subarray(i, i + 32768)); return btoa(s); }
@@ -4137,9 +4161,9 @@ function saveProjectFile() {
 $('#bSave').onclick = () => {
   closeTapeMenu(); const el = document.createElement('div'); el.id = 'tmenu'; el.style.right = '12px'; el.style.top = '8px';
   const np = (U.src && U.src.kind === 'pdf') ? pagesWithWork().length : 1;
-  el.innerHTML = `<div class="tm-h">Сохранить</div><button data-k="proj" class="pri">💾 Сохранить проект «${escH(AS.pname || 'Обмер')}»${AS.dirty ? ' ●' : ''}</button><button data-k="pdf">📄 PDF с замерами${np > 1 ? ' (листов: ' + np + ')' : ''} — итог</button><button data-k="json">💾 Файл проекта — продолжить позже, открыть на компьютере</button><button data-k="" class="tm-x">Отмена</button>`;
+  el.innerHTML = `<div class="tm-h">Сохранить</div><button data-k="all" class="pri">💾 Сохранить: проект + цельный PDF${U.pages > 1 ? ' (все ' + U.pages + ' листов)' : ''}</button><button data-k="proj">Только проект в программе${AS.dirty ? ' ●' : ''} <small>(быстро, без файла)</small></button><button data-k="pdf">📄 Только PDF (выбрать листы)${np > 1 ? ' (листов: ' + np + ')' : ''} — итог</button><button data-k="json">💾 Файл проекта — продолжить позже, открыть на компьютере</button><button data-k="" class="tm-x">Отмена</button>`;
   $('#main').appendChild(el);
-  el.querySelectorAll('button').forEach(b => b[window.PointerEvent ? 'onpointerup' : 'onclick'] = ev => { ev.stopPropagation(); ev.preventDefault(); el.remove(); if (b.dataset.k === 'proj') saveNow(); else if (b.dataset.k === 'pdf') exportOverlayPdf(); else if (b.dataset.k === 'json') saveProjectFile(); });
+  el.querySelectorAll('button').forEach(b => b[window.PointerEvent ? 'onpointerup' : 'onclick'] = ev => { ev.stopPropagation(); ev.preventDefault(); el.remove(); if (b.dataset.k === 'all') saveAll(); else if (b.dataset.k === 'proj') saveNow(); else if (b.dataset.k === 'pdf') exportOverlayPdf(); else if (b.dataset.k === 'json') saveProjectFile(); });
 };
 // на iPhone/iPad фильтр по расширению не ставим: новые iOS делают файл проекта серым (не выбрать), если «Файлы» сохранили его не как .json
 if (IOS) $('#fProj').removeAttribute('accept');
@@ -4250,13 +4274,17 @@ async function autosave0(force) {
     showAS();
   } finally { AS.busy = false; }
 }
+async function saveAll() { // одна кнопка: записать проект в программе и выдать цельный PDF файлом
+  const okP = await saveNow(); if (!okP && AS.restoreFailed) return;
+  await exportOverlayPdf({ all: true });
+}
 async function saveNow() { // «Сохранить проект»: перезаписывает этот же проект (+ версия в «Копиях»)
   if (AS.hold) { stat('Подождите — собирается PDF.'); return false; }
   if (AS.restoreFailed) { uiAlert('Этот проект не открылся полностью — сохранять поверх нельзя. Откройте версию из «Копии» или файл проекта.'); return false; }
   checkDirty(); busy('Сохраняю проект…'); await autosave(true); busy('');
   if (AS.off) { uiAlert('Не удалось сохранить в память iPad. Сохраните «Файл проекта» (Сохранить → Файл проекта).'); return false; }
   try { const q = JSON.parse(localStorage.getItem('ruletka_quick') || 'null'); if (q && q.pid === AS.pid) localStorage.removeItem('ruletka_quick'); } catch (e) { }
-  stat(`Сохранено в проект «${AS.pname}» · ${new Date().toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}. Предыдущие версии — в «Копии».`); return true;
+  stat(`Проект «${AS.pname}» сохранён в программе (☰ Проекты) · ${new Date().toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}. Файл PDF — «Сохранить: проект + цельный PDF».`); return true;
 }
 async function addSnap(r) {
   const idx = (await asGetK('snaps')) || []; const list = Array.isArray(idx) ? idx : [];
@@ -4416,6 +4444,14 @@ async function renderHome() {
   host.querySelectorAll('[data-ren]').forEach(b => b.onclick = () => projRename(b.dataset.ren));
   host.querySelectorAll('[data-del]').forEach(b => b.onclick = () => projDelete(b.dataset.del));
 }
+// новая версия на сайте? (браузер мог показать старую из кэша)
+async function checkUpdate() {
+  try { const r = await fetch(location.pathname + '?v=' + Date.now(), { cache: 'no-store' }); if (!r.ok) return; const t = await r.text(); const m = t.match(/Рулетка (\d+\.\d+) ·/); const cur = (document.body.innerHTML.match(/Рулетка (\d+\.\d+) ·/) || [])[1];
+    if (m && cur && m[1] !== cur) { let b = document.getElementById('updBar'); if (!b) { b = document.createElement('div'); b.id = 'updBar'; b.style.cssText = 'position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:99;background:#1f6feb;color:#fff;padding:10px 14px;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,.25);font:600 15px Golos Text,sans-serif;display:flex;gap:10px;align-items:center'; document.body.appendChild(b); }
+      b.innerHTML = `Есть новая версия Рулетки ${m[1]} (у вас ${cur}) <button style="background:#fff;color:#1f6feb;border:0;border-radius:8px;padding:6px 10px;font-weight:700">Обновить</button>`;
+      b.querySelector('button').onclick = async () => { if (!(await leaveProject())) return; location.replace(location.pathname + '?v=' + m[1] + '-' + Date.now()); }; } } catch (e) { }
+}
+setTimeout(checkUpdate, 4000); setInterval(checkUpdate, 30 * 60000);
 (async () => {
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) { }
   AS.db = await asDB();
@@ -5728,12 +5764,13 @@ function pdfKit() {
   const b = atob(document.getElementById('fontb64').textContent.trim()), u8 = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u8[i] = b.charCodeAt(i);
   PDFK = { L: window.PDFLib, font: window.opentype.parse(u8.buffer) }; return PDFK;
 }
-async function exportOverlayPdf() {
+async function exportOverlayPdf(opt = {}) {
   const isPdf = !!(U.src && U.src.kind === 'pdf'); if (isPdf) await ensurePdf();
   const work = isPdf ? pagesWithWork().filter(n => pgHas(n) || (n === U.srcPage && M.pts.length)) : [U.srcPage || 1]; const curPg = U.srcPage || 1;
   if (!M.pts.length && !work.length) { uiAlert('Пока нечего сохранять: нет ни одной точки.'); return; }
   let pages = work.length ? work : [curPg];
-  if (isPdf && U.pages > 1 && pages.length < U.pages) {
+  if (opt.all && isPdf && U.pages > 1) pages = Array.from({ length: U.pages }, (_, i) => i + 1);
+  else if (isPdf && U.pages > 1 && pages.length < U.pages) {
     const k = await ask3('Какие листы сохранить в PDF?', `В исходном PDF листов: ${U.pages}, с замерами: ${work.length ? work.join(', ') : 'нет'}. Всё сохранится одним файлом.`, [['all', `Все ${U.pages} листов одним файлом`, 'pri'], ['work', `Только с замерами (${work.length})`, ''], ['stay', 'Отмена', '']]);
     if (k === 'stay') return; if (k === 'all') pages = Array.from({ length: U.pages }, (_, i) => i + 1); }
   const withWork = new Set(work);
@@ -5895,7 +5932,7 @@ async function exportOverlayPdf() {
     const bytes = await doc.save();
     busy(''); const fname = ((AS.pname || U.name || 'Обмер').replace(/\.[^.]+$/, '').replace(/[\\/:*?"<>|]/g, '_')) + '_замеры.pdf';
     stat(`PDF готов: листов ${pages.length}${work.length && pages.length > 1 ? ' (с замерами: ' + work.join(', ') + ')' : ''}, подложка в исходном качестве, замеры поверх — векторные.`);
-    await saveFileDialog(fname, bytes, 'application/pdf', `PDF готов: ${pages.length === 1 ? '1 лист' : 'листов ' + pages.length}, ${(bytes.length / 1048576).toFixed(1)} МБ`);
+    await fileReady(fname, bytes, 'application/pdf', `PDF готов: ${pages.length === 1 ? '1 лист' : 'листов ' + pages.length}, ${(bytes.length / 1048576).toFixed(1).replace('.', ',')} МБ`);
   } catch (e) { busy(''); console.error(e); uiAlert('Не удалось сделать PDF: ' + (e.message || e)); }
   finally { if (held) { back(); AS.hold = Math.max(0, (AS.hold || 1) - 1); asSoon(); } }
 }
