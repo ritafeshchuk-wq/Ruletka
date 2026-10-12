@@ -211,7 +211,8 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 #selbox .sb-h{font-weight:700}#selbox .row{display:flex;flex-wrap:wrap;gap:6px}#selbox button{min-height:40px}
 #trail{position:absolute;left:8px;top:8px;bottom:8px;display:flex;flex-direction:column;gap:4px;overflow-y:auto;z-index:6;padding:4px;background:rgba(27,36,48,.88);border-radius:14px;scrollbar-width:none;width:66px}
 #trail::-webkit-scrollbar{display:none}
-#trail button{display:flex;flex-direction:column;align-items:center;gap:1px;padding:6px 2px;min-height:52px;border:0;border-radius:10px;background:transparent;color:#E7ECF2;font-size:10.5px;line-height:1.1;flex:none}
+#trail button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:3px 2px;min-height:36px;max-height:56px;border:0;border-radius:10px;background:transparent;color:#E7ECF2;font-size:10.5px;line-height:1.1;flex:1 1 0}
+@media (max-height:700px){#trail button i{font-size:17px!important}#trail{gap:2px}}
 #trail button i{font-style:normal;font-size:20px;line-height:1}
 #trail button.on{background:var(--tape,#E3A21A);color:#1B2430}
 #mcard{position:absolute;top:8px;left:calc(50% + 37px);transform:translateX(-50%);width:min(440px,calc(100% - 100px));z-index:6;background:#fff;border:2px solid var(--line);border-radius:14px;box-shadow:0 6px 20px rgba(15,23,36,.18);padding:8px 10px;display:flex;flex-direction:column;gap:6px}
@@ -259,7 +260,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 3.5 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 3.6 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -4141,7 +4142,7 @@ async function applyProject(j) {
 const AS = { db: null, last: '', savedAt: 0, fileAt: 0, busy: false, off: false, snapAt: 0, sid: Date.now(), dirty: false, pid: null, pname: '' };
 const SNAP_EVERY = 120000, SNAP_KEEP = 40; // копия каждые 2 минуты, хранится 40 последних (~1,5 часа работы) + последнее состояние каждого сеанса
 function asDB() { return new Promise(res => { try { const r = indexedDB.open('scan2plan', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => res(r.result); r.onerror = () => res(null); r.onblocked = () => res(null); } catch (e) { res(null); } }); }
-async function asTx(mode, fn) { try { const db = AS.db || (AS.db = await asDB()); if (!db) return null; return await new Promise(res => { const tx = db.transaction('kv', mode), st = tx.objectStore('kv'); let out = null; const r = fn(st); if (r) r.onsuccess = () => { out = r.result; }; tx.oncomplete = () => res(out === null ? true : out); tx.onerror = tx.onabort = () => res(null); }); } catch (e) { return null; } }
+async function asTx(mode, fn) { try { const db = AS.db || (AS.db = await asDB()); if (!db) return null; return await new Promise(res => { let done = false; const fin = v => { if (!done) { done = true; clearTimeout(tm); res(v); } }; const tm = setTimeout(() => { AS.db = null; try { db.close(); } catch (e) { } fin(null); }, 25000); const tx = db.transaction('kv', mode), st = tx.objectStore('kv'); let out = null; const r = fn(st); if (r) r.onsuccess = () => { out = r.result; }; tx.oncomplete = () => fin(out === null ? true : out); tx.onerror = tx.onabort = () => fin(null); }); } catch (e) { AS.db = null; return null; } }
 const asGetK = k => asTx('readonly', st => st.get(k));
 const asPutK = (k, v) => asTx('readwrite', st => st.put(v, k));
 const asDelK = k => asTx('readwrite', st => st.delete(k));
@@ -4159,8 +4160,8 @@ const tfmt = d => new Date(d).toLocaleString('ru', { day: '2-digit', month: '2-d
 function showAS() {
   const el = $('#asInd'); if (!el) return;
   const t = d => new Date(d).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  el.textContent = AS.off ? '⚠ Автосохранение не работает — сохраните проект файлом' : AS.savedAt ? `✓ Сохранено ${t(AS.savedAt)}` : '';
-  el.style.color = AS.off ? '#ff8a80' : '';
+  el.textContent = AS.restoreFailed ? '⚠ Проект не открылся — изменения НЕ сохраняются. Откройте «Копии» или другой проект' : AS.off ? '⚠ Автосохранение не работает — сохраните проект файлом' : AS.savedAt ? `✓ Сохранено ${t(AS.savedAt)}` : '';
+  el.style.color = AS.off || AS.restoreFailed ? '#ff8a80' : '';
   el.title = 'Работа сохраняется в памяти iPad через пару секунд после каждого изменения; каждые 2 минуты — отдельная копия (40 последних). После обновления страницы работа восстанавливается сама. Файл проекта («Сохранить проект») — копия вне браузера, её стоит сохранять в конце дня.';
 }
 // подложка хранится один раз отдельно, в копиях — только ссылка на неё
@@ -4178,30 +4179,42 @@ async function unpackProj(txt) {
   if (j.tape && j.tape.U && j.tape.U.srcRef) { const so = await asGetK(j.tape.U.srcRef); if (so && so.bytes) j.tape.U.srcObj = so; }
   return j;
 }
-function quickSave() { try { localStorage.setItem('ruletka_quick', JSON.stringify({ when: Date.now(), M, U: U.img ? { s: U.s, rot: U.rot, tx: U.tx, ty: U.ty, alpha: U.alpha, name: U.name } : null })); } catch (e) { } }
-async function autosave(force) {
-  if (AS.busy || AS.restoring || !hasWork()) return;
-  AS.busy = true;
+function quickSave() { try { if (AS.restoring || AS.restoreFailed || !AS.pid || (!hasWork() && !AS.last)) return; localStorage.setItem('ruletka_quick', JSON.stringify({ when: Date.now(), pid: AS.pid, page: U.srcPage || 1, M, U: U.img ? { s: U.s, rot: U.rot, tx: U.tx, ty: U.ty, alpha: U.alpha, name: U.name } : null })); } catch (e) { } }
+// сохранения идут строго по очереди: вызов во время записи не теряется, а ставится следом (с самым свежим состоянием)
+let AS_Q = Promise.resolve();
+function autosave(force) {
+  if (AS.qn) { AS.qf = AS.qf || !!force; return AS_Q; }
+  AS.qn = true; AS.qf = !!force;
+  AS_Q = AS_Q.then(() => { AS.qn = false; const f = AS.qf; AS.qf = false; return autosave0(f); }).catch(e => { console.warn('autosave', e); AS.off = true; showAS(); });
+  return AS_Q;
+}
+async function autosave0(force) {
+  if (AS.restoring || AS.restoreFailed || (!hasWork() && !AS.last)) return;
+  if (!AS.pid) await projCreate(AS.pname || ('Обмер ' + new Date().toLocaleDateString('ru')), true);
+  AS.busy = true; const gen = AS.gen || 0;
+  // всё, что относится к этому сохранению, фиксируем сразу: проект, время снимка, сводку
+  const ep = AS.epoch || 0, pid = AS.pid, pname = AS.pname, sid = AS.sid, now = Date.now(), summary = workSummary();
   try {
     quickSave();
     let txt; try { txt = await packProj(); } catch (e) { txt = null; }
+    if ((AS.epoch || 0) !== ep) return; // пока готовили запись, открыли другой проект — не пишем
     if (!txt) { AS.off = true; showAS(); return; }
-    const now = Date.now(), changed = txt !== AS.last;
-    if (!AS.pid) await projCreate(AS.pname || ('Обмер ' + new Date().toLocaleDateString('ru')), true);
+    const changed = txt !== AS.last;
     if (changed || force) {
-      const ok = await asPutK('proj:' + AS.pid, txt) && await asPutK('last', { when: now, summary: workSummary(), proj: txt, sid: AS.sid, pid: AS.pid });
-      if (ok) await projIndexTouch(AS.pid, { updated: now, summary: workSummary() });
+      const ok = await asPutK('proj:' + pid, txt) && await asPutK('last', { when: now, summary, proj: txt, sid, pid });
+      if (ok) await projIndexTouch(pid, { updated: now, summary });
+      if ((AS.epoch || 0) !== ep) return;
       if (ok) { AS.last = txt; AS.savedAt = now; AS.off = false; } else AS.off = true;
     }
-    if (changed && now - AS.snapAt >= SNAP_EVERY) await addSnap({ when: now, summary: workSummary(), proj: txt, sid: AS.sid, pid: AS.pid });
+    if (changed && now - AS.snapAt >= SNAP_EVERY && (AS.epoch || 0) === ep) await addSnap({ when: now, summary, proj: txt, sid, pid, pname });
     showAS();
-  } finally { AS.busy = false; AS.dirty = false; }
+  } finally { AS.busy = false; if ((AS.gen || 0) === gen && !AS.off) AS.dirty = false; }
 }
 async function addSnap(r) {
   const idx = (await asGetK('snaps')) || []; const list = Array.isArray(idx) ? idx : [];
   if (list.some(x => x.when === r.when)) return;
   const ok = await asPutK('snap:' + r.when, r.proj); if (!ok) return;
-  list.push({ when: r.when, summary: r.summary, sid: r.sid, pid: r.pid || null, pname: r.pid ? AS.pname : (r.pname || '') });
+  list.push({ when: r.when, summary: r.summary, sid: r.sid, pid: r.pid || null, pname: r.pname || (r.pid ? AS.pname : '') });
   // оставляем 40 последних + последнюю копию каждого старого сеанса
   list.sort((a, b) => a.when - b.when);
   const keepSid = new Map(); list.forEach(x => keepSid.set(x.sid, x.when));
@@ -4213,16 +4226,29 @@ async function addSnap(r) {
 }
 let asTimer = 0;
 setInterval(() => { if (!hasWork() || S.step !== 'tape') return; const since = Date.now() - Math.max(AS.fileAt || 0, AS.remindAt || AS.sid); if (since > 30 * 60000) { AS.remindAt = Date.now(); stat('Напоминание: сохраните копию файлом — «Сохранить проект» → «Сохранить в Файлы».'); const b = $('#bSave'); if (b) { b.classList.add('pri'); setTimeout(() => b.classList.remove('pri'), 20000); } } }, 60000);
-function asSoon() { AS.dirty = true; clearTimeout(asTimer); asTimer = setTimeout(autosave, 1500); }
+function asSoon() { AS.dirty = true; AS.gen = (AS.gen || 0) + 1; if (!asTimer) asTimer = setTimeout(() => { asTimer = 0; autosave(); }, 1500); } // не позже 1,5 с после первого изменения, даже если работа идёт без пауз
 setInterval(autosave, 15000);
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') autosave(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { quickSave(); autosave(); } });
 addEventListener('pagehide', () => { quickSave(); autosave(); });
 addEventListener('beforeunload', e => { quickSave(); if (hasWork() && (AS.dirty || !AS.savedAt || Date.now() - AS.savedAt > 20000)) { e.preventDefault(); e.returnValue = ''; } });
+const msig = m => { try { return JSON.stringify([(m.pts || []).map(p => [p.id, p.x0, p.y0]), (m.meas || []).map(x => [x.id, x.v, x.on]), m.edges, m.rooms, m.objs, m.notes, m.marks]); } catch (e) { return ''; } };
+async function asGC() { // только при запуске; при любой ошибке чтения — ничего не удаляет
+  try {
+    const keys = await asTx('readonly', st => st.getAllKeys()); if (!Array.isArray(keys)) return;
+    const refs = new Set(), scan = t => { for (const m of String(t).matchAll(/"(?:ref|srcRef)":"((?:img|src):\d+)"/g)) refs.add(m[1]); };
+    for (const k of keys) if (typeof k === 'string' && (k.startsWith('proj:') || k.startsWith('snap:'))) { const v = await asGetK(k); if (typeof v !== 'string') return; scan(v); }
+    const l = await asGetK('last'); if (l && l.proj) scan(l.proj);
+    const dead = keys.filter(k => typeof k === 'string' && /^(img|src):\d+$/.test(k) && !refs.has(k) && Date.now() - +k.split(':')[1] > 3600000);
+    for (const k of dead) await asDelK(k);
+    if (dead.length) console.info('asGC: удалено', dead.length);
+  } catch (e) { }
+}
 async function restoreFrom(r, label) {
   AS.restoring = true; busy('Восстанавливаю…');
-  try { const j = await unpackProj(r.proj); await applyProject(j); AS.last = ''; AS.savedAt = r.when; stat(`Работа восстановлена (${label || tfmt(r.when)}). Можно продолжать.`); }
-  catch (err) { uiAlert('Не удалось восстановить: ' + err.message); }
-  AS.restoring = false; busy(''); showAS(); autosave(true);
+  let ok = false;
+  try { const j = await unpackProj(r.proj); await applyProject(j); AS.last = ''; AS.savedAt = r.when; ok = true; AS.restoreFailed = false; stat(`Работа восстановлена (${label || tfmt(r.when)}). Можно продолжать.`); }
+  catch (err) { console.error(err); AS.restoreFailed = true; uiAlert('Не удалось открыть: ' + err.message + '\n\nСохранённые данные НЕ тронуты и не перезаписаны. Попробуйте «Копии» — более раннюю копию, или откройте файл проекта. Сделайте снимок экрана с этим сообщением.'); }
+  AS.restoring = false; busy(''); showAS(); if (ok) autosave(true); return ok;
 }
 async function snapsDialog() {
   const list = ((await asGetK('snaps')) || []).filter(x => !AS.pid || !x.pid || x.pid === AS.pid).slice().reverse();
@@ -4238,7 +4264,7 @@ const PJ = { list: [] };
 async function projIndex() { const l = await asGetK('projects'); PJ.list = Array.isArray(l) ? l : []; return PJ.list; }
 async function projIndexTouch(id, patch) { await projIndex(); const p = PJ.list.find(x => x.id === id); if (p) Object.assign(p, patch); await asPutK('projects', PJ.list); }
 async function projCreate(name, keepWork) {
-  await projIndex(); const id = 'p' + Date.now(); const now = Date.now();
+  await projIndex(); const id = 'p' + Date.now(); const now = Date.now(); AS.restoreFailed = false;
   PJ.list.push({ id, name, created: now, updated: now, summary: keepWork ? workSummary() : 'пусто' }); await asPutK('projects', PJ.list);
   AS.pid = id; AS.pname = name; AS.sid = now; AS.snapAt = 0; if (S.sheetOpt && S.sheetOpt.info) S.sheetOpt.info.object = name; showProjName(); return id;
 }
@@ -4247,14 +4273,20 @@ function resetWork() {
   Object.assign(M, { axis: null, snap90: true, pts: [], meas: [], edges: [], rooms: [], chains: [], objs: [], notes: [], marks: [], lastNum: {}, nextId: 1, nextMeas: 1, cond: false, scaleFit: false, scaleAsked: false });
   Object.assign(U, { img: null, pdf: null, pages: 0, page: 1, name: '', src: null, ptPerPx: null, srcPage: 1, _imgKey: null, _imgKeyFor: null, _imgSaved: false, _srcKey: null, _data: null, _dataFor: null, mip: null, mipSrc: null, pdfPage: null, s: 0.01, rot: 0, tx: 0, ty: 0 });
   Object.assign(T, { mk: null, dragMark: null, dragSel: null, dragEdge: null, snapG: null, selSet: null, box: null, noteTip: null, undo: [], redo: [], pending: null, chain: null, sel: null, buffer: null, objIds: null, roomIds: null, mA: null, tA: null, fitted: false });
-  AS.last = ''; AS.savedAt = 0; try { localStorage.removeItem('ruletka_quick'); } catch (e) { }
+  AS.last = ''; AS.savedAt = 0; AS.epoch = (AS.epoch || 0) + 1;
   adjust();
 }
-async function leaveProject() { if (AS.pid && hasWork()) await autosave(true); }
+async function leaveProject() { if (AS.pid && (hasWork() || AS.last)) await autosave(true); await AS_Q; }
 async function projOpen(id) {
   await leaveProject(); await projIndex(); const p = PJ.list.find(x => x.id === id); if (!p) return;
-  const txt = await asGetK('proj:' + id); resetWork(); AS.pid = id; AS.pname = p.name; AS.sid = Date.now(); AS.snapAt = 0; showProjName();
-  if (txt && txt !== true) await restoreFrom({ when: p.updated, proj: txt }, p.name); else { T.fitted = true; setMode('tape'); fitTape(); draw(); renderTape(); }
+  let q = null; try { q = JSON.parse(localStorage.getItem('ruletka_quick') || 'null'); } catch (e) { }
+  const txt = await asGetK('proj:' + id); resetWork(); AS.restoreFailed = false; AS.pid = id; AS.pname = p.name; AS.sid = Date.now(); AS.snapAt = 0; showProjName();
+  if (txt && txt !== true) { const ok = await restoreFrom({ when: p.updated, proj: txt }, p.name);
+    // запасная копия (пишется мгновенно при каждом уходе со страницы) новее сохранённой — значит последние замеры не успели записаться
+    if (ok && q && q.pid === id && q.M && Array.isArray(q.M.pts) && q.when > (p.updated || 0) && (q.page || 1) === (U.srcPage || 1) && msig(q.M) !== msig(M)) {
+      Object.assign(M, q.M); M.objs = M.objs || []; M.notes = M.notes || []; M.marks = M.marks || []; markObjEdges(); adjust(); draw(); renderTape(); asSoon();
+      stat('Подхвачены последние изменения (' + tfmt(q.when) + '), которые не успели сохраниться перед закрытием.'); } }
+  else { T.fitted = true; setMode('tape'); fitTape(); draw(); renderTape(); }
   if (S.sheetOpt && S.sheetOpt.info) S.sheetOpt.info.object = p.name;
 }
 async function projNew(name, withUnderlay) {
@@ -4298,6 +4330,7 @@ async function renderHome() {
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) { }
   AS.db = await asDB();
   await projIndex();
+  asGC();
   // перенос работы из прежних версий (без проектов) в проект
   const r = await asGet();
   if (r && r.proj && !r.pid && !PJ.list.length) { const id = 'p' + (r.when || Date.now()); PJ.list.push({ id, name: 'Обмер ' + tfmt(r.when), created: r.when, updated: r.when, summary: r.summary || '' }); await asPutK('proj:' + id, r.proj); await asPutK('projects', PJ.list); await asPutK('last', { ...r, pid: id }); }
@@ -4552,6 +4585,16 @@ function tieHatch(o, e) { // выбрать сторону люка, обращ�
   const old = M.meas.find(m => m.type === 'tie' && m.c === best.c && m.d === best.d && ((m.a === e.a && m.b === e.b) || (m.a === e.b && m.b === e.a)));
   if (old) { tPush(); M.meas = M.meas.filter(x => x !== old); adjust(); }
   makePending({ type: 'tie', a: e.a, b: e.b, c: best.c, d: best.d });
+}
+// место подписи помещения: центр, а если там люк/объект — сдвиг внутри помещения туда, где свободно
+function roomLabelAt(R) {
+  const poly = R.ids.map(ptById).filter(Boolean).map(PX); const n = poly.length; if (n < 3) return null;
+  const c = [poly.reduce((s0, q) => s0 + q[0], 0) / n, poly.reduce((s0, q) => s0 + q[1], 0) / n];
+  const boxes = (M.objs || []).map(o => objGeom(o, PX)).filter(Boolean).map(g => { const xs = g.poly.map(q => q[0]), ys = g.poly.map(q => q[1]).concat(g.label.p[1]); return [Math.min(...xs) - 0.9, Math.min(...ys) - 0.45, Math.max(...xs) + 0.9, Math.max(...ys) + 0.45]; });
+  const free = q => SHEET_inside(poly, q) && !boxes.some(b => q[0] > b[0] && q[0] < b[2] && q[1] > b[1] && q[1] < b[3]);
+  if (free(c)) return c;
+  for (let r = 0.5; r < 6; r += 0.5) for (const [dx, dy] of [[0, -1], [0, 1], [1, 0], [-1, 0], [1, -1], [-1, -1], [1, 1], [-1, 1]]) { const q = [c[0] + dx * r, c[1] + dy * r]; if (free(q)) return q; }
+  return c;
 }
 function markObjEdges() { for (const e of M.edges) delete e.obj; for (const o of M.objs || []) { const k = o.ids.length; for (let i = 0; i < k; i++) { const e = hasEdge(o.ids[i], o.ids[(i + 1) % k]); if (e) e.obj = o.id; } } }
 function chooseObjType(cur) {
@@ -5241,7 +5284,7 @@ function drawTape() {
     ctx.beginPath(); pts.forEach((p, i) => { const s = W2S(...PX(p)); i ? ctx.lineTo(...s) : ctx.moveTo(...s); }); ctx.closePath();
     ctx.fillStyle = 'rgba(31,111,235,.08)'; ctx.fill();
     const info = TAPE.roomInfo(M, R);
-    let cx = 0, cy = 0; pts.forEach(p => { const q = PX(p); cx += q[0]; cy += q[1]; }); cx /= pts.length; cy /= pts.length;
+    let [cx, cy] = roomLabelAt(R);
     const [x, y] = W2S(cx, cy);
     ctx.fillStyle = '#1d3f8f'; ctx.font = `bold ${13 * dpr}px Golos Text, Segoe UI`; ctx.textAlign = 'center';
     ctx.fillText(`${R.num}. ${R.name}`, x, y - 9 * dpr); ctx.font = `${12 * dpr}px Golos Text, Segoe UI`; ctx.fillText(SHEET.fmtArea(info.area) + ' м²', x, y + 7 * dpr);
@@ -5401,6 +5444,7 @@ const TTOOLS = [['walk', 'Обход', 'щёлкайте углы по поря�
   ['drag', 'Двигать', 'тащите точку (прилипает в линию с другими точками) или стену — она сдвигается целиком, соседние стены растягиваются. В режиме «Условно» так работает в любом инструменте. Shift + фон — сдвиг подложки'],
   ['select', '✎ Правка', 'коснитесь точки, стены или размера — откроется меню: перемерить, изменить число, выключить, удалить. В любом инструменте то же меню — долгое нажатие или правый щелчок']];
 function renderTape() {
+  if (AS.pid && !AS.restoring) asSoon();
   if (window.TB) renderTouchBar();
   if (S.step !== 'tape') { ['trail', 'mcard', 'selbox', 'pgbar'].forEach(id => { const e = document.getElementById(id); if (e) e.remove(); }); return; }
   const pd = T.pending, ap = pd && approxOf(pd);
@@ -5570,7 +5614,7 @@ async function exportOverlayPdf() {
     for (const m of M.meas) if (m.type === 'thick' && m.on !== false) { const q = [m.a, m.b, m.c, m.d].map(id => P2(ptById(id))); text('δ ' + fm(m.v), [(q[0][0] + q[1][0] + q[2][0] + q[3][0]) / 4, (q[0][1] + q[1][1] + q[2][1] + q[3][1]) / 4], fs * 0.85, RED); }
     for (const m of M.meas) if (m.type === 'angle' && m.on !== false) { const q = P2(ptById(m.b)); text('∠' + fdeg(m.v), [q[0] + fs, q[1] + fs], fs * 0.85, VIO, 0, 'l'); }
     // помещения
-    for (const R of M.rooms) { const pts = R.ids.map(ptById).filter(Boolean).map(P2); if (pts.length < 3) continue; const c = [pts.reduce((s0, q) => s0 + q[0], 0) / pts.length, pts.reduce((s0, q) => s0 + q[1], 0) / pts.length];
+    for (const R of M.rooms) { const pts = R.ids.map(ptById).filter(Boolean).map(P2); if (pts.length < 3) continue; const c = toPt(...roomLabelAt(R));
       let area = 0; try { area = TAPE.roomInfo(M, R).area; } catch (e) { }
       text(`${R.num}. ${R.name}`, [c[0], c[1] + fs * 0.7], fs * 1.05, BLUE); text(SHEET.fmtArea(area) + ' м²', [c[0], c[1] - fs * 0.7], fs, BLUE); }
     // фото и сканы
@@ -5664,10 +5708,12 @@ async function upgradeUnderlay() {
       await ensurePdf(); const pg = U.srcPage || 1; const r = await rasterPdfPage(pg);
       if (U.img !== img0 || (U.srcPage || 1) !== pg) return; // пока грузили — сменили лист/подложку
       const k = U.ptPerPx ? (1 / r.z) / U.ptPerPx : img0.width / r.c.width;
+      if (U._imgKeyFor === img0 && U._data) { U._imgKeyFor = r.c; U._data = { url: U._data.url, k: U._data.k * k }; U._dataFor = r.c; }
       U.s *= k; U.img = r.c; U.zoomPdf = r.z; U.ptPerPx = 1 / r.z; U.pw = r.c.width; U.ph = r.c.height; U.pdfPage = r.page; U.page = pg;
     } else {
       const bmp = await createImageBitmap(new Blob([src.bytes])); if (U.img !== img0) return;
-      const k = img0.width / bmp.width; U.s *= k; if (U.ptPerPx) U.ptPerPx *= k; U.img = bmp; U.pw = bmp.width; U.ph = bmp.height;
+      const k = img0.width / bmp.width; if (U._imgKeyFor === img0 && U._data) { U._imgKeyFor = bmp; U._data = { url: U._data.url, k: U._data.k * k }; U._dataFor = bmp; }
+      U.s *= k; if (U.ptPerPx) U.ptPerPx *= k; U.img = bmp; U.pw = bmp.width; U.ph = bmp.height;
     }
     hqReset(); draw(); renderTape();
   } catch (e) { console.warn('upgradeUnderlay', e); }
@@ -5675,7 +5721,7 @@ async function upgradeUnderlay() {
 async function tapeRestore(j) {
   if (!j) return;
   Object.assign(M, j.M); M.objs = M.objs || []; markObjEdges(); T.undo = []; T.pending = null; T.chain = null; PGS.data = j.pages || {};
-  if (j.U && j.U.data) { const img = new Image(); img.src = j.U.data.url; await img.decode(); const bmp = await createImageBitmap(img); Object.assign(U, j.U); U.img = bmp; U.s = j.U.s / j.U.data.k; U.ptPerPx = j.U.ptPerPx ? j.U.ptPerPx / j.U.data.k : null; U.src = j.U.srcObj || null; U._srcKey = j.U.srcRef || null; delete U.srcObj; U.pdf = null; U.pdfPage = null; U.pages = 0; U.pw = bmp.width; U.ph = bmp.height; hqReset();
+  if (j.U && j.U.data) { const img = new Image(); img.src = j.U.data.url; await img.decode(); const bmp = await createImageBitmap(img); Object.assign(U, j.U); U.img = bmp; U.s = j.U.s / j.U.data.k; if (j.U.data.ref) { U._imgKey = j.U.data.ref; U._imgKeyFor = bmp; U._imgSaved = true; U._data = { url: j.U.data.url, k: 1 }; U._dataFor = bmp; } U.ptPerPx = j.U.ptPerPx ? j.U.ptPerPx / j.U.data.k : null; U.src = j.U.srcObj || null; U._srcKey = j.U.srcRef || null; delete U.srcObj; U.pdf = null; U.pdfPage = null; U.pages = 0; U.pw = bmp.width; U.ph = bmp.height; hqReset();
     if (j.U.srcB64 && !U.src) { const b = atob(j.U.srcB64), u8 = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u8[i] = b.charCodeAt(i); U.src = { kind: j.U.srcKind || 'pdf', bytes: u8 }; U._srcKey = null; } delete U.srcB64;
     U.page = U.srcPage || 1; upgradeUnderlay(); }
   adjust();
