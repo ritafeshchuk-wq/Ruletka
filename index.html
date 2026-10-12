@@ -260,7 +260,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 3.7 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 3.8 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -5498,13 +5498,18 @@ function drawTape() {
     ctx.strokeStyle = '#e07000'; ctx.lineWidth = 1 * dpr; ctx.setLineDash([4 * dpr, 4 * dpr]); ctx.beginPath(); ctx.moveTo(...sa); ctx.lineTo(...sb); ctx.stroke(); ctx.setLineDash([]);
   }
   // points
+  const PNR = M.pts.map(p => { const [x, y] = W2S(...PX(p)); return [x - 5 * dpr, y - 5 * dpr, x + 5 * dpr, y + 5 * dpr]; });
   for (const p of M.pts) {
     const [x, y] = W2S(...PX(p));
     const sel = T.sel && T.sel.pt === p, inCh = T.chain && T.chain[0] === p.id, isA = T.mA === p.id || T.opA === p.id || (T.roomIds && T.roomIds.includes(p.id)) || (T.objIds && T.objIds.includes(p.id));
     ctx.fillStyle = sel ? '#1f6feb' : inCh ? '#e07000' : isA ? '#7b4bd6' : '#fff'; ctx.strokeStyle = '#111'; ctx.lineWidth = 1.5 * dpr;
     if (p.soft && !sel) { ctx.lineWidth = 1 * dpr; ctx.beginPath(); ctx.arc(x, y, 3 * dpr, 0, 7); ctx.fill(); ctx.stroke(); continue; }
     ctx.beginPath(); ctx.arc(x, y, 5 * dpr, 0, 7); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#333'; ctx.font = `${10 * dpr}px Golos Text, Segoe UI`; ctx.fillText(pname(p.id), x + 7 * dpr, y - 6 * dpr);
+    ctx.font = `${10 * dpr}px Golos Text, Segoe UI`; const nm = pname(p.id), tw = ctx.measureText(nm).width, th = 10 * dpr;
+    // номер точки — в первый свободный угол; если все заняты соседями — не пишем (выбранная точка — всегда)
+    let put = null; for (const [ox, oy] of [[7, -6], [-7, -6], [7, 14], [-7, 14]]) { const x0 = ox > 0 ? x + ox * dpr : x + ox * dpr - tw, y0 = y + oy * dpr - th; if (!PNR.some(r => x0 < r[2] && x0 + tw > r[0] && y0 < r[3] && y0 + th > r[1])) { put = [x0, y0]; break; } }
+    if (!put && sel) put = [x + 7 * dpr, y - 6 * dpr - th];
+    if (put) { PNR.push([put[0], put[1], put[0] + tw, put[1] + th]); ctx.fillStyle = '#333'; ctx.fillText(nm, put[0], put[1] + th); }
   }
   if (T.calMode) { ctx.fillStyle = '#e00'; T.cal.forEach(p => { const [x, y] = W2S(...p); ctx.beginPath(); ctx.arc(x, y, 6 * dpr, 0, 7); ctx.fill(); }); }
 }
@@ -5674,37 +5679,72 @@ async function exportOverlayPdf() {
       page.drawSvgPath(font.getPath(str, 0, 0, size).toPathData(3), { x, y, color: col, borderWidth: 0, rotate: degrees(ang) });
     };
     const segAng = (a, b) => { let g = Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI; if (g > 90) g -= 180; if (g <= -90) g += 180; return g; };
+    // ---- раскладка подписей: ничего не налезает друг на друга; тесно — подпись меньше, сдвиг или сноска ----
+    const OB = []; // занятые места: повёрнутые прямоугольники {c, u, hw, hh}
+    const obb = (c, ang, hw, hh) => { const r = ang * Math.PI / 180; return { c, u: [Math.cos(r), Math.sin(r)], hw, hh }; };
+    const hit = (A, B) => { const d = [B.c[0] - A.c[0], B.c[1] - A.c[1]];
+      for (const ax of [A.u, [-A.u[1], A.u[0]], B.u, [-B.u[1], B.u[0]]]) { const pr = O => O.hw * Math.abs(O.u[0] * ax[0] + O.u[1] * ax[1]) + O.hh * Math.abs(-O.u[1] * ax[0] + O.u[0] * ax[1]); if (Math.abs(d[0] * ax[0] + d[1] * ax[1]) > pr(A) + pr(B)) return false; }
+      return true; };
+    const boxOf = (str, size, c, ang) => obb(c, ang, font.getAdvanceWidth(str, size) / 2 + size * 0.2, size * 0.6);
+    const upOf = ang => { const r = ang * Math.PI / 180; return [-Math.sin(r), Math.cos(r)]; };
+    const textC = (str, c, size, col, ang = 0) => { const up = upOf(ang); text(str, [c[0] - up[0] * 0.35 * size, c[1] - up[1] * 0.35 * size], size, col, ang); OB.push(boxOf(str, size, c, ang)); };
+    const leader = (from, B, col) => { const dx = from[0] - B.c[0], dy = from[1] - B.c[1]; const lx = dx * B.u[0] + dy * B.u[1], ly = -dx * B.u[1] + dy * B.u[0];
+      const t = Math.min(Math.abs(lx) > 1e-6 ? B.hw / Math.abs(lx) : 1e9, Math.abs(ly) > 1e-6 ? B.hh / Math.abs(ly) : 1e9); if (t >= 1) return;
+      const e = [B.c[0] + dx * t, B.c[1] + dy * t]; page.drawLine({ start: { x: from[0], y: from[1] }, end: { x: e[0], y: e[1] }, thickness: lw * 0.45, color: col });
+      page.drawCircle({ x: from[0], y: from[1], size: lw * 0.9, color: col }); };
+    // разместить подпись: первый свободный вариант; если свободных нет — keep: наименее занятый, иначе не рисовать
+    const place = (str, col, ang, cands, keep = true) => {
+      let best = null, bn = 1e9;
+      for (const k of cands) { const B = boxOf(str, k.size, k.c, ang); let n = 0; for (const o of OB) if (hit(o, B)) { n++; if (n >= bn) break; } if (n < bn) { bn = n; best = k; } if (!n) break; }
+      if (!best || (bn && !keep)) return false;
+      textC(str, best.c, best.size, col, ang); if (best.lead) leader(best.lead, OB[OB.length - 1], col); return true; };
+    // варианты для размера на отрезке a–b: над/под, сдвиг вдоль, мельче, затем сноска
+    const segCands = (a, b, str, size0) => {
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1e-6, ang = segAng(a, b), r = ang * Math.PI / 180, up = upOf(ang), dir = [Math.cos(r), Math.sin(r)], mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      const w0 = font.getAdvanceWidth(str, size0); let size = size0; if (w0 > 0.92 * L) size = Math.max(size0 * 0.55, size0 * 0.92 * L / w0);
+      const at = (k, t, sz) => [mid[0] + up[0] * k * sz + dir[0] * t, mid[1] + up[1] * k * sz + dir[1] * t];
+      const C = [];
+      for (const sz of [size, Math.max(size0 * 0.55, size * 0.75)]) { const w = font.getAdvanceWidth(str, sz), sh = Math.max(0, (L - w) / 2 - sz * 0.2);
+        for (const t of sh > sz * 0.5 ? [0, -sh, sh] : [0]) for (const k of [0.68, -0.68]) C.push({ c: at(k, t, sz), size: sz }); }
+      for (const k of [2.0, 3.0, 4.2, 5.6, 7.2]) for (const sg of [1, -1]) C.push({ c: at(sg * k, 0, size), size, lead: mid });
+      return { ang, C };
+    };
+    // варианты вокруг точки (подписи без отрезка): со сноской, если рядом тесно
+    const ptCands = (p, size, near = 0.9) => { const C = []; for (const rr of [near, near * 2.2, near * 3.6]) for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4 + Math.PI / 8; C.push({ c: [p[0] + Math.cos(a) * rr * size * 1.6, p[1] + Math.sin(a) * rr * size], size, lead: rr > near ? p : null }); } return C; };
+    // занятые заранее: точки
+    for (const p of M.pts) { if (p.soft) continue; const q = P2(p); OB.push(obb(q, 0, lw * 2.2, lw * 2.2)); }
     // объекты
     for (const o of M.objs || []) { const g = objGeom(o, PX); if (!g) continue;
       for (const [a, b, w] of g.lines) page.drawLine({ start: { x: toPt(...a)[0], y: toPt(...a)[1] }, end: { x: toPt(...b)[0], y: toPt(...b)[1] }, thickness: lw * (w > 0.3 ? 1.2 : 0.7), color: VIO });
       for (const d0 of g.dots) { const d = toPt(...d0); page.drawCircle({ x: d[0], y: d[1], size: lw * 2.2, color: VIO }); }
-      text(g.label.s, toPt(...g.label.p), fs * 0.95, VIO); }
-    // стены
+      place(g.label.s, VIO, 0, ptCands(toPt(...g.label.p), fs * 0.95, 0).map((k, i) => i ? k : { c: toPt(...g.label.p), size: fs * 0.95 })); }
+    // стены (линии сразу, подписи — в очередь)
+    const DL = [];
     for (const e of M.edges) { const A = ptById(e.a), B = ptById(e.b); if (!A || !B || e.obj) continue; const a = P2(A), b = P2(B), m = distMeas(e.a, e.b);
       page.drawLine({ start: { x: a[0], y: a[1] }, end: { x: b[0], y: b[1] }, thickness: e.open ? lw * 2.2 : lw * 1.3, color: e.open ? GRN : m ? RED : GRY, dashArray: m || e.open ? undefined : [lw * 6, lw * 4] });
-      const ang = segAng(a, b), r = ang * Math.PI / 180, mid = [(a[0] + b[0]) / 2 - Math.sin(r) * fs * 0.45, (a[1] + b[1]) / 2 + Math.cos(r) * fs * 0.45];
-      if (m) text(fm(m.v), mid, fs, RED, ang); else if (!e.open) { const Lw = Math.hypot(...[0, 1].map(i => PX(B)[i] - PX(A)[i])); text('≈' + fm(Lw), mid, fs * 0.8, GRY, ang); } }
+      if (m) DL.push({ pr: 1, L: Math.hypot(b[0] - a[0], b[1] - a[1]), a, b, s: fm(m.v), size: fs, col: RED });
+      else if (!e.open) { const Lw = Math.hypot(...[0, 1].map(i => PX(B)[i] - PX(A)[i])); DL.push({ pr: 6, L: 0, a, b, s: '≈' + fm(Lw), size: fs * 0.8, col: GRY, opt: true }); } }
     for (const e of M.edges) for (const [p1, p2, k] of openGeom(e, PX)) { const a = toPt(...p1), b = toPt(...p2); page.drawLine({ start: { x: a[0], y: a[1] }, end: { x: b[0], y: b[1] }, thickness: lw * (k === 'arc' ? 0.6 : 1.1), color: GRN }); }
     // диагонали и прочие замеры
     for (const m of M.meas) { if (m.type !== 'dist' || hasEdge(m.a, m.b) || m.on === false) continue; const A = ptById(m.a), B = ptById(m.b); if (!A || !B) continue; const a = P2(A), b = P2(B);
       page.drawLine({ start: { x: a[0], y: a[1] }, end: { x: b[0], y: b[1] }, thickness: lw * 0.8, color: VIO, dashArray: [lw * 4, lw * 3] });
-      text(fm(m.v), [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], fs * 0.9, VIO, segAng(a, b)); }
+      DL.push({ pr: 3, L: Math.hypot(b[0] - a[0], b[1] - a[1]), a, b, s: fm(m.v), size: fs * 0.9, col: VIO }); }
     for (const m of M.meas) if (m.type === 'tie' && m.on !== false) { const g = tieGeom(m, PX); if (!g) continue; const a = toPt(...g.p), b = toPt(...g.q);
       page.drawLine({ start: { x: a[0], y: a[1] }, end: { x: b[0], y: b[1] }, thickness: lw * 0.8, color: RED, dashArray: [lw * 4, lw * 3] });
       const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, nx = -(b[1] - a[1]) / L * lw * 3, ny = (b[0] - a[0]) / L * lw * 3;
       for (const z of [a, b]) page.drawLine({ start: { x: z[0] - nx, y: z[1] - ny }, end: { x: z[0] + nx, y: z[1] + ny }, thickness: lw * 0.8, color: RED });
-      text(fm(m.v), [(a[0] + b[0]) / 2 + nx * 1.6, (a[1] + b[1]) / 2 + ny * 1.6], fs * 0.85, RED, segAng(a, b)); }
-    for (const m of M.meas) if (m.type === 'thick' && m.on !== false) { const q = [m.a, m.b, m.c, m.d].map(id => P2(ptById(id))); text('δ ' + fm(m.v), [(q[0][0] + q[1][0] + q[2][0] + q[3][0]) / 4, (q[0][1] + q[1][1] + q[2][1] + q[3][1]) / 4], fs * 0.85, RED); }
-    for (const m of M.meas) if (m.type === 'angle' && m.on !== false) { const q = P2(ptById(m.b)); text('∠' + fdeg(m.v), [q[0] + fs, q[1] + fs], fs * 0.85, VIO, 0, 'l'); }
+      DL.push({ pr: 2, L, a, b, s: fm(m.v), size: fs * 0.85, col: RED }); }
+    for (const m of M.meas) if (m.type === 'thick' && m.on !== false) { const q = [m.a, m.b, m.c, m.d].map(id => P2(ptById(id))); DL.push({ pr: 4, p: [(q[0][0] + q[1][0] + q[2][0] + q[3][0]) / 4, (q[0][1] + q[1][1] + q[2][1] + q[3][1]) / 4], s: 'δ ' + fm(m.v), size: fs * 0.85, col: RED }); }
+    for (const m of M.meas) if (m.type === 'angle' && m.on !== false) { const q = P2(ptById(m.b)); DL.push({ pr: 5, p: q, s: '∠' + fdeg(m.v), size: fs * 0.85, col: VIO }); }
     // помещения
     for (const R of M.rooms) { const pts = R.ids.map(ptById).filter(Boolean).map(P2); if (pts.length < 3) continue; const c = toPt(...roomLabelAt(R));
       let area = 0; try { area = TAPE.roomInfo(M, R).area; } catch (e) { }
-      text(`${R.num}. ${R.name}`, [c[0], c[1] + fs * 0.7], fs * 1.05, BLUE); text(SHEET.fmtArea(area) + ' м²', [c[0], c[1] - fs * 0.7], fs, BLUE); }
+      textC(`${R.num}. ${R.name}`, [c[0], c[1] + fs * 0.7], fs * 1.05, BLUE); textC(SHEET.fmtArea(area) + ' м²', [c[0], c[1] - fs * 0.7], fs, BLUE); }
     // фото и сканы
     const RLC = rgb(0.76, 0.09, 0.36);
     for (const m of (M.marks || []).filter(x => x.type === 'rlab')) { const c = toPt(...m.p), l1 = m.num ? '№ ' + m.num : '', l2 = m.name || '', f1 = fs * 1.15, f2 = fs * 0.95;
       const w1 = l1 ? font.getAdvanceWidth(l1, f1) : 0, w2 = l2 ? font.getAdvanceWidth(l2, f2) : 0, pad = fs * 0.45, W = Math.max(w1, w2) + 2 * pad, H = (l1 ? f1 * 1.15 : 0) + (l2 ? f2 * 1.2 : 0) + pad * 1.1;
-      page.drawRectangle({ x: c[0] - W / 2, y: c[1] - H / 2, width: W, height: H, color: rgb(1, 1, 1), opacity: 0.92, borderColor: RLC, borderWidth: lw * 1.4 });
+      page.drawRectangle({ x: c[0] - W / 2, y: c[1] - H / 2, width: W, height: H, color: rgb(1, 1, 1), opacity: 0.92, borderColor: RLC, borderWidth: lw * 1.4 }); OB.push(obb(c, 0, W / 2, H / 2));
       let y = c[1] + H / 2 - pad * 0.55;
       if (l1) { y -= f1; page.drawSvgPath(font.getPath(l1, 0, 0, f1).toPathData(3), { x: c[0] - w1 / 2, y, color: RLC, borderWidth: 0 }); y -= f1 * 0.15; }
       if (l2) { y -= f2; page.drawSvgPath(font.getPath(l2, 0, 0, f2).toPathData(3), { x: c[0] - w2 / 2, y, color: RLC, borderWidth: 0 }); } }
@@ -5714,16 +5754,28 @@ async function exportOverlayPdf() {
         page.drawSvgPath(`M0 0L${-fs * 0.7 * Math.cos(a - 0.45)} ${fs * 0.7 * Math.sin(a - 0.45)}L${-fs * 0.7 * Math.cos(a + 0.45)} ${fs * 0.7 * Math.sin(a + 0.45)}Z`, { x: tip[0], y: tip[1], color: col, borderWidth: 0 }); }
       if (m.type === 'scan') page.drawSvgPath(`M0 ${-r * 1.2}L${r * 1.04} ${r * 0.6}L${-r * 1.04} ${r * 0.6}Z`, { x: c[0], y: c[1], color: rgb(1, 1, 1), borderColor: col, borderWidth: lw });
       else { page.drawRectangle({ x: c[0] - r, y: c[1] - r * 0.7, width: 2 * r, height: 1.4 * r, color: rgb(1, 1, 1), borderColor: col, borderWidth: lw }); page.drawCircle({ x: c[0], y: c[1], size: r * 0.38, borderColor: col, borderWidth: lw * 0.8 }); }
-      const lab = (m.type === 'photo' ? 'Ф ' : 'Скан ') + m.num; if (m.dir != null) { const q = toPt(m.p[0] + Math.cos(m.dir), m.p[1] + Math.sin(m.dir)); const a = Math.atan2(q[1] - c[1], q[0] - c[0]); text(lab, [c[0] - Math.cos(a) * r * 2.6, c[1] - Math.sin(a) * r * 2.6 - fs * 0.3], fs * 0.85, col); } else text(lab, [c[0] + r * 1.4, c[1] + r * 1.2], fs * 0.85, col, 0, 'l'); }
-    // выноски
+      OB.push(obb(c, 0, r * 1.1, r * 1.1));
+      const lab = (m.type === 'photo' ? 'Ф ' : 'Скан ') + m.num, fl = fs * 0.85; let c0;
+      if (m.dir != null) { const q = toPt(m.p[0] + Math.cos(m.dir), m.p[1] + Math.sin(m.dir)); const a = Math.atan2(q[1] - c[1], q[0] - c[0]); c0 = [c[0] - Math.cos(a) * r * 2.6, c[1] - Math.sin(a) * r * 2.6]; }
+      else c0 = [c[0] + r * 1.4 + font.getAdvanceWidth(lab, fl) / 2, c[1] + r * 1.2 + fl * 0.35];
+      place(lab, col, 0, [{ c: c0, size: fl }].concat(ptCands(c, fl, 1.4))); }
+    // выноски (их место выбрано вручную — рисуются как есть)
     const ORG = rgb(0.85, 0.28, 0.06);
     for (const n of M.notes || []) { const at = toPt(...n.at), ls = noteLines(n.text), fsn = fs * 0.95;
       if (n.arrow && (n.tip || n.pt != null)) { const tp = toPt(...noteTip(n)); const dx = tp[0] - at[0], dy = tp[1] - at[1], L = Math.hypot(dx, dy) || 1, st = [at[0] + dx / L * fsn * 1.2, at[1] + dy / L * fsn * 1.2];
         page.drawLine({ start: { x: st[0], y: st[1] }, end: { x: tp[0], y: tp[1] }, thickness: lw, color: ORG }); const a = Math.atan2(dy, dx), h = fsn * 0.8;
         page.drawSvgPath(`M0 0L${-h * Math.cos(a - 0.4)} ${h * Math.sin(a - 0.4)}L${-h * Math.cos(a + 0.4)} ${h * Math.sin(a + 0.4)}Z`, { x: tp[0], y: tp[1], color: ORG, borderWidth: 0 }); }
-      ls.forEach((l, i) => text(l, [at[0], at[1] - (i - (ls.length - 1) / 2) * fsn * 1.25 - fsn * 0.35], fsn, ORG)); }
-    // точки
-    for (const p of M.pts) { if (p.soft) continue; const q = P2(p); page.drawCircle({ x: q[0], y: q[1], size: lw * 1.6, color: rgb(1, 1, 1), borderColor: rgb(0.1, 0.1, 0.1), borderWidth: lw * 0.6 }); text(pname(p.id), [q[0] + fs * 0.4, q[1] + fs * 0.4], fs * 0.6, rgb(0.2, 0.2, 0.2), 0, 'l'); }
+      ls.forEach((l, i) => textC(l, [at[0], at[1] - (i - (ls.length - 1) / 2) * fsn * 1.25], fsn, ORG)); }
+    // размеры: сначала короткие стены (им тесней всего), потом привязки, диагонали, толщины, углы; «≈» — только если есть место
+    DL.sort((x, y) => x.pr - y.pr || (x.L || 0) - (y.L || 0));
+    for (const d of DL) {
+      if (d.a) { const { ang, C } = segCands(d.a, d.b, d.s, d.size); place(d.s, d.col, ang, C, !d.opt); }
+      else place(d.s, d.col, 0, [{ c: d.p, size: d.size }].concat(ptCands(d.p, d.size, 1.2)));
+    }
+    // номера точек — мелко и только там, где свободно
+    for (const p of M.pts) { if (p.soft) continue; const q = P2(p); page.drawCircle({ x: q[0], y: q[1], size: lw * 1.6, color: rgb(1, 1, 1), borderColor: rgb(0.1, 0.1, 0.1), borderWidth: lw * 0.6 });
+      const s0 = pname(p.id), f0 = fs * 0.55, w = font.getAdvanceWidth(s0, f0) / 2 + f0 * 0.5;
+      place(s0, rgb(0.3, 0.3, 0.3), 0, [[1, 1], [-1, 1], [1, -1], [-1, -1]].map(([sx, sy]) => ({ c: [q[0] + sx * w, q[1] + sy * f0 * 0.95], size: f0 })), false); }
     const d = new Date(); text(`Обмер рулеткой · ${d.toLocaleDateString('ru')} · ${M.cond ? 'условно по чертежу' : 'факт по замерам'} · размеры в метрах · Рулетка · © d1sco`, [10, 10], Math.max(4, Math.min(8, W / 160)), GRY, 0, 'l');
       })();
     }
