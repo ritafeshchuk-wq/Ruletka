@@ -260,7 +260,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 3.8 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 3.9 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -2872,6 +2872,18 @@ function uiDialog({ title, text = '', input = null, ok = 'OK', cancel = null }) 
     document.body.appendChild(ov); setTimeout(() => (inp || ov.querySelector('.uidlg-ok')).focus(), 30);
   });
 }
+function ask3(title, text, btns) { // btns: [[key, label, cls]] → key; закрыть без выбора = последняя кнопка
+  return new Promise(res => {
+    const ov = document.createElement('div'); ov.className = 'uidlg';
+    ov.innerHTML = `<div class="uidlg-box" role="dialog"><div class="uidlg-t"></div>${text ? '<div class="uidlg-x"></div>' : ''}<div class="row">${btns.map(b => `<button data-k="${b[0]}" class="${b[2] || ''}"></button>`).join('')}</div></div>`;
+    ov.querySelector('.uidlg-t').textContent = title; if (text) ov.querySelector('.uidlg-x').textContent = text;
+    btns.forEach(b => { ov.querySelector(`[data-k="${b[0]}"]`).textContent = b[1]; });
+    const done = k => { ov.remove(); res(k); };
+    ov.querySelectorAll('[data-k]').forEach(b => b.onclick = () => done(b.dataset.k));
+    ov.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Escape') done(btns[btns.length - 1][0]); });
+    document.body.appendChild(ov); setTimeout(() => ov.querySelector('[data-k]').focus(), 30);
+  });
+}
 const uiAlert = msg => { uiDialog({ title: String(msg) }); };
 const uiAsk = (title, def = '') => uiDialog({ title, input: def, ok: 'Готово', cancel: 'Отмена' });
 const uiConfirm = (title) => uiDialog({ title, ok: 'Продолжить', cancel: 'Отмена' });
@@ -3107,7 +3119,7 @@ function setMode(mode) {
   setStep(last || STEPS[mode][0][0]);
   if (mode === 'tape' && !T.fitted) { T.fitted = true; fitTape(); draw(); }
 }
-function goHome() { leaveProject().then(renderHome); $('#app').classList.add('home'); document.querySelectorAll('.modes button').forEach(b => b.classList.remove('on')); }
+async function goHome() { if (!(await leaveProject())) return; renderHome(); $('#app').classList.add('home'); document.querySelectorAll('.modes button').forEach(b => b.classList.remove('on')); }
 document.querySelectorAll('.modes button').forEach(b => b.onclick = () => setMode(b.dataset.mode));
 document.querySelectorAll('[data-go]').forEach(b => b.onclick = () => setMode(b.dataset.go));
 $('#brand').onclick = goHome;
@@ -3872,10 +3884,12 @@ function pMove(ev) {
     if (Math.hypot(ev.clientX - TP.tap.x, ev.clientY - TP.tap.y) < 10) return;
     lpCancel(); const t0 = TP.tap; TP.tap = null;
     // «Рулетка»: палец лёг на точку и повёл — двигаем точку (линии идут за ней, замеры не меняются)
-    if (S.step === 'tape' && !T.calMode) { const w0 = S2W(t0.x - r.left, t0.y - r.top), mkd = (T.tool === 'photo' || T.tool === 'scan') ? null : markAt(t0.x - r.left, t0.y - r.top), nt = mkd ? null : noteAt(t0.x - r.left, t0.y - r.top), p = null;
+    if (S.step === 'tape' && !T.calMode) { const w0 = S2W(t0.x - r.left, t0.y - r.top); let mkd = (T.tool === 'photo' || T.tool === 'scan') ? null : markAt(t0.x - r.left, t0.y - r.top), nt = mkd ? null : noteAt(t0.x - r.left, t0.y - r.top); const p = null;
+      const mv = T.tool === 'drag';
+      if (mkd && !mv) mkd = null; if (nt && !(mv || T.tool === 'note')) nt = null;
       if (mkd) { tPush(); T.dragMark = { m: mkd, off: [mkd.p[0] - w0[0], mkd.p[1] - w0[1]] }; T.sel = { mark: mkd }; TP.toolDrag = true; }
       if (nt) { tPush(); T.dragNote = { n: nt, off: [nt.at[0] - w0[0], nt.at[1] - w0[1]] }; T.sel = { note: nt }; TP.toolDrag = true; }
-      if (!mkd && !nt && (T.tool === 'box' ? (T.selSet && inSel(w0) && (startSelDrag(w0), true)) : grabAt(w0, t0.x - r.left, t0.y - r.top, M.cond || T.tool === 'drag'))) TP.toolDrag = true; }
+      if (!mkd && !nt && (T.tool === 'box' ? (T.selSet && inSel(w0) && (startSelDrag(w0), true)) : (mv && grabAt(w0, t0.x - r.left, t0.y - r.top, true)))) TP.toolDrag = true; }
     if (TP.toolDrag) { }
     else if (toolDrags()) { TP.toolDrag = true; onDown(fakeEv(t0.ev, t0.x, t0.y)); }
     else TP.pan = { px: t0.x, py: t0.y, cx: S.view.cx, cy: S.view.cy };
@@ -4102,7 +4116,7 @@ function buildProject() {
     tape: tapeProject() };
 }
 function saveProjectFile() {
-  const proj = buildProject();
+  const proj = buildProject(); proj.pid = AS.pid; proj.pname = AS.pname;
   if (proj.tape && proj.tape.U && U.src && U.src.bytes) { let bs = ''; const u = U.src.bytes; for (let i = 0; i < u.length; i += 32768) bs += String.fromCharCode.apply(null, u.subarray(i, i + 32768)); proj.tape.U.srcB64 = btoa(bs); proj.tape.U.srcKind = U.src.kind; }
   download((AS.pname || S.sheetOpt.info.object || 'проект').replace(/[\\/:*?"<>|]/g, '_') + '.scanplan.json', JSON.stringify(proj), 'application/json');
   AS.fileAt = Date.now(); showAS();
@@ -4110,9 +4124,9 @@ function saveProjectFile() {
 $('#bSave').onclick = () => {
   closeTapeMenu(); const el = document.createElement('div'); el.id = 'tmenu'; el.style.right = '12px'; el.style.top = '8px';
   const np = (U.src && U.src.kind === 'pdf') ? pagesWithWork().length : 1;
-  el.innerHTML = `<div class="tm-h">Сохранить</div><button data-k="pdf" class="pri">📄 PDF с замерами${np > 1 ? ' (листов: ' + np + ')' : ''} — итог</button><button data-k="json">💾 Файл проекта — продолжить позже, открыть на компьютере</button><button data-k="" class="tm-x">Отмена</button>`;
+  el.innerHTML = `<div class="tm-h">Сохранить</div><button data-k="proj" class="pri">💾 Сохранить проект «${escH(AS.pname || 'Обмер')}»${AS.dirty ? ' ●' : ''}</button><button data-k="pdf">📄 PDF с замерами${np > 1 ? ' (листов: ' + np + ')' : ''} — итог</button><button data-k="json">💾 Файл проекта — продолжить позже, открыть на компьютере</button><button data-k="" class="tm-x">Отмена</button>`;
   $('#main').appendChild(el);
-  el.querySelectorAll('button').forEach(b => b[window.PointerEvent ? 'onpointerup' : 'onclick'] = ev => { ev.stopPropagation(); ev.preventDefault(); el.remove(); if (b.dataset.k === 'pdf') exportOverlayPdf(); else if (b.dataset.k === 'json') saveProjectFile(); });
+  el.querySelectorAll('button').forEach(b => b[window.PointerEvent ? 'onpointerup' : 'onclick'] = ev => { ev.stopPropagation(); ev.preventDefault(); el.remove(); if (b.dataset.k === 'proj') saveNow(); else if (b.dataset.k === 'pdf') exportOverlayPdf(); else if (b.dataset.k === 'json') saveProjectFile(); });
 };
 // на iPhone/iPad фильтр по расширению не ставим: новые iOS делают файл проекта серым (не выбрать), если «Файлы» сохранили его не как .json
 if (IOS) $('#fProj').removeAttribute('accept');
@@ -4125,7 +4139,15 @@ async function readProjFile(f) {
 }
 $('#fProj').onchange = async e => {
   const f = e.target.files[0]; if (!f) return; busy('Открываю проект «' + f.name + '»…');
-  try { const j = await readProjFile(f); await leaveProject(); resetWork(); await projCreate((j.sheetOpt && j.sheetOpt.info && j.sheetOpt.info.object) || f.name.replace(/\.scanplan\.json$|\.json$/i, ''), false); await applyProject(j); await autosave(true); }
+  try { const j = await readProjFile(f); busy(''); if (!(await leaveProject())) { e.target.value = ''; return; }
+    const nm = j.pname || (j.sheetOpt && j.sheetOpt.info && j.sheetOpt.info.object) || f.name.replace(/\.scanplan\.json$|\.json$/i, '').replace(/[ _-]*\(?\d+\)?$/, '');
+    await projIndex(); const same = PJ.list.find(x => j.pid && x.id === j.pid) || PJ.list.find(x => x.name === nm); let target = null;
+    if (same) { const k = await ask3(`Проект «${same.name}» уже есть в списке`, 'Заменить его содержимым этого файла? Нынешнее состояние проекта останется в «Копии».', [['repl', 'Заменить', 'pri'], ['new', 'Открыть отдельным проектом', ''], ['stay', 'Отмена', '']]);
+      if (k === 'stay') { e.target.value = ''; return; } if (k === 'repl') target = same; }
+    busy('Открываю проект…');
+    if (target) { const old = await asGetK('proj:' + target.id); if (typeof old === 'string') await addSnap({ when: Date.now(), summary: 'до замены из файла', proj: old, sid: AS.sid, pid: target.id, pname: target.name }); }
+    resetWork(); if (target) { AS.pid = target.id; AS.pname = target.name; AS.sid = Date.now(); AS.snapAt = 0; AS.restoreFailed = false; showProjName(); } else await projCreate(nm, false);
+    await applyProject(j); await autosave(true); markSaved(); stat(`Файл открыт ${target ? 'в проект' : 'как проект'} «${AS.pname}» и сохранён.`); }
   catch (err) { busy(''); uiAlert('Не удалось открыть проект: ' + (err && err.message || err)); }
   busy(''); e.target.value = '';
 };
@@ -4164,9 +4186,9 @@ const tfmt = d => new Date(d).toLocaleString('ru', { day: '2-digit', month: '2-d
 function showAS() {
   const el = $('#asInd'); if (!el) return;
   const t = d => new Date(d).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  el.textContent = AS.restoreFailed ? '⚠ Проект не открылся — изменения НЕ сохраняются. Откройте «Копии» или другой проект' : AS.off ? '⚠ Автосохранение не работает — сохраните проект файлом' : AS.savedAt ? `✓ Сохранено ${t(AS.savedAt)}` : '';
-  el.style.color = AS.off || AS.restoreFailed ? '#ff8a80' : '';
-  el.title = 'Работа сохраняется в памяти iPad через пару секунд после каждого изменения; каждые 2 минуты — отдельная копия (40 последних). После обновления страницы работа восстанавливается сама. Файл проекта («Сохранить проект») — копия вне браузера, её стоит сохранять в конце дня.';
+  el.textContent = AS.restoreFailed ? '⚠ Проект не открылся — сохранять поверх нельзя. Откройте «Копии»' : AS.off ? '⚠ Не удалось сохранить — сохраните файл проекта' : AS.dirty ? '● Не сохранено' : AS.savedAt ? `✓ Сохранено ${t(AS.savedAt)}` : '';
+  el.style.color = AS.off || AS.restoreFailed ? '#ff8a80' : AS.dirty ? '#ffb74d' : ''; const bs = $('#bSave'); if (bs) bs.classList.toggle('pri', !!AS.dirty);
+  el.title = 'Проект сохраняется в памяти iPad только кнопкой «Сохранить» → «Сохранить проект» (перезаписывается тот же проект, прошлые версии — в «Копии»). Файл проекта — копия вне iPad, её стоит сохранять в конце дня.';
 }
 // подложка хранится один раз отдельно, в копиях — только ссылка на неё
 async function packProj() {
@@ -4183,7 +4205,7 @@ async function unpackProj(txt) {
   if (j.tape && j.tape.U && j.tape.U.srcRef) { const so = await asGetK(j.tape.U.srcRef); if (so && so.bytes) j.tape.U.srcObj = so; }
   return j;
 }
-function quickSave() { try { if (AS.hold || AS.restoring || AS.restoreFailed || !AS.pid || (!hasWork() && !AS.last)) return; localStorage.setItem('ruletka_quick', JSON.stringify({ when: Date.now(), pid: AS.pid, page: U.srcPage || 1, M, U: U.img ? { s: U.s, rot: U.rot, tx: U.tx, ty: U.ty, alpha: U.alpha, name: U.name } : null })); } catch (e) { } }
+function quickSave() { try { if (AS.hold || AS.restoring || AS.restoreFailed || !AS.pid || !AS.dirty) return; localStorage.setItem('ruletka_quick', JSON.stringify({ when: Date.now(), pid: AS.pid, page: U.srcPage || 1, M, pages: PGS.data, U: U.img ? { s: U.s, rot: U.rot, tx: U.tx, ty: U.ty, alpha: U.alpha, name: U.name } : null })); } catch (e) { } }
 // сохранения идут строго по очереди: вызов во время записи не теряется, а ставится следом (с самым свежим состоянием)
 let AS_Q = Promise.resolve();
 function autosave(force) {
@@ -4198,9 +4220,8 @@ async function autosave0(force) {
   if (!AS.pid) await projCreate(AS.pname || ('Обмер ' + new Date().toLocaleDateString('ru')), true);
   AS.busy = true; const gen = AS.gen || 0;
   // всё, что относится к этому сохранению, фиксируем сразу: проект, время снимка, сводку
-  const ep = AS.epoch || 0, pid = AS.pid, pname = AS.pname, sid = AS.sid, now = Date.now(), summary = workSummary();
+  const ep = AS.epoch || 0, pid = AS.pid, pname = AS.pname, sid = AS.sid, now = Date.now(), summary = workSummary(), sig = curSig();
   try {
-    quickSave();
     let txt; try { txt = await packProj(); } catch (e) { txt = null; }
     if ((AS.epoch || 0) !== ep) return; // пока готовили запись, открыли другой проект — не пишем
     if (!txt) { AS.off = true; showAS(); return; }
@@ -4209,11 +4230,20 @@ async function autosave0(force) {
       const ok = await asPutK('proj:' + pid, txt) && await asPutK('last', { when: now, summary, proj: txt, sid, pid });
       if (ok) await projIndexTouch(pid, { updated: now, summary });
       if ((AS.epoch || 0) !== ep) return;
-      if (ok) { AS.last = txt; AS.savedAt = now; AS.off = false; } else AS.off = true;
+      if (ok) { AS.last = txt; AS.savedAt = now; AS.off = false; AS.savedSig = sig; } else AS.off = true;
     }
-    if (changed && now - AS.snapAt >= SNAP_EVERY && (AS.epoch || 0) === ep) await addSnap({ when: now, summary, proj: txt, sid, pid, pname });
+    if (changed && !AS.off && (AS.epoch || 0) === ep) await addSnap({ when: now, summary, proj: txt, sid, pid, pname });
+    checkDirty();
     showAS();
-  } finally { AS.busy = false; if ((AS.gen || 0) === gen && !AS.off) AS.dirty = false; }
+  } finally { AS.busy = false; }
+}
+async function saveNow() { // «Сохранить проект»: перезаписывает этот же проект (+ версия в «Копиях»)
+  if (AS.hold) { stat('Подождите — собирается PDF.'); return false; }
+  if (AS.restoreFailed) { uiAlert('Этот проект не открылся полностью — сохранять поверх нельзя. Откройте версию из «Копии» или файл проекта.'); return false; }
+  checkDirty(); busy('Сохраняю проект…'); await autosave(true); busy('');
+  if (AS.off) { uiAlert('Не удалось сохранить в память iPad. Сохраните «Файл проекта» (Сохранить → Файл проекта).'); return false; }
+  try { const q = JSON.parse(localStorage.getItem('ruletka_quick') || 'null'); if (q && q.pid === AS.pid) localStorage.removeItem('ruletka_quick'); } catch (e) { }
+  stat(`Сохранено в проект «${AS.pname}» · ${new Date().toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}. Предыдущие версии — в «Копии».`); return true;
 }
 async function addSnap(r) {
   const idx = (await asGetK('snaps')) || []; const list = Array.isArray(idx) ? idx : [];
@@ -4230,12 +4260,21 @@ async function addSnap(r) {
   await asPutK('snaps', out); AS.snapAt = r.when;
 }
 let asTimer = 0;
-setInterval(() => { if (!hasWork() || S.step !== 'tape') return; const since = Date.now() - Math.max(AS.fileAt || 0, AS.remindAt || AS.sid); if (since > 30 * 60000) { AS.remindAt = Date.now(); stat('Напоминание: сохраните копию файлом — «Сохранить проект» → «Сохранить в Файлы».'); const b = $('#bSave'); if (b) { b.classList.add('pri'); setTimeout(() => b.classList.remove('pri'), 20000); } } }, 60000);
-function asSoon() { AS.dirty = true; AS.gen = (AS.gen || 0) + 1; if (!asTimer) asTimer = setTimeout(() => { asTimer = 0; autosave(); }, 1500); } // не позже 1,5 с после первого изменения, даже если работа идёт без пауз
-setInterval(autosave, 15000);
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { quickSave(); autosave(); } });
-addEventListener('pagehide', () => { quickSave(); autosave(); });
-addEventListener('beforeunload', e => { quickSave(); if (hasWork() && (AS.dirty || !AS.savedAt || Date.now() - AS.savedAt > 20000)) { e.preventDefault(); e.returnValue = ''; } });
+setInterval(() => { if (S.step !== 'tape') return; checkDirty(); if (!AS.dirty || !AS.dirtySince) return; const now = Date.now(); if (now - AS.dirtySince > 10 * 60000 && now - (AS.remindAt || 0) > 10 * 60000) { AS.remindAt = now; stat('Есть несохранённые изменения с ' + new Date(AS.dirtySince).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }) + ' — нажмите «💾 Сохранить» → «Сохранить проект».'); } }, 60000);
+// АВТОСОХРАНЕНИЯ НЕТ: в проект пишет только «Сохранить». Здесь лишь отмечаем, что есть несохранённые изменения.
+const SIGR = (k, v) => (k === 'x' || k === 'y' || k === 'res' || k === 'calc') ? undefined : (typeof v === 'number' ? Math.round(v * 1e6) / 1e6 : v);
+function curSig() { try {
+  const pg = {}; for (const [k, d] of Object.entries(PGS.data || {})) pg[k] = { m: JSON.parse(d.m), u: d.u ? [d.u.ptPerPx ? d.u.s / d.u.ptPerPx : d.u.s, d.u.rot, d.u.tx, d.u.ty] : null };
+  const m = {}; MKEYS.forEach(k => m[k] = M[k]); pg[U.srcPage || 1] = { m, u: U.img ? [U.ptPerPx ? U.s / U.ptPerPx : U.s, U.rot, U.tx, U.ty] : null };
+  return JSON.stringify([pg, U.name || '', U.src ? U.src.kind : '', !!U.img], SIGR);
+} catch (e) { return 'err' + Math.random(); } }
+function checkDirty() { clearTimeout(asTimer); asTimer = 0; if (!AS.pid || AS.restoring) return; const d = curSig() !== AS.savedSig; if (d && !AS.dirty) AS.dirtySince = Date.now(); AS.dirty = d; showAS(); }
+function markSaved() { AS.savedSig = curSig(); AS.dirty = false; AS.dirtySince = 0; showAS(); }
+function asSoon() { AS.gen = (AS.gen || 0) + 1; if (!asTimer) asTimer = setTimeout(() => { asTimer = 0; checkDirty(); }, 400); }
+// при закрытии с несохранёнными изменениями — только аварийная копия (в проект она не пишется; при открытии программа спросит)
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { checkDirty(); if (AS.dirty) quickSave(); } });
+addEventListener('pagehide', () => { checkDirty(); if (AS.dirty) quickSave(); });
+addEventListener('beforeunload', e => { checkDirty(); if (AS.dirty) { quickSave(); e.preventDefault(); e.returnValue = ''; } });
 const msig = m => { try { return JSON.stringify([(m.pts || []).map(p => [p.id, p.x0, p.y0]), (m.meas || []).map(x => [x.id, x.v, x.on]), m.edges, m.rooms, m.objs, m.notes, m.marks]); } catch (e) { return ''; } };
 async function asGC() { // только при запуске; при любой ошибке чтения — ничего не удаляет
   try {
@@ -4248,13 +4287,14 @@ async function asGC() { // только при запуске; при любой
     if (dead.length) console.info('asGC: удалено', dead.length);
   } catch (e) { }
 }
-async function restoreFrom(r, label) {
+async function restoreFrom(r, label, asSaved) {
   AS.restoring = true; busy('Восстанавливаю…');
   let ok = false;
   try { const j = await unpackProj(r.proj); await applyProject(j); AS.last = ''; AS.savedAt = r.when; ok = true; AS.restoreFailed = false; stat(`Работа восстановлена (${label || tfmt(r.when)}). Можно продолжать.`); }
   catch (err) { console.error(err); AS.restoreFailed = true; uiAlert('Не удалось открыть: ' + err.message + '\n\nСохранённые данные НЕ тронуты и не перезаписаны. Попробуйте «Копии» — более раннюю копию, или откройте файл проекта. Сделайте снимок экрана с этим сообщением.'); }
-  AS.restoring = false; busy(''); showAS(); if (ok) autosave(true); return ok;
+  AS.restoring = false; busy(''); if (ok && asSaved) markSaved(); else checkDirty(); return ok;
 }
+async function snapCurrent(note) { if (!hasWork()) return; try { const txt = await packProj(); if (txt) await addSnap({ when: Date.now(), summary: workSummary() + note, proj: txt, sid: AS.sid, pid: AS.pid, pname: AS.pname }); } catch (e) { } }
 function snapPages(t) { // листы с замерами в копии: [{pg, n, m, u}]
   const out = []; const cur = t.U && t.U.srcPage || 1;
   for (const [k, d] of Object.entries(t.pages || {})) { if (+k === cur) continue; try { const m = JSON.parse(d.m); if (m.pts && m.pts.length) out.push({ pg: +k, n: m.pts.length, m, u: d.u }); } catch (e) { } }
@@ -4263,16 +4303,16 @@ function snapPages(t) { // листы с замерами в копии: [{pg, n
 }
 async function restorePageFromSnap(t, pg, w) {
   const x = snapPages(t).find(v => v.pg === pg); if (!x) return;
-  await autosave(true); if (hasWork()) await addSnap({ when: Date.now(), summary: workSummary() + ` (до возврата листа ${pg})`, proj: AS.last, sid: AS.sid, pid: AS.pid });
+  await snapCurrent(` (до возврата листа ${pg})`);
   if (U.srcPage === pg) { tPush(); PGS.data[pg] = { m: JSON.stringify(x.m), u: x.u || (PGS.data[pg] && PGS.data[pg].u) }; const d = loadPageModel(pg); if (d && d.u) Object.assign(U, { s: d.u.ptPerPx && U.ptPerPx ? d.u.s * U.ptPerPx / d.u.ptPerPx : d.u.s, rot: d.u.rot, tx: d.u.tx, ty: d.u.ty }); adjust(); fitTape(); draw(); renderTape(); }
   else { savePage(); PGS.data[pg] = { m: JSON.stringify(x.m), u: x.u || (PGS.data[pg] && PGS.data[pg].u) }; renderTape(); }
-  asSoon(); await autosave(true);
-  stat(`Лист ${pg} возвращён из копии ${tfmt(w)} (точек ${x.n}). Остальные листы не тронуты. ${U.srcPage === pg ? '' : 'Перейдите на лист ' + pg + ', чтобы посмотреть.'}`);
+  checkDirty();
+  stat(`Лист ${pg} возвращён из копии ${tfmt(w)} (точек ${x.n}). Остальные листы не тронуты. Проверьте и нажмите «Сохранить проект». ${U.srcPage === pg ? '' : 'Перейдите на лист ' + pg + ', чтобы посмотреть.'}`);
 }
 async function snapsDialog() {
   const list = ((await asGetK('snaps')) || []).filter(x => !AS.pid || !x.pid || x.pid === AS.pid).slice().reverse();
   closeTapeMenu(); const el = document.createElement('div'); el.id = 'pagePick';
-  el.innerHTML = `<div class="pp-box" style="max-width:560px"><div class="pp-head"><div><b>Сохранённые копии</b><div class="hint" style="margin:2px 0 0">Копии этого проекта — каждые 2 минуты работы. Выберите, к какой вернуться: текущее состояние тоже останется в списке.</div></div><button id="snX">Закрыть</button></div><div class="row" style="margin:0 0 10px"><button id="snNew">☰ Все проекты</button><span class="hint" style="margin:0">новый проект, другой объект</span></div><div style="display:flex;flex-direction:column;gap:6px;max-height:60vh;overflow:auto">${list.length ? list.map(x => `<button data-w="${x.when}" style="text-align:left;padding:10px 12px"><b>${tfmt(x.when)}</b> · ${escH(x.summary || '')}</button>`).join('') : '<p class="hint">Копий пока нет.</p>'}</div></div>`;
+  el.innerHTML = `<div class="pp-box" style="max-width:560px"><div class="pp-head"><div><b>Сохранённые копии</b><div class="hint" style="margin:2px 0 0">Версии этого проекта — каждое «Сохранить проект». Выберите, к какой вернуться: текущее состояние тоже останется в списке.</div></div><button id="snX">Закрыть</button></div><div class="row" style="margin:0 0 10px"><button id="snNew">☰ Все проекты</button><span class="hint" style="margin:0">новый проект, другой объект</span></div><div style="display:flex;flex-direction:column;gap:6px;max-height:60vh;overflow:auto">${list.length ? list.map(x => `<button data-w="${x.when}" style="text-align:left;padding:10px 12px"><b>${tfmt(x.when)}</b> · ${escH(x.summary || '')}</button>`).join('') : '<p class="hint">Копий пока нет.</p>'}</div></div>`;
   document.body.appendChild(el);
   el.querySelector('#snX').onclick = () => el.remove();
   el.querySelector('#snNew').onclick = () => { el.remove(); goHome(); }; el.onclick = e => { if (e.target === el) el.remove(); };
@@ -4285,9 +4325,9 @@ async function snapsDialog() {
         <button data-all="1" style="text-align:left;padding:10px 12px">Вернуть <b>весь проект</b> к этой копии</button></div>`;
       box.querySelector('#snX2').onclick = () => { el.remove(); snapsDialog(); };
       box.querySelectorAll('[data-pg]').forEach(x => x.onclick = async () => { el.remove(); await restorePageFromSnap(j.tape, +x.dataset.pg, w); });
-      box.querySelector('[data-all]').onclick = async () => { el.remove(); await autosave(true); if (hasWork()) await addSnap({ when: Date.now(), summary: workSummary() + ' (до возврата)', proj: AS.last, sid: AS.sid, pid: AS.pid }); restoreFrom({ when: w, proj }, 'копия ' + tfmt(w)); };
+      box.querySelector('[data-all]').onclick = async () => { el.remove(); await snapCurrent(' (до возврата)'); restoreFrom({ when: w, proj }, 'копия ' + tfmt(w)); };
       return; }
-    el.remove(); await autosave(true); if (hasWork()) await addSnap({ when: Date.now(), summary: workSummary() + ' (до возврата)', proj: AS.last, sid: AS.sid, pid: AS.pid }); if (!proj || proj === true) { uiAlert('Эта копия не найдена.'); return; } restoreFrom({ when: w, proj }, 'копия ' + tfmt(w)); });
+    el.remove(); await snapCurrent(' (до возврата)'); if (!proj || proj === true) { uiAlert('Эта копия не найдена.'); return; } restoreFrom({ when: w, proj }, 'копия ' + tfmt(w)); });
 }
 // ---------- проекты ----------
 const PJ = { list: [] };
@@ -4303,24 +4343,31 @@ function resetWork() {
   Object.assign(M, { axis: null, snap90: true, pts: [], meas: [], edges: [], rooms: [], chains: [], objs: [], notes: [], marks: [], lastNum: {}, nextId: 1, nextMeas: 1, cond: false, scaleFit: false, scaleAsked: false });
   Object.assign(U, { img: null, pdf: null, pages: 0, page: 1, name: '', src: null, ptPerPx: null, srcPage: 1, _imgKey: null, _imgKeyFor: null, _imgSaved: false, _srcKey: null, _data: null, _dataFor: null, mip: null, mipSrc: null, pdfPage: null, s: 0.01, rot: 0, tx: 0, ty: 0 });
   Object.assign(T, { mk: null, dragMark: null, dragSel: null, dragEdge: null, snapG: null, selSet: null, box: null, noteTip: null, undo: [], redo: [], pending: null, chain: null, sel: null, buffer: null, objIds: null, roomIds: null, mA: null, tA: null, fitted: false });
-  AS.last = ''; AS.savedAt = 0; AS.epoch = (AS.epoch || 0) + 1;
-  adjust();
+  PGS.data = {}; AS.last = ''; AS.savedAt = 0; AS.epoch = (AS.epoch || 0) + 1;
+  adjust(); markSaved();
 }
-async function leaveProject() { if (AS.pid && (hasWork() || AS.last)) await autosave(true); await AS_Q; }
+async function leaveProject() { // true — можно уходить
+  await AS_Q; checkDirty(); if (!AS.pid || !AS.dirty) return true;
+  const k = await ask3(`Сохранить изменения в «${AS.pname}»?`, 'В проекте есть несохранённые изменения.', [['save', '💾 Сохранить', 'pri'], ['drop', 'Не сохранять', 'danger'], ['stay', 'Отмена', '']]);
+  if (k === 'save') return await saveNow();
+  if (k === 'drop') { markSaved(); return true; }
+  return false; }
 async function projOpen(id) {
-  await leaveProject(); await projIndex(); const p = PJ.list.find(x => x.id === id); if (!p) return;
+  if (!(await leaveProject())) return; await projIndex(); const p = PJ.list.find(x => x.id === id); if (!p) return;
   let q = null; try { q = JSON.parse(localStorage.getItem('ruletka_quick') || 'null'); } catch (e) { }
   const txt = await asGetK('proj:' + id); resetWork(); AS.restoreFailed = false; AS.pid = id; AS.pname = p.name; AS.sid = Date.now(); AS.snapAt = 0; showProjName();
-  if (txt && txt !== true) { const ok = await restoreFrom({ when: p.updated, proj: txt }, p.name);
-    // запасная копия (пишется мгновенно при каждом уходе со страницы) новее сохранённой — значит последние замеры не успели записаться
-    if (ok && q && q.pid === id && q.M && Array.isArray(q.M.pts) && q.when > (p.updated || 0) && (q.page || 1) === (U.srcPage || 1) && msig(q.M) !== msig(M)) {
-      Object.assign(M, q.M); M.objs = M.objs || []; M.notes = M.notes || []; M.marks = M.marks || []; markObjEdges(); adjust(); draw(); renderTape(); asSoon();
-      stat('Подхвачены последние изменения (' + tfmt(q.when) + '), которые не успели сохраниться перед закрытием.'); } }
-  else { T.fitted = true; setMode('tape'); fitTape(); draw(); renderTape(); }
+  let ok = true;
+  if (txt && txt !== true) ok = await restoreFrom({ when: p.updated, proj: txt }, p.name, true); else { T.fitted = true; setMode('tape'); fitTape(); draw(); renderTape(); markSaved(); }
+  { // аварийная копия новее сохранённого — программа закрылась без «Сохранить»
+    if (ok && q && q.pid === id && q.M && Array.isArray(q.M.pts) && q.when > (p.updated || 0) && (q.page || 1) === (U.srcPage || 1) && msig(q.M) !== msig(M)
+      && await uiDialog({ title: 'Вернуть несохранённые изменения?', text: `Программа закрылась ${tfmt(q.when)}, а последние изменения не были сохранены. Вернуть их? В проект они попадут, только когда нажмёте «Сохранить проект».`, ok: 'Вернуть', cancel: 'Нет, открыть сохранённое' })) {
+      if (q.pages) for (const [k, d] of Object.entries(q.pages)) if (+k !== (U.srcPage || 1)) PGS.data[k] = d;
+      Object.assign(M, q.M); M.objs = M.objs || []; M.notes = M.notes || []; M.marks = M.marks || []; markObjEdges(); adjust(); draw(); renderTape(); checkDirty();
+      fitTape(); draw(); stat('Несохранённые изменения возвращены — проверьте и нажмите «Сохранить проект».'); } }
   if (S.sheetOpt && S.sheetOpt.info) S.sheetOpt.info.object = p.name;
 }
 async function projNew(name, withUnderlay) {
-  await leaveProject(); resetWork(); await projCreate(name || ('Обмер ' + new Date().toLocaleDateString('ru')), false);
+  if (!(await leaveProject())) return; resetWork(); await projCreate(name || ('Обмер ' + new Date().toLocaleDateString('ru')), false);
   T.fitted = true; setMode('tape'); fitTape(); draw(); renderTape(); stat(withUnderlay ? 'Новый проект. Выберите план БТИ (PDF или картинку).' : 'Новый проект на чистом листе. Начинайте обход: коснитесь первого угла.');
 }
 async function projDelete(id) {
