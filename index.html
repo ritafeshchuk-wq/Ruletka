@@ -215,7 +215,8 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 @media (max-height:700px){#trail button i{font-size:17px!important}#trail{gap:2px}}
 #trail button i{font-style:normal;font-size:20px;line-height:1}
 #trail button.on{background:var(--tape,#E3A21A);color:#1B2430}
-#trail button.del{color:#ff8a80;border-top:1px solid rgba(255,255,255,.12);border-radius:0 0 10px 10px}#trail button.del.on{background:#C4372F;color:#fff}
+#trail .tsep{flex:0 0 1px;background:rgba(255,255,255,.16);margin:2px 8px}
+#trail button.del{color:#ff8a80}#trail button.del.on{background:#C4372F;color:#fff}
 #mcard{position:absolute;top:8px;left:calc(50% + 37px);transform:translateX(-50%);width:min(440px,calc(100% - 100px));z-index:6;background:#fff;border:2px solid var(--line);border-radius:14px;box-shadow:0 6px 20px rgba(15,23,36,.18);padding:8px 10px;display:flex;flex-direction:column;gap:6px}
 #mcard.wait{border-color:var(--tape,#E3A21A);background:#FFFBF1}#mcard.got{border-color:#1E8A55}
 #mcard.idle{padding:5px 8px;opacity:.94}
@@ -261,7 +262,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 4.0 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 4.1 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -4513,7 +4514,7 @@ function tapeMenu(w, cx, cy) {
   T.sel = h.mark ? { mark: h.mark } : h.note ? { note: h.note } : h.pt ? { pt: h.pt } : h.edge ? { edge: h.edge } : h.obj ? { obj: h.obj } : { meas: h.meas }; draw();
   const mv = m => m ? fm(m.v) + ' м' : '';
   let title, items = [];
-  const remeasure = m => ['↻ Перемерить', () => { tPush(); M.meas = M.meas.filter(x => x !== m); adjust(); makePending({ type: m.type, a: m.a, b: m.b, c: m.c, d: m.d, re: true }); stat('Сделайте замер заново: ' + pendLabel(T.pending)); }];
+  const remeasure = m => ['↻ Перемерить', () => { tPush(); M.meas = M.meas.filter(x => x !== m); adjust(); makePending({ type: m.type, a: m.a, b: m.b, c: m.c, d: m.d, re: true, prom: m.prom }); stat('Сделайте замер заново: ' + pendLabel(T.pending)); }];
   const edit = m => ['✎ Изменить число…', () => { uiAsk('Новое значение (м или мм):', nf(m.v, 3)).then(s => { const v = parseManual(s || ''); if (v) { tPush(); m.v = v; adjust(); renderTape(); } }); }];
   const toggle = m => [m.on === false ? '☑ Учитывать замер' : '☐ Не учитывать (выключить)', () => { tPush(); m.on = m.on === false; adjust(); renderTape(); }];
   const delM = m => ['🗑 Удалить замер', () => { tPush(); M.meas = M.meas.filter(x => x !== m); adjust(); renderTape(); stat('Замер удалён'); }, 'danger'];
@@ -4651,6 +4652,13 @@ function tieGeom(m, PXf) {
   const ux = b[0] - a[0], uy = b[1] - a[1], L2 = ux * ux + uy * uy || 1e-12, t = ((mid[0] - a[0]) * ux + (mid[1] - a[1]) * uy) / L2;
   const f = [a[0] + ux * t, a[1] + uy * t]; return { p: mid, q: f, c: [(mid[0] + f[0]) / 2, (mid[1] + f[1]) / 2] };
 }
+function promPoint(w) {
+  const p = nearestPoint(w); if (p) return p;
+  tPush(); const ed = nearestWall(w, 10);
+  if (ed) { const A = ptById(ed.e.a), B = ptById(ed.e.b), a = PX(A), b = PX(B); const q = addPoint([a[0] + (b[0] - a[0]) * ed.t, a[1] + (b[1] - a[1]) * ed.t]); q.free = true;
+    M.meas.push({ id: M.nextMeas++, type: 'line', a: ed.e.a, b: ed.e.b, p: q.id, on: true }); adjust(); return q; } // точка лежит на стене, контур не меняется
+  const q = addPoint(w); q.free = true; adjust(); return q;
+}
 function nearestWall(w, px = 14) { let best = null, bd = px * HITK() / S.view.s, bt = 0; for (const e of M.edges) { if (e.obj) continue; const A = ptById(e.a), B = ptById(e.b); if (!A || !B) continue; const [d, t] = distSeg(w, PX(A), PX(B)); if (d < bd) { bd = d; best = e; bt = t; } } return best ? { e: best, t: bt } : null; }
 function createHatch(w) {
   tPush(); let ang = M.axis || 0, bd = 6;
@@ -4766,14 +4774,19 @@ function insertDoor(e0, tc, L) { // дверь в месте касания: д�
   stat('Дверь поставлена. Замерьте ширину проёма, затем расстояние от угла (или «Пропустить»). Коснитесь двери ещё раз — повернуть / окно.');
   renderTape();
 }
-function cycleOpening(e) { // стена → дверь (4 положения) → окно → проём → стена
-  if (!e.open) { e.open = true; e.kind = 'door'; e.dor = 0; }
-  else if (e.kind === 'door' && (e.dor || 0) < 3) e.dor = (e.dor || 0) + 1;
-  else if (e.kind === 'door') { e.kind = 'window'; delete e.dor; }
-  else if (e.kind === 'window') { delete e.kind; }
-  else { e.open = false; delete e.kind; delete e.dor; }
+function cycleOpening(e, tool = 'door') { // «Дверь»: стена → дверь (4 положения) → проём → стена; «Окно»: стена → окно → проём → стена
+  if (tool === 'window') {
+    if (!e.open || e.kind === 'door') { e.open = true; e.kind = 'window'; delete e.dor; }
+    else if (e.kind === 'window') { delete e.kind; }
+    else { e.open = false; delete e.kind; delete e.dor; }
+  } else {
+    if (!e.open || e.kind === 'window') { e.open = true; e.kind = 'door'; e.dor = 0; }
+    else if (e.kind === 'door' && (e.dor || 0) < 3) e.dor = (e.dor || 0) + 1;
+    else if (e.kind === 'door') { delete e.kind; delete e.dor; }
+    else { e.open = false; delete e.kind; delete e.dor; }
+  }
   const nm = { door: 'Дверь' + (e.dor ? ` (положение ${e.dor + 1} из 4)` : ''), window: 'Окно' }[e.kind] || (e.open ? 'Пустой проём' : 'Снова стена');
-  stat(nm + '. Коснитесь ещё раз — ' + (e.kind === 'door' && e.dor < 3 ? 'повернуть дверь' : e.kind === 'door' ? 'окно' : e.kind === 'window' ? 'пустой проём' : e.open ? 'снова стена' : 'дверь') + '.');
+  stat(nm + '. Коснитесь ещё раз — ' + (e.kind === 'door' && e.dor < 3 ? 'повернуть дверь' : e.kind ? 'пустой проём' : e.open ? 'снова стена' : tool === 'window' ? 'окно' : 'дверь') + '.');
 }
 // ---------- выделение и уравнивание ----------
 const TOL = () => M.tol || 0.01; // допуск на замер, м
@@ -5182,7 +5195,7 @@ function makePending(p) { // p: {type, a,b,(c,d), approx}
 function acceptPending() {
   const p = T.pending; if (!p || p.got == null) return;
   tPush();
-  if (p.type === 'dist') M.meas.push({ id: M.nextMeas++, type: 'dist', a: p.a, b: p.b, v: p.got, on: true, src: T.last && T.last.src });
+  if (p.type === 'dist') M.meas.push({ id: M.nextMeas++, type: 'dist', a: p.a, b: p.b, v: p.got, on: true, src: T.last && T.last.src, ...(p.prom ? { prom: true } : {}) });
   else if (p.type === 'thick') {
     const A = PX(ptById(p.a)), B = PX(ptById(p.b)), C = PX(ptById(p.c));
     const side = Math.sign((B[0] - A[0]) * (C[1] - A[1]) - (B[1] - A[1]) * (C[0] - A[0])) || 1;
@@ -5241,11 +5254,11 @@ function tapeDown(e, w) {
     } else { ch.push(p.id); makePending({ type: 'dist', a: prev, b: p.id }); }
     adjust(); renderTape(); return;
   }
-  if (t === 'meas') {
-    const p = nearestPoint(w); if (!p) { stat('Щёлкните по существующей точке'); return; }
-    if (!T.mA) { T.mA = p.id; renderTape(); return; }
+  if (t === 'meas') { // промер: две любые точки — существующие, на стене или в пустом месте; контур не рисуется
+    const p = promPoint(w); if (!p) return;
+    if (!T.mA) { T.mA = p.id; stat(`Промер от ${pname(p.id)}: коснитесь второго места (точка, стена или пустое место)`); renderTape(); draw(); return; }
     if (p.id === T.mA) return;
-    const a = T.mA; T.mA = null; makePending({ type: 'dist', a, b: p.id }); return;
+    const a = T.mA; T.mA = null; makePending({ type: 'dist', a, b: p.id, prom: true }); draw(); return;
   }
   if (t === 'online') {
     const ed = nearestEdge(w, 10); if (!ed) { stat('Щёлкните по стене (линии между точками)'); return; }
@@ -5264,16 +5277,16 @@ function tapeDown(e, w) {
     stat(`Точка ${pname(p.id)} на стене ${pname(e0.a)}–${pname(e0.b)}. Замер от ${pname(e0.a)}.`);
     renderTape(); return;
   }
-  if (t === 'open') {
+  if (t === 'open' || t === 'window') { const KIND = t === 'window' ? 'window' : 'door', KN = t === 'window' ? 'Окно' : 'Дверь';
     const p = nearestPoint(w);
     if (p) { // две точки (любые, не обязательно соседние) → проём между ними
       if (!T.opA || T.opA === p.id) { T.opA = p.id; stat(`Проём от ${pname(p.id)}: коснитесь второй точки`); draw(); renderTape(); return; }
       const a = T.opA; T.opA = null; tPush(); let e = hasEdge(a, p.id);
       if (!e) { e = { a, b: p.id }; M.edges.push(e); }
-      if (!e.open) { e.open = true; e.kind = 'door'; e.dor = 0; stat(`Дверь ${pname(a)}–${pname(p.id)}. Коснитесь её ещё раз — повернуть / окно / проём.`); } else cycleOpening(e);
+      if (!e.open || e.kind !== KIND) { e.open = true; e.kind = KIND; if (KIND === 'door') e.dor = 0; else delete e.dor; stat(`${KN} ${pname(a)}–${pname(p.id)}. Коснитесь ещё раз — ${KIND === 'door' ? 'повернуть / проём' : 'пустой проём'}.`); } else cycleOpening(e, KIND);
       adjust(); draw(); renderTape(); return; }
     const ed = nearestEdge(w, 12); if (!ed) { stat('Коснитесь отрезка стены или двух точек — краёв проёма'); return; }
-    tPush(); cycleOpening(ed.e); draw(); renderTape(); return; }
+    tPush(); cycleOpening(ed.e, KIND); draw(); renderTape(); return; }
   if (t === 'thick') {
     const ed = nearestEdge(w); if (!ed) { stat('Щёлкните по стене'); return; }
     if (!T.tA) { T.tA = ed.e; stat('Теперь щёлкните по противоположной стороне этой стены (в соседнем помещении)'); renderTape(); return; }
@@ -5316,7 +5329,7 @@ function insertBetween(arr, a, b, p, cyclic) {
   const n = arr.length;
   for (let i = 0; i < n - (cyclic ? 0 : 1); i++) { const x = arr[i], y = arr[(i + 1) % n]; if ((x === a && y === b) || (x === b && y === a)) { arr.splice(i + 1, 0, p); return; } }
 }
-function pendLabel(p) { if (p.label) return p.label; if (p.type === 'tie') return `люк ↔ стена ${pname(p.a)}–${pname(p.b)}`; return p.type === 'thick' ? `толщины стены ${pname(p.a)}–${pname(p.b)} ↔ ${pname(p.c)}–${pname(p.d)}` : `${pname(p.a)} → ${pname(p.b)}`; }
+function pendLabel(p) { if (p.label) return p.label; if (p.prom) return `промер ${pname(p.a)} → ${pname(p.b)}`; if (p.type === 'tie') return `люк ↔ стена ${pname(p.a)}–${pname(p.b)}`; return p.type === 'thick' ? `толщины стены ${pname(p.a)}–${pname(p.b)} ↔ ${pname(p.c)}–${pname(p.d)}` : `${pname(p.a)} → ${pname(p.b)}`; }
 function approxOf(p) { if (p.type === 'tie') { const g = tieGeom(p, PX); return g ? Math.hypot(g.q[0] - g.p[0], g.q[1] - g.p[1]) : null; } if (p.type !== 'dist') return null; const a = PX(ptById(p.a)), b = PX(ptById(p.b)); return Math.hypot(b[0] - a[0], b[1] - a[1]); }
 function tapeMove(w) {
   if (T.mk) { T.mk.q = w.slice(); draw(); return true; }
@@ -5527,8 +5540,10 @@ function drawTape() {
     if (m.type !== 'dist' || hasEdge(m.a, m.b)) continue;
     const A = ptById(m.a), B = ptById(m.b); if (!A || !B) continue; const sa = W2S(...PX(A)), sb = W2S(...PX(B));
     const bad = !M.cond && Math.abs(m.res || 0) > 0.005;
-    ctx.strokeStyle = m.on === false ? '#ccc' : bad ? '#c4372f' : '#7b4bd6'; ctx.lineWidth = 1.2 * dpr; ctx.setLineDash([3 * dpr, 3 * dpr]);
+    ctx.strokeStyle = m.on === false ? '#ccc' : bad ? '#c4372f' : m.prom ? '#0b7285' : '#7b4bd6'; ctx.lineWidth = 1.2 * dpr; if (!m.prom) ctx.setLineDash([3 * dpr, 3 * dpr]);
     ctx.beginPath(); ctx.moveTo(...sa); ctx.lineTo(...sb); ctx.stroke(); ctx.setLineDash([]);
+    if (m.prom) { const L = Math.hypot(sb[0] - sa[0], sb[1] - sa[1]) || 1, ux = (sb[0] - sa[0]) / L, uy = (sb[1] - sa[1]) / L, k = 5 * dpr; ctx.lineWidth = 1.6 * dpr;
+      for (const z of [sa, sb]) { ctx.beginPath(); ctx.moveTo(z[0] - (ux + uy) * k * 0.7, z[1] - (uy - ux) * k * 0.7); ctx.lineTo(z[0] + (ux + uy) * k * 0.7, z[1] + (uy - ux) * k * 0.7); ctx.stroke(); } }
     ctx.fillStyle = ctx.strokeStyle; ctx.font = `${11 * dpr}px Golos Text, Segoe UI`; ctx.textAlign = 'center';
     ctx.fillText(fm(m.v) + (bad ? ` (${m.res > 0 ? '+' : ''}${Math.round(m.res * 1000)} мм)` : ''), (sa[0] + sb[0]) / 2, (sa[1] + sb[1]) / 2 - 5 * dpr); ctx.textAlign = 'start';
   }
@@ -5604,6 +5619,13 @@ const TTOOLS = [['erase', 'Удалить (ластик)', 'коснитесь �
   ['box', 'Выделить', 'рамка пальцем — выделить часть чертежа; касание внутри помещения — всё помещение; касание точки — добавить/убрать. Выделенное тащите пальцем за любое место в синей рамке. Появится проверка невязок и «Уравнять»'],
   ['drag', 'Двигать', 'тащите точку (прилипает в линию с другими точками) или стену — она сдвигается целиком, соседние стены растягиваются. В режиме «Условно» так работает в любом инструменте. Shift + фон — сдвиг подложки'],
   ['select', '✎ Правка', 'коснитесь точки, стены или размера — откроется меню: перемерить, изменить число, выключить, удалить. В любом инструменте то же меню — долгое нажатие или правый щелчок']];
+// порядок и группы колонки: обмер · проёмы · помещения и объекты · пометки · правка
+{ const f = id => TTOOLS.find(t => t[0] === id);
+  Object.assign(f('meas'), { 1: 'Промер', 2: 'коснитесь двух мест — точки, стены (точка встанет на стену) или пустого места: между ними будет размер с засечками, без стен и контура. Для промеров, диагоналей, привязок' });
+  Object.assign(f('open'), { 1: 'Дверь', 2: 'коснитесь отрезка стены — весь станет дверью; или двух точек — краёв проёма. Касание по двери: повернуть (4 положения) → пустой проём → стена' });
+  TTOOLS.push(['window', 'Окно', 'коснитесь отрезка стены — весь станет окном; или двух точек — краёв окна. Касание по окну: пустой проём → стена']); }
+const TORDER = ['walk', 'meas', 'online', 'thick', '|', 'open', 'window', '|', 'room', 'rlab', 'hatch', 'obj', '|', 'note', 'photo', 'scan', '|', 'box', 'drag', 'select', 'erase'];
+TTOOLS.sort((a, b) => TORDER.indexOf(a[0]) - TORDER.indexOf(b[0]));
 function renderTape() {
   if (AS.pid && !AS.restoring) asSoon();
   if (window.TB) renderTouchBar();
@@ -5612,12 +5634,13 @@ function renderTape() {
   const R = T.result || {};
   const rows = M.meas.filter(m => m.type !== 'line' && m.type !== 'angle' && m.type !== 'right').slice().reverse();
   const warn = m => Math.abs(m.res || 0) > 0.015 ? 'bad' : Math.abs(m.res || 0) > 0.005 ? 'warn' : 'ok';
-  const TICON = { walk: '⬠', meas: '↔', online: '⊸', open: '🚪', thick: '▥', room: '▢', obj: '◆', hatch: '⊠', note: '💬', photo: '📷', scan: '◬', rlab: '№', box: '⬚', drag: '✥', select: '✎' };
-  const TSHORT = { walk: 'Обход', meas: 'Замер', online: 'На стене', open: 'Дверь', thick: 'Толщина', room: 'Помещ.', obj: 'Объект', hatch: 'Люк', note: 'Выноска', photo: 'Фото', scan: 'Скан', rlab: '№ пом.', box: 'Выделить', drag: 'Двигать', select: 'Правка' };
+  const TICON = { walk: '⬠', meas: '⟷', online: '⊸', open: '🚪', window: '🪟', thick: '▥', room: '▢', obj: '◆', hatch: '⊠', note: '💬', photo: '📷', scan: '◬', rlab: '№', box: '⬚', drag: '✥', select: '✎' };
+  const TSHORT = { walk: 'Обход', meas: 'Промер', online: 'На стене', open: 'Дверь', window: 'Окно', thick: 'Толщина', room: 'Помещ.', obj: 'Объект', hatch: 'Люк', note: 'Выноска', photo: 'Фото', scan: 'Скан', rlab: '№ пом.', box: 'Выделить', drag: 'Двигать', select: 'Правка' };
   // панель инструментов на чертеже — всегда под рукой
   let rail = document.getElementById('trail'); if (!rail) { rail = document.createElement('div'); rail.id = 'trail'; $('#main').appendChild(rail); }
-  rail.innerHTML = TTOOLS.filter(t => t[0] !== 'erase').map(t => `<button data-tt="${t[0]}" class="${T.tool === t[0] ? 'on' : ''}" title="${escH(t[1] + ': ' + t[2])}"><i>${TICON[t[0]] || '•'}</i><span>${TSHORT[t[0]] || t[1]}</span></button>`).join('')
-    + `<button data-act="del" class="del ${T.tool === 'erase' ? 'on' : ''}" title="Удалить выделенное; если ничего не выделено — ластик: касание удаляет"><i>🗑</i><span>Удалить</span></button>`;
+  rail.innerHTML = TORDER.map(id => { if (id === '|') return '<div class="tsep"></div>';
+    if (id === 'erase') return `<button data-act="del" class="del ${T.tool === 'erase' ? 'on' : ''}" title="Удалить выделенное; если ничего не выделено — ластик: касание удаляет"><i>🗑</i><span>Удалить</span></button>`;
+    const t = TTOOLS.find(x => x[0] === id); if (!t) return ''; return `<button data-tt="${t[0]}" class="${T.tool === t[0] ? 'on' : ''}" title="${escH(t[1] + ': ' + t[2])}"><i>${TICON[t[0]] || '•'}</i><span>${TSHORT[t[0]] || t[1]}</span></button>`; }).join('');
   { const db = rail.querySelector('[data-act="del"]'); if (db) db.onclick = railDelete; }
   let pb = document.getElementById('pgbar');
   if (U.img && (U.pages > 1)) { if (!pb) { pb = document.createElement('div'); pb.id = 'pgbar'; $('#main').appendChild(pb); }
@@ -5812,6 +5835,10 @@ async function exportOverlayPdf() {
     for (const e of M.edges) for (const [p1, p2, k] of openGeom(e, PX)) { const a = toPt(...p1), b = toPt(...p2); page.drawLine({ start: { x: a[0], y: a[1] }, end: { x: b[0], y: b[1] }, thickness: lw * (k === 'arc' ? 0.6 : 1.1), color: GRN }); }
     // диагонали и прочие замеры
     for (const m of M.meas) { if (m.type !== 'dist' || hasEdge(m.a, m.b) || m.on === false) continue; const A = ptById(m.a), B = ptById(m.b); if (!A || !B) continue; const a = P2(A), b = P2(B);
+      if (m.prom) { const TEAL = rgb(0.04, 0.45, 0.52), L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L, k = lw * 2.6;
+        page.drawLine({ start: { x: a[0], y: a[1] }, end: { x: b[0], y: b[1] }, thickness: lw * 0.7, color: TEAL });
+        for (const z of [a, b]) page.drawLine({ start: { x: z[0] - (ux - uy) * k, y: z[1] - (uy + ux) * k }, end: { x: z[0] + (ux - uy) * k, y: z[1] + (uy + ux) * k }, thickness: lw * 1.1, color: TEAL });
+        DL.push({ pr: 2, L, a, b, s: fm(m.v), size: fs * 0.9, col: TEAL }); continue; }
       page.drawLine({ start: { x: a[0], y: a[1] }, end: { x: b[0], y: b[1] }, thickness: lw * 0.8, color: VIO, dashArray: [lw * 4, lw * 3] });
       DL.push({ pr: 3, L: Math.hypot(b[0] - a[0], b[1] - a[1]), a, b, s: fm(m.v), size: fs * 0.9, col: VIO }); }
     for (const m of M.meas) if (m.type === 'tie' && m.on !== false) { const g = tieGeom(m, PX); if (!g) continue; const a = toPt(...g.p), b = toPt(...g.q);
