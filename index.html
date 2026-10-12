@@ -256,7 +256,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 3.0 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 3.1 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -4228,7 +4228,7 @@ async function projCreate(name, keepWork) {
 function showProjName() { const el = $('#projName'); if (el) el.textContent = AS.pname || ''; }
 function resetWork() {
   Object.assign(M, { axis: null, snap90: true, pts: [], meas: [], edges: [], rooms: [], chains: [], objs: [], notes: [], marks: [], lastNum: {}, nextId: 1, nextMeas: 1, cond: false, scaleFit: false, scaleAsked: false });
-  Object.assign(U, { img: null, pdf: null, pages: 0, page: 1, name: '', src: null, ptPerPx: null, srcPage: 1, _imgKey: null, _imgKeyFor: null, _imgSaved: false, _srcKey: null, _data: null, _dataFor: null, mip: null, mipSrc: null, s: 0.01, rot: 0, tx: 0, ty: 0 });
+  Object.assign(U, { img: null, pdf: null, pages: 0, page: 1, name: '', src: null, ptPerPx: null, srcPage: 1, _imgKey: null, _imgKeyFor: null, _imgSaved: false, _srcKey: null, _data: null, _dataFor: null, mip: null, mipSrc: null, pdfPage: null, s: 0.01, rot: 0, tx: 0, ty: 0 });
   Object.assign(T, { mk: null, dragMark: null, selSet: null, box: null, noteTip: null, undo: [], redo: [], pending: null, chain: null, sel: null, buffer: null, objIds: null, roomIds: null, mA: null, tA: null, fitted: false });
   AS.last = ''; AS.savedAt = 0; try { localStorage.removeItem('ruletka_quick'); } catch (e) { }
   adjust();
@@ -4647,7 +4647,7 @@ async function ensurePdf() { if (U.pdf || !U.src || U.src.kind !== 'pdf') return
 async function switchPage(pg) {
   if (!(await ensurePdf())) return; if (pg === U.srcPage) return;
   savePage(); busy('Открываю лист ' + pg + '…');
-  try { const d = loadPageModel(pg); U.page = pg; await renderPdfPage(); if (d && d.u) Object.assign(U, { s: d.u.s, rot: d.u.rot, tx: d.u.tx, ty: d.u.ty, alpha: d.u.alpha ?? U.alpha });
+  try { const d = loadPageModel(pg); U.page = pg; await renderPdfPage(); if (d && d.u) Object.assign(U, { s: d.u.ptPerPx ? d.u.s * U.ptPerPx / d.u.ptPerPx : d.u.s, rot: d.u.rot, tx: d.u.tx, ty: d.u.ty, alpha: d.u.alpha ?? U.alpha });
     Object.assign(T, { undo: [], redo: [], pending: null, chain: null, sel: null, selSet: null, objIds: null, roomIds: null, noteTip: null }); showSelBox(); adjust(); savePage(); }
   finally { busy(''); }
   if (M.pts.length) fitTape(); else fitUnderlay(); draw(); renderTape(); asSoon();
@@ -4707,7 +4707,7 @@ async function loadUnderlay(file) {
       await renderPdfPage();
     } else {
       const img = await createImageBitmap(file); U.src = { kind: /png/i.test(file.type || file.name) ? 'png' : 'jpg', bytes: new Uint8Array(await file.arrayBuffer()) }; U._srcKey = null; U.ptPerPx = 0.75;
-      U.img = img; U.pdf = null; U.pages = 0; U.zoomPdf = 0;
+      U.img = img; U.pdf = null; U.pages = 0; U.zoomPdf = 0; U.pdfPage = null; hqReset();
       U.s = 0.01; U.rot = 0; U.tx = 0; U.ty = img.height * U.s;
     }
     U.name = file.name;
@@ -4772,15 +4772,20 @@ function pickPage() {
 async function changePage() {
   if (!(await ensurePdf())) return; const pg = await pickPage(); if (!pg) return; await switchPage(pg);
 }
-async function renderPdfPage() {
-  const page = await U.pdf.getPage(U.page);
+// базовый растр листа: максимум, который iPad держит в одном холсте (≤ ~15 Мп); резкость при приближении — hqPatch()
+async function rasterPdfPage(pg) {
+  const page = await U.pdf.getPage(pg);
   const vp0 = page.getViewport({ scale: 1 });
-  const z = Math.min(6, 5000 / Math.max(vp0.width, vp0.height));
+  const z = Math.min(8, Math.sqrt(15e6 / (vp0.width * vp0.height)), 8000 / Math.max(vp0.width, vp0.height));
   const vp = page.getViewport({ scale: z });
   const c = document.createElement('canvas'); c.width = Math.round(vp.width); c.height = Math.round(vp.height);
-  const cx = c.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, c.width, c.height);
+  const cx = c.getContext('2d', { alpha: false }); cx.fillStyle = '#fff'; cx.fillRect(0, 0, c.width, c.height);
   await page.render({ canvasContext: cx, viewport: vp }).promise;
-  U.img = c; U.zoomPdf = z; U.ptPerPx = 1 / z; U.srcPage = U.page; U.pw = c.width; U.ph = c.height;
+  return { c, z, page };
+}
+async function renderPdfPage() {
+  const { c, z, page } = await rasterPdfPage(U.page);
+  U.img = c; U.zoomPdf = z; U.ptPerPx = 1 / z; U.srcPage = U.page; U.pw = c.width; U.ph = c.height; U.pdfPage = page; hqReset();
   // default: assume 1:100 drawing  -> 1 px = 25.4/(72 z) mm paper * 100
   U.s = 25.4 / (72 * z) * 100 / 1000; U.rot = 0; U.tx = 0; U.ty = c.height * U.s;
 }
@@ -5052,6 +5057,35 @@ function mipFor(ss) {
   }
   return Math.min(L, U.mip.length - 1);
 }
+const HQ = { c: null, img: null, u0: 0, v0: 0, k: 1, task: null, t: 0, want: '' };
+function hqReset() { if (HQ.task) try { HQ.task.cancel(); } catch (e) { } Object.assign(HQ, { c: null, img: null, task: null, want: '' }); }
+function hqSchedule(ss) {
+  clearTimeout(HQ.t); if (!U.pdfPage || !U.img || ss <= 1.05) return;
+  HQ.t = setTimeout(() => hqRender(ss), 220);
+}
+async function hqRender(ss) {
+  if (!U.pdfPage || !U.img) return; const dpr = devicePixelRatio, Wd = cv.width, Hd = cv.height;
+  // видимая область в пикселях базового растра
+  const inv = (sx, sy) => { const w = S2W(sx / dpr, sy / dpr), c = Math.cos(U.rot), sn = Math.sin(U.rot), dx = w[0] - U.tx, dy = w[1] - U.ty; return [(c * dx + sn * dy) / U.s, -(-sn * dx + c * dy) / U.s]; };
+  const q = [inv(0, 0), inv(Wd, 0), inv(Wd, Hd), inv(0, Hd)];
+  let u0 = Math.max(0, Math.floor(Math.min(...q.map(a => a[0])))), v0 = Math.max(0, Math.floor(Math.min(...q.map(a => a[1]))));
+  let u1 = Math.min(U.img.width, Math.ceil(Math.max(...q.map(a => a[0])))), v1 = Math.min(U.img.height, Math.ceil(Math.max(...q.map(a => a[1]))));
+  if (u1 <= u0 || v1 <= v0) return;
+  let k = Math.min(ss, 24); // пикс. фрагмента на пиксель базы
+  const lim = 12e6; if ((u1 - u0) * (v1 - v0) * k * k > lim) k = Math.sqrt(lim / ((u1 - u0) * (v1 - v0)));
+  if (k <= 1.05) return;
+  const key = [U.img.width, u0, v0, u1, v1, k.toFixed(3)].join(',');
+  if (HQ.want === key || (HQ.img === U.img && HQ.c && HQ.k >= k * 0.98 && HQ.u0 <= u0 && HQ.v0 <= v0 && HQ.u1 >= u1 && HQ.v1 >= v1)) return;
+  if (HQ.task) try { HQ.task.cancel(); } catch (e) { }
+  HQ.want = key; const img = U.img, page = U.pdfPage, z = U.zoomPdf * k;
+  const c = document.createElement('canvas'); c.width = Math.ceil((u1 - u0) * k); c.height = Math.ceil((v1 - v0) * k);
+  const x = c.getContext('2d', { alpha: false }); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
+  const vp = page.getViewport({ scale: z, offsetX: -u0 * k, offsetY: -v0 * k });
+  const task = page.render({ canvasContext: x, viewport: vp }); HQ.task = task;
+  try { await task.promise; } catch (e) { if (HQ.task === task) { HQ.task = null; HQ.want = ''; } return; }
+  if (HQ.task !== task || U.img !== img) return;
+  Object.assign(HQ, { c, img, u0, v0, u1, v1, k, task: null }); draw();
+}
 function drawTape() {
   const dpr = devicePixelRatio;
   if (U.img) {
@@ -5059,7 +5093,11 @@ function drawTape() {
     const o = W2S(U.tx, U.ty), ss = U.s * S.view.s * dpr;
     ctx.setTransform(ss * Math.cos(-U.rot), ss * Math.sin(-U.rot), -ss * Math.sin(-U.rot), ss * Math.cos(-U.rot), o[0], o[1]);
     const L = mipFor(ss), f = 1 << L; if (L) ctx.scale(f, f);
-    ctx.globalAlpha = U.alpha; ctx.drawImage(U.mip[L], 0, 0); ctx.restore(); ctx.globalAlpha = 1;
+    ctx.globalAlpha = U.alpha; const hq = HQ.c && HQ.img === U.img && ss > 1.05;
+    if (hq) { const pw = HQ.c.width / HQ.k, ph = HQ.c.height / HQ.k; ctx.save(); ctx.beginPath(); ctx.rect(0, 0, U.img.width / f, U.img.height / f); ctx.rect(HQ.u0 / f, HQ.v0 / f, pw / f, ph / f); ctx.clip('evenodd'); ctx.drawImage(U.mip[L], 0, 0); ctx.restore();
+      if (L) ctx.scale(1 / f, 1 / f); ctx.drawImage(HQ.c, HQ.u0, HQ.v0, pw, ph); }
+    else ctx.drawImage(U.mip[L], 0, 0);
+    ctx.restore(); ctx.globalAlpha = 1; hqSchedule(ss);
   }
   // grid 1 m when no underlay
   if (!U.img) {
@@ -5449,13 +5487,29 @@ function tapePlan() {
 }
 function tapeProject() { return { M: JSON.parse(JSON.stringify(M)), U: U.img ? { s: U.s, rot: U.rot, tx: U.tx, ty: U.ty, alpha: U.alpha, name: U.name, ptPerPx: U.ptPerPx || null, srcPage: U.srcPage || 1, pw: U.pw || null, ph: U.ph || null, srcKind: U.src ? U.src.kind : null, data: imgToData() } : null, pages: (savePage(), PGS.data) }; }
 function imgToData() { if (U._dataFor === U.img && U._data) return U._data; const r = imgToData0(); if (r) { U._dataFor = U.img; U._data = r; } return r; }
-function imgToData0() { try { const c = document.createElement('canvas'); const k = Math.min(1, 3000 / Math.max(U.img.width, U.img.height)); c.width = U.img.width * k; c.height = U.img.height * k; c.getContext('2d').drawImage(U.img, 0, 0, c.width, c.height); U._k = k; return { url: c.toDataURL('image/jpeg', 0.8), k }; } catch (e) { return null; } }
+function imgToData0() { try { const c = document.createElement('canvas'); const k = Math.min(1, 4000 / Math.max(U.img.width, U.img.height)); c.width = U.img.width * k; c.height = U.img.height * k; c.getContext('2d').drawImage(U.img, 0, 0, c.width, c.height); U._k = k; return { url: c.toDataURL('image/jpeg', 0.9), k }; } catch (e) { return null; } }
+// после открытия проекта: вместо сжатой копии (3000 px JPEG) — исходник в полном качестве
+async function upgradeUnderlay() {
+  const src = U.src, img0 = U.img; if (!src || !img0) return;
+  try {
+    if (src.kind === 'pdf') {
+      await ensurePdf(); const pg = U.srcPage || 1; const r = await rasterPdfPage(pg);
+      if (U.img !== img0 || (U.srcPage || 1) !== pg) return; // пока грузили — сменили лист/подложку
+      const k = U.ptPerPx ? (1 / r.z) / U.ptPerPx : img0.width / r.c.width;
+      U.s *= k; U.img = r.c; U.zoomPdf = r.z; U.ptPerPx = 1 / r.z; U.pw = r.c.width; U.ph = r.c.height; U.pdfPage = r.page; U.page = pg;
+    } else {
+      const bmp = await createImageBitmap(new Blob([src.bytes])); if (U.img !== img0) return;
+      const k = img0.width / bmp.width; U.s *= k; if (U.ptPerPx) U.ptPerPx *= k; U.img = bmp; U.pw = bmp.width; U.ph = bmp.height;
+    }
+    hqReset(); draw(); renderTape();
+  } catch (e) { console.warn('upgradeUnderlay', e); }
+}
 async function tapeRestore(j) {
   if (!j) return;
   Object.assign(M, j.M); M.objs = M.objs || []; markObjEdges(); T.undo = []; T.pending = null; T.chain = null; PGS.data = j.pages || {};
-  if (j.U && j.U.data) { const img = new Image(); img.src = j.U.data.url; await img.decode(); const bmp = await createImageBitmap(img); Object.assign(U, j.U); U.img = bmp; U.s = j.U.s / j.U.data.k; U.ptPerPx = j.U.ptPerPx ? j.U.ptPerPx / j.U.data.k : null; U.src = j.U.srcObj || null; U._srcKey = j.U.srcRef || null; delete U.srcObj; U.pdf = null; U.pages = 0; U.pw = bmp.width; U.ph = bmp.height;
+  if (j.U && j.U.data) { const img = new Image(); img.src = j.U.data.url; await img.decode(); const bmp = await createImageBitmap(img); Object.assign(U, j.U); U.img = bmp; U.s = j.U.s / j.U.data.k; U.ptPerPx = j.U.ptPerPx ? j.U.ptPerPx / j.U.data.k : null; U.src = j.U.srcObj || null; U._srcKey = j.U.srcRef || null; delete U.srcObj; U.pdf = null; U.pdfPage = null; U.pages = 0; U.pw = bmp.width; U.ph = bmp.height; hqReset();
     if (j.U.srcB64 && !U.src) { const b = atob(j.U.srcB64), u8 = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u8[i] = b.charCodeAt(i); U.src = { kind: j.U.srcKind || 'pdf', bytes: u8 }; U._srcKey = null; } delete U.srcB64;
-    U.page = U.srcPage || 1; if (U.src && U.src.kind === 'pdf') ensurePdf().then(() => renderTape()).catch(() => { }); }
+    U.page = U.srcPage || 1; upgradeUnderlay(); }
   adjust();
 }
 
