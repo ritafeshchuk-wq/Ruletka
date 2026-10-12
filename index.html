@@ -256,7 +256,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 2.9 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 3.0 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -4670,7 +4670,7 @@ function continueFrom(p) { // начать (продолжить) обход о�
   stat(`Обход продолжается от ${pname(p.id)}. Касайтесь следующего угла (на пустом месте — новая точка).`); renderTape(); draw();
 }
 function endChain() { if (T.pending && T.pending.got == null) T.pending = null; T.chain = null; T.mA = null; T.tA = null; T.roomIds = null; T.objIds = null; stat('Обход закончен. Коснитесь любой точки — продолжить от неё, или пустого места — начать с новой точки.'); renderTape(); draw(); }
-function setTapeTool(t) { if (T.selSet && t !== 'box') { T.selSet = null; showSelBox(); } T.tool = t; T.chain = null; T.mA = null; T.tA = null; T.roomIds = null; T.objIds = null; T.noteTip = null; renderTape(); }
+function setTapeTool(t) { T.opA = null; if (T.selSet && t !== 'box') { T.selSet = null; showSelBox(); } T.tool = t; T.chain = null; T.mA = null; T.tA = null; T.roomIds = null; T.objIds = null; T.noteTip = null; renderTape(); }
 function addPoint(w) { const p = { id: M.nextId++, x0: w[0], y0: w[1] }; M.pts.push(p); return p; }
 function nearestPoint(w, px = 7) { let best = null, bd = px * HITK() / S.view.s; for (const p of M.pts) { const [x, y] = PX(p); const d = Math.hypot(x - w[0], y - w[1]); if (d < bd) { bd = d; best = p; } } return best; }
 function nearestEdge(w, px = 8) { let best = null, bd = px * HITK() / S.view.s, bt = 0; for (const e of M.edges) { const a = PX(ptById(e.a)), b = PX(ptById(e.b)); const [d, t] = distSeg(w, a, b); if (d < bd) { bd = d; best = e; bt = t; } } return best ? { e: best, t: bt } : null; }
@@ -4964,10 +4964,16 @@ function tapeDown(e, w) {
     stat(`Точка ${pname(p.id)} на стене ${pname(e0.a)}–${pname(e0.b)}. Замер от ${pname(e0.a)}.`);
     renderTape(); return;
   }
-  if (t === 'open') { const ed = nearestEdge(w, 12); if (!ed) { stat('Коснитесь стены, где дверь или окно'); return; }
-    const A = PX(ptById(ed.e.a)), B = PX(ptById(ed.e.b)), L = Math.hypot(B[0] - A[0], B[1] - A[1]);
-    tPush(); if (ed.e.open || L <= 1.3) { cycleOpening(ed.e); draw(); renderTape(); return; }
-    insertDoor(ed.e, ed.t * L, L); return; }
+  if (t === 'open') {
+    const p = nearestPoint(w);
+    if (p) { // две точки (любые, не обязательно соседние) → проём между ними
+      if (!T.opA || T.opA === p.id) { T.opA = p.id; stat(`Проём от ${pname(p.id)}: коснитесь второй точки`); draw(); renderTape(); return; }
+      const a = T.opA; T.opA = null; tPush(); let e = hasEdge(a, p.id);
+      if (!e) { e = { a, b: p.id }; M.edges.push(e); }
+      if (!e.open) { e.open = true; e.kind = 'door'; e.dor = 0; stat(`Дверь ${pname(a)}–${pname(p.id)}. Коснитесь её ещё раз — повернуть / окно / проём.`); } else cycleOpening(e);
+      adjust(); draw(); renderTape(); return; }
+    const ed = nearestEdge(w, 12); if (!ed) { stat('Коснитесь отрезка стены или двух точек — краёв проёма'); return; }
+    tPush(); cycleOpening(ed.e); draw(); renderTape(); return; }
   if (t === 'thick') {
     const ed = nearestEdge(w); if (!ed) { stat('Щёлкните по стене'); return; }
     if (!T.tA) { T.tA = ed.e; stat('Теперь щёлкните по противоположной стороне этой стены (в соседнем помещении)'); renderTape(); return; }
@@ -5182,7 +5188,7 @@ function drawTape() {
   // points
   for (const p of M.pts) {
     const [x, y] = W2S(...PX(p));
-    const sel = T.sel && T.sel.pt === p, inCh = T.chain && T.chain[0] === p.id, isA = T.mA === p.id || (T.roomIds && T.roomIds.includes(p.id)) || (T.objIds && T.objIds.includes(p.id));
+    const sel = T.sel && T.sel.pt === p, inCh = T.chain && T.chain[0] === p.id, isA = T.mA === p.id || T.opA === p.id || (T.roomIds && T.roomIds.includes(p.id)) || (T.objIds && T.objIds.includes(p.id));
     ctx.fillStyle = sel ? '#1f6feb' : inCh ? '#e07000' : isA ? '#7b4bd6' : '#fff'; ctx.strokeStyle = '#111'; ctx.lineWidth = 1.5 * dpr;
     ctx.beginPath(); ctx.arc(x, y, 5 * dpr, 0, 7); ctx.fill(); ctx.stroke();
     ctx.fillStyle = '#333'; ctx.font = `${10 * dpr}px Golos Text, Segoe UI`; ctx.fillText(pname(p.id), x + 7 * dpr, y - 6 * dpr);
@@ -5194,7 +5200,7 @@ function drawTape() {
 const TTOOLS = [['walk', 'Обход', 'щёлкайте углы по порядку; каждый отрезок ждёт замер. Щелчок по первой точке замыкает помещение. Alt — новая точка без привязки к соседним'],
   ['meas', 'Замер / диагональ', 'щёлкните две существующие точки — между ними будет замер (диагональ, привязка через проём)'],
   ['online', 'Точка на стене', 'щелчок по стене ставит точку на её прямой (откос, угол проёма); замер идёт от начала стены'],
-  ['open', 'Дверь / окно', 'коснитесь стены в месте двери — она встанет туда, замерьте ширину и расстояние от угла. Касание по двери: повернуть (4 положения) → окно → пустой проём → стена'],
+  ['open', 'Дверь / окно', 'коснитесь отрезка стены — он весь станет дверью; или коснитесь двух точек — краёв проёма (любых). Касание по двери: повернуть (4 положения) → окно → пустой проём → стена'],
   ['thick', 'Толщина', 'щёлкните сторону стены в одном помещении, затем в соседнем — и введите толщину'],
   ['room', 'Помещение', 'щёлкните точки контура по порядку и снова первую'],
   ['obj', 'Объект', 'лестница, пандус, шахта, колонна: коснитесь углов по порядку (первые две точки — НИЗ лестницы или пандуса) и снова первой точки, затем выберите тип'],
@@ -5283,7 +5289,7 @@ function renderTape() {
   const pa = $('#pAcc'); if (pa) pa.onclick = acceptPending; const pr = $('#pRej'); if (pr) pr.onclick = rejectPending;
   const ps = $('#pSkip'); if (ps) ps.onclick = e => { e.preventDefault(); skipPending(); };
   const mfi = $('#mFit'); void mfi;
-  rail.querySelectorAll('[data-tt]').forEach(b => b.onclick = () => { if (T.selSet && b.dataset.tt !== 'box') { T.selSet = null; showSelBox(); } T.tool = b.dataset.tt; T.mA = null; T.tA = null; T.roomIds = null; T.objIds = null; T.noteTip = null; if (T.tool !== 'walk') T.chain = null; const tt = TTOOLS.find(t => t[0] === T.tool); if (tt) stat(tt[1] + ': ' + tt[2]); renderTape(); });
+  rail.querySelectorAll('[data-tt]').forEach(b => b.onclick = () => { if (T.selSet && b.dataset.tt !== 'box') { T.selSet = null; showSelBox(); } T.opA = null; T.tool = b.dataset.tt; T.mA = null; T.tA = null; T.roomIds = null; T.objIds = null; T.noteTip = null; if (T.tool !== 'walk') T.chain = null; const tt = TTOOLS.find(t => t[0] === T.tool); if (tt) stat(tt[1] + ': ' + tt[2]); renderTape(); });
   $('#tUndo').onclick = tUndo; $('#tRedo').onclick = tRedo;
   $('#orth').onchange = e => { M.ortho = e.target.checked; adjust(); renderTape(); };
   side.querySelectorAll('[data-mon]').forEach(c => c.onchange = () => { const m = M.meas.find(x => x.id === +c.dataset.mon); tPush(); m.on = c.checked; adjust(); renderTape(); });
