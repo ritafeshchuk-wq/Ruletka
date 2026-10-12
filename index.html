@@ -256,7 +256,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 2.8 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 2.9 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -4565,6 +4565,21 @@ function openGeom(e, PXf) { // линии условного обозначен�
   let prev = tip; for (let i = 1; i <= 12; i++) { const a = a0 + da * i / 12, q = [H[0] + Math.cos(a) * L, H[1] + Math.sin(a) * L]; out.push([prev, q, 'arc']); prev = q; }
   return out;
 }
+function insertDoor(e0, tc, L) { // дверь в месте касания: две точки на стене, между ними — дверь, потом замеры ширины и привязки
+  const A = PX(ptById(e0.a)), B = PX(ptById(e0.b)), u = [(B[0] - A[0]) / L, (B[1] - A[1]) / L];
+  const wd = Math.min(M.doorW || 0.9, L - 0.1), c = Math.max(wd / 2 + 0.05, Math.min(L - wd / 2 - 0.05, tc));
+  const mk = d => { const q = [A[0] + u[0] * d, A[1] + u[1] * d]; const p = addPoint(q); p.x = q[0]; p.y = q[1]; return p; };
+  const p1 = mk(c - wd / 2), p2 = mk(c + wd / 2);
+  M.edges = M.edges.filter(x => x !== e0);
+  M.edges.push({ a: e0.a, b: p1.id }, { a: p1.id, b: p2.id, open: true, kind: 'door', dor: 0 }, { a: p2.id, b: e0.b });
+  M.meas.push({ id: M.nextMeas++, type: 'line', a: e0.a, b: e0.b, p: p1.id, on: true }, { id: M.nextMeas++, type: 'line', a: e0.a, b: e0.b, p: p2.id, on: true });
+  for (const R of M.rooms) { insertBetween(R.ids, e0.a, e0.b, p1.id, true); insertBetween(R.ids, p1.id, e0.b, p2.id, true); }
+  for (const ch of M.chains) { insertBetween(ch, e0.a, e0.b, p1.id, false); insertBetween(ch, p1.id, e0.b, p2.id, false); }
+  adjust(); draw();
+  makePending({ type: 'dist', a: p1.id, b: p2.id, hint: 'ширина проёма', after: () => { if (!distMeas(e0.a, p1.id)) makePending({ type: 'dist', a: e0.a, b: p1.id, hint: 'от угла до проёма' }); } });
+  stat('Дверь поставлена. Замерьте ширину проёма, затем расстояние от угла (или «Пропустить»). Коснитесь двери ещё раз — повернуть / окно.');
+  renderTape();
+}
 function cycleOpening(e) { // стена → дверь (4 положения) → окно → проём → стена
   if (!e.open) { e.open = true; e.kind = 'door'; e.dor = 0; }
   else if (e.kind === 'door' && (e.dor || 0) < 3) e.dor = (e.dor || 0) + 1;
@@ -4949,7 +4964,10 @@ function tapeDown(e, w) {
     stat(`Точка ${pname(p.id)} на стене ${pname(e0.a)}–${pname(e0.b)}. Замер от ${pname(e0.a)}.`);
     renderTape(); return;
   }
-  if (t === 'open') { const ed = nearestEdge(w); if (ed) { tPush(); cycleOpening(ed.e); draw(); renderTape(); } return; }
+  if (t === 'open') { const ed = nearestEdge(w, 12); if (!ed) { stat('Коснитесь стены, где дверь или окно'); return; }
+    const A = PX(ptById(ed.e.a)), B = PX(ptById(ed.e.b)), L = Math.hypot(B[0] - A[0], B[1] - A[1]);
+    tPush(); if (ed.e.open || L <= 1.3) { cycleOpening(ed.e); draw(); renderTape(); return; }
+    insertDoor(ed.e, ed.t * L, L); return; }
   if (t === 'thick') {
     const ed = nearestEdge(w); if (!ed) { stat('Щёлкните по стене'); return; }
     if (!T.tA) { T.tA = ed.e; stat('Теперь щёлкните по противоположной стороне этой стены (в соседнем помещении)'); renderTape(); return; }
@@ -5176,7 +5194,7 @@ function drawTape() {
 const TTOOLS = [['walk', 'Обход', 'щёлкайте углы по порядку; каждый отрезок ждёт замер. Щелчок по первой точке замыкает помещение. Alt — новая точка без привязки к соседним'],
   ['meas', 'Замер / диагональ', 'щёлкните две существующие точки — между ними будет замер (диагональ, привязка через проём)'],
   ['online', 'Точка на стене', 'щелчок по стене ставит точку на её прямой (откос, угол проёма); замер идёт от начала стены'],
-  ['open', 'Дверь / окно', 'коснитесь участка стены между двумя точками: дверь → ещё касание поворачивает дверь (4 положения) → окно → пустой проём → снова стена'],
+  ['open', 'Дверь / окно', 'коснитесь стены в месте двери — она встанет туда, замерьте ширину и расстояние от угла. Касание по двери: повернуть (4 положения) → окно → пустой проём → стена'],
   ['thick', 'Толщина', 'щёлкните сторону стены в одном помещении, затем в соседнем — и введите толщину'],
   ['room', 'Помещение', 'щёлкните точки контура по порядку и снова первую'],
   ['obj', 'Объект', 'лестница, пандус, шахта, колонна: коснитесь углов по порядку (первые две точки — НИЗ лестницы или пандуса) и снова первой точки, затем выберите тип'],
@@ -5208,7 +5226,7 @@ function renderTape() {
   let mc = document.getElementById('mcard'); if (!mc) { mc = document.createElement('div'); mc.id = 'mcard'; $('#main').appendChild(mc); }
   const waiting = pd && pd.got == null, got = pd && pd.got != null;
   mc.className = pd ? (got ? 'got' : 'wait') : 'idle';
-  mc.innerHTML = `${pd ? `<div class="mc-h">Замер <b>${pendLabel(pd)}</b>${ap ? ` <span class="mc-ap">≈ ${fm(ap)} по чертежу</span>` : ''}</div>` : ''}
+  mc.innerHTML = `${pd ? `<div class="mc-h">Замер <b>${pendLabel(pd)}</b>${pd.hint ? ' · ' + pd.hint : ''}${ap ? ` <span class="mc-ap">≈ ${fm(ap)} по чертежу</span>` : ''}</div>` : ''}
     ${got ? `<div class="mc-big">${fm(pd.got)} м</div>${ap && Math.abs(pd.got - ap) / ap > 0.2 ? '<div class="mc-bad">Сильно отличается от чертежа — та ли стена?</div>' : ''}
       <div class="mc-row"><button class="pri" id="pAcc">✓ Принять</button><button id="pRej">✕ Отклонить</button></div>` : ''}
     ${!got ? `<div class="mc-row"><input type="text" id="mIn" inputmode="decimal" enterkeyhint="done" autocomplete="off" placeholder="${waiting ? (T.btState === 'подключена' ? 'жму кнопку на DISTO… или введите' : 'введите замер, м') : 'ввести замер вручную'}"><button id="mOk">↵</button>${waiting ? '<button id="pSkip">Пропустить</button>' : ''}</div>` : ''}
