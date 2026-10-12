@@ -259,7 +259,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 3.4 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 3.5 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -2113,7 +2113,7 @@ const TAPE = (() => {
         for (const [i, vi] of J) { g[i] += w * vi * r; for (const [j, vj] of J) A[i * N + j] += w * vi * vj; }
       };
       // priors
-      P.forEach((p, i) => { const w = 1 / (SIG.prior * SIG.prior) * (p.fixed ? 1e6 : 1); add([[2 * i, 1]], p.x0 - X[2 * i], w); add([[2 * i + 1, 1]], p.y0 - X[2 * i + 1], w); });
+      P.forEach((p, i) => { const w = 1 / (SIG.prior * SIG.prior) * (p.fixed ? 1e6 : p.soft ? 1e-4 : 1); /* soft: точки люка — положение задают привязки */ add([[2 * i, 1]], p.x0 - X[2 * i], w); add([[2 * i + 1, 1]], p.y0 - X[2 * i + 1], w); });
       for (const m of meas) {
         if (m.type === 'dist') {
           const i = idx.get(m.a), j = idx.get(m.b);
@@ -2121,7 +2121,9 @@ const TAPE = (() => {
           add([[2 * i, -dx / L], [2 * i + 1, -dy / L], [2 * j, dx / L], [2 * j + 1, dy / L]], m.v - L, 1 / (SIG.dist ** 2));
         } else if (m.type === 'angle') { // заданный угол в вершине b (от b→c против часовой до b→a), m.v в градусах
           const r = angleResJ(X, idx.get(m.a), idx.get(m.b), idx.get(m.c)); if (r) add(r.J, m.v * Math.PI / 180 - r.f, 1 / ((0.05 * Math.PI / 180) ** 2));
-        } else if (m.type === 'line' || m.type === 'thick') {
+        } else if (m.type === 'right') { // прямой угол в вершине b (люк): cos = 0
+          const r = rightResJ(X, idx.get(m.a), idx.get(m.b), idx.get(m.c)); add(r.J, -r.f, 1 / ((0.05 * Math.PI / 180) ** 2));
+        } else if (m.type === 'line' || m.type === 'thick' || m.type === 'tie') {
           const pairs = m.type === 'line' ? [[m.p, 0]] : [[m.c, m.v * (m.side || 1)], [m.d, m.v * (m.side || 1)]];
           for (const [pid, target] of pairs) {
             const i = idx.get(m.a), j = idx.get(m.b), k = idx.get(pid);
@@ -2151,11 +2153,11 @@ const TAPE = (() => {
     // residuals
     let maxR = 0;
     for (const m of M.meas || []) {
-      m.res = null; if (m.on === false || !meas.includes(m)) continue;
+      m.res = null; if (m.on === false || !meas.includes(m) || m.type === 'right') continue;
       if (m.type === 'dist') { const a = P[idx.get(m.a)], b = P[idx.get(m.b)]; m.calc = Math.hypot(b.x - a.x, b.y - a.y); m.res = m.v - m.calc; }
       else if (m.type === 'line') { const r = lineResJ(X, idx.get(m.a), idx.get(m.b), idx.get(m.p)); m.calc = r.f; m.res = -r.f; }
       else if (m.type === 'angle') { const r = angleResJ(X, idx.get(m.a), idx.get(m.b), idx.get(m.c)); m.calc = r ? r.f * 180 / Math.PI : null; m.res = null; continue; }
-      else if (m.type === 'thick') { const r1 = lineResJ(X, idx.get(m.a), idx.get(m.b), idx.get(m.c)), r2 = lineResJ(X, idx.get(m.a), idx.get(m.b), idx.get(m.d)); m.calc = (Math.abs(r1.f) + Math.abs(r2.f)) / 2; m.res = m.v - m.calc; }
+      else if (m.type === 'thick' || m.type === 'tie') { const r1 = lineResJ(X, idx.get(m.a), idx.get(m.b), idx.get(m.c)), r2 = lineResJ(X, idx.get(m.a), idx.get(m.b), idx.get(m.d)); m.calc = (Math.abs(r1.f) + Math.abs(r2.f)) / 2; m.res = m.v - m.calc; }
       maxR = Math.max(maxR, Math.abs(m.res));
     }
     // angles report
@@ -2165,6 +2167,10 @@ const TAPE = (() => {
   // signed perpendicular distance of point k from line i->j, with jacobian (numeric)
   function lineResJ(X, i, j, k) {
     const f = (X2) => { const ax = X2[2 * i], ay = X2[2 * i + 1], bx = X2[2 * j], by = X2[2 * j + 1], px = X2[2 * k], py = X2[2 * k + 1]; const L = Math.hypot(bx - ax, by - ay) || 1e-9; return ((bx - ax) * (py - ay) - (by - ay) * (px - ax)) / L; };
+    return numJ(X, [i, j, k], f);
+  }
+  function rightResJ(X, i, j, k) { // косинус угла i-j-k
+    const f = (X2) => { const ax = X2[2 * i] - X2[2 * j], ay = X2[2 * i + 1] - X2[2 * j + 1], cx = X2[2 * k] - X2[2 * j], cy = X2[2 * k + 1] - X2[2 * j + 1]; return (ax * cx + ay * cy) / ((Math.hypot(ax, ay) * Math.hypot(cx, cy)) || 1e-9); };
     return numJ(X, [i, j, k], f);
   }
   // interior angle at j (from ji to jk), counter-clockwise in [0, 2π)
@@ -4371,6 +4377,7 @@ function hitTape(w) {
   const p = nearestPoint(w, 9); if (p) return { pt: p };
   const tol = 10 * HITK() / S.view.s; let best = null, bd = tol;
   for (const m of M.meas) { if (m.type !== 'dist' || hasEdge(m.a, m.b)) continue; const A = ptById(m.a), B = ptById(m.b); if (!A || !B) continue; const d = distToSeg(w, PX(A), PX(B)); if (d < bd) { bd = d; best = { meas: m }; } }
+  for (const m of M.meas) { if (m.type !== 'tie') continue; const g = tieGeom(m, PX); if (!g) continue; const d = distToSeg(w, g.p, g.q); if (d < bd) { bd = d; best = { meas: m }; } }
   for (const m of M.meas) { if (m.type !== 'thick') continue; const pts = [m.a, m.b, m.c, m.d].map(id => PX(ptById(id))); const c = [pts.reduce((s, q) => s + q[0], 0) / 4, pts.reduce((s, q) => s + q[1], 0) / 4]; const d = Math.hypot(w[0] - c[0], w[1] - c[1]); if (d < bd) { bd = d; best = { meas: m }; } }
   if (best) return best;
   const ed = nearestEdge(w, 10); if (ed) return { edge: ed.e, meas: distMeas(ed.e.a, ed.e.b) };
@@ -4432,9 +4439,10 @@ function tapeMenu(w, cx, cy) {
     if (o.type === 'ramp') items.push(['% Уклон…', async () => { tPush(); await askObjParams(o); renderTape(); draw(); }]);
     if (o.type === 'stair' || o.type === 'ramp') items.push(['↻ Сменить направление (низ — другая сторона)', () => { tPush(); o.base = ((o.base || 0) + 1) % o.ids.length; renderTape(); draw(); }]);
     items.push(['Aa Подпись…', async () => { const v = await uiAsk('Подпись на плане:', objLabel(o)); if (v != null) { tPush(); o.text = v.trim() || null; renderTape(); draw(); } }]);
+    if (o.type === 'hatch') items.push(['🗑 Удалить люк целиком (с размерами и привязками)', () => { tPush(); const ids = new Set(o.ids); M.objs = M.objs.filter(x => x !== o); M.pts = M.pts.filter(p => !ids.has(p.id)); M.edges = M.edges.filter(e => !ids.has(e.a) && !ids.has(e.b)); M.meas = M.meas.filter(m => ![m.a, m.b, m.c, m.d, m.p].some(id => ids.has(id))); if (T.hatch === o.id) T.hatch = null; markObjEdges(); adjust(); renderTape(); draw(); }, 'danger']);
     items.push(['🗑 Удалить объект (точки и замеры останутся)', () => { tPush(); M.objs = M.objs.filter(x => x !== o); markObjEdges(); renderTape(); draw(); }, 'danger']);
   } else {
-    const m = h.meas; title = (m.type === 'thick' ? 'Толщина ' : 'Замер ') + `${pname(m.a)}–${pname(m.type === 'thick' ? m.c : m.b)} · ${mv(m)}`;
+    const m = h.meas; title = m.type === 'tie' ? `Привязка люка к стене ${pname(m.a)}–${pname(m.b)} · ${mv(m)}` : (m.type === 'thick' ? 'Толщина ' : 'Замер ') + `${pname(m.a)}–${pname(m.type === 'thick' ? m.c : m.b)} · ${mv(m)}`;
     items.push(remeasure(m), edit(m), toggle(m), delM(m));
   }
   const el = document.createElement('div'); el.id = 'tmenu';
@@ -4472,8 +4480,9 @@ function setAngle(id) {
   });
 }
 // ---------- объекты: лестница, пандус, шахта, колонна, приямок, подпись ----------
-const OBJT = { stair: 'Лестница', ramp: 'Пандус', shaft: 'Шахта', column: 'Колонна', pit: 'Приямок', note: 'Подпись' };
+const OBJT = { stair: 'Лестница', ramp: 'Пандус', shaft: 'Шахта', column: 'Колонна', pit: 'Приямок', hatch: 'Люк', note: 'Подпись' };
 function objLabel(o) {
+  if (o.type === 'hatch') { const a = distMeas(o.ids[0], o.ids[1]), b = distMeas(o.ids[1], o.ids[2]); return (o.text || 'Люк') + (a && b ? ' ' + fm(a.v) + '×' + fm(b.v) : ''); }
   if (o.text) return o.text;
   if (o.type === 'stair') return 'Лестница' + (o.steps ? ', ' + o.steps + ' ст.' : '');
   if (o.type === 'ramp') return 'Пандус' + (o.slope ? ', i=' + String(o.slope).replace('.', ',') + '%' : '');
@@ -4507,10 +4516,42 @@ function objGeom(o, PXf) { // всё в метрах модели: lines [[a,b,w
     const h = Math.min(0.35, depth * 0.15, (r[1] - r[0]) * 0.3), back = [p1[0] - n[0] * h, p1[1] - n[1] * h];
     add(p1, [back[0] + u[0] * h * 0.45, back[1] + u[1] * h * 0.45], 0.25); add(p1, [back[0] - u[0] * h * 0.45, back[1] - u[1] * h * 0.45], 0.25);
     if (o.type === 'stair') dots.push(p0);
-  } else if (o.type === 'shaft') { if (nn === 4) { add(poly[0], poly[2], 0.18); add(poly[1], poly[3], 0.18); } else hatch(Math.PI / 4, Math.max(depth / 6, 0.05)); }
+  } else if (o.type === 'hatch') { if (nn === 4) { add(poly[0], poly[2], 0.13); add(poly[1], poly[3], 0.13); } }
+  else if (o.type === 'shaft') { if (nn === 4) { add(poly[0], poly[2], 0.18); add(poly[1], poly[3], 0.18); } else hatch(Math.PI / 4, Math.max(depth / 6, 0.05)); }
   else if (o.type === 'column') hatch(Math.PI / 4, Math.max(Math.min(depth, bl) / 8, 0.03));
   else if (o.type === 'pit') hatch(Math.PI / 4, Math.max(depth / 5, 0.1));
-  return { lines: L, dots, arrow, label: { p: c, s: objLabel(o) }, poly, u, n, depth };
+  const lp = o.type === 'hatch' ? [c[0], Math.max(...poly.map(q => q[1])) + 0.22] : c;
+  return { lines: L, dots, arrow, label: { p: lp, s: objLabel(o) }, poly, u, n, depth };
+}
+function tieGeom(m, PXf) {
+  const A = ptById(m.a), B = ptById(m.b), C = ptById(m.c), D = ptById(m.d); if (!A || !B || !C || !D) return null;
+  const a = PXf(A), b = PXf(B), c = PXf(C), d = PXf(D), mid = [(c[0] + d[0]) / 2, (c[1] + d[1]) / 2];
+  const ux = b[0] - a[0], uy = b[1] - a[1], L2 = ux * ux + uy * uy || 1e-12, t = ((mid[0] - a[0]) * ux + (mid[1] - a[1]) * uy) / L2;
+  const f = [a[0] + ux * t, a[1] + uy * t]; return { p: mid, q: f, c: [(mid[0] + f[0]) / 2, (mid[1] + f[1]) / 2] };
+}
+function nearestWall(w, px = 14) { let best = null, bd = px * HITK() / S.view.s, bt = 0; for (const e of M.edges) { if (e.obj) continue; const A = ptById(e.a), B = ptById(e.b); if (!A || !B) continue; const [d, t] = distSeg(w, PX(A), PX(B)); if (d < bd) { bd = d; best = e; bt = t; } } return best ? { e: best, t: bt } : null; }
+function createHatch(w) {
+  tPush(); let ang = M.axis || 0, bd = 6;
+  for (const e of M.edges) { if (e.obj) continue; const A = ptById(e.a), B = ptById(e.b); if (!A || !B) continue; const a = PX(A), b = PX(B), [d] = distSeg(w, a, b); if (d < bd) { bd = d; ang = Math.atan2(b[1] - a[1], b[0] - a[0]); } }
+  const u = [Math.cos(ang), Math.sin(ang)], n = [-u[1], u[0]], h = 0.3;
+  const ids = [[-h, -h], [h, -h], [h, h], [-h, h]].map(([x, y]) => addPoint([w[0] + u[0] * x + n[0] * y, w[1] + u[1] * x + n[1] * y])).map(p => (p.soft = true, p.id));
+  for (let i = 0; i < 4; i++) M.edges.push({ a: ids[i], b: ids[(i + 1) % 4] });
+  for (let i = 1; i < 4; i++) M.meas.push({ id: M.nextMeas++, type: 'right', a: ids[i - 1], b: ids[i], c: ids[(i + 1) % 4], on: true });
+  const o = { id: (M.objs || []).reduce((m, x) => Math.max(m, x.id), 0) + 1, type: 'hatch', ids, base: 0 };
+  (M.objs = M.objs || []).push(o); markObjEdges(); T.hatch = o.id; adjust(); draw();
+  const done = () => stat('Люк построен. Теперь касайтесь стен, к которым его привязать (сколько нужно), и вводите расстояние от края люка до стены.');
+  makePending({ type: 'dist', a: ids[0], b: ids[1], label: 'Люк — сторона 1', after: () => makePending({ type: 'dist', a: ids[1], b: ids[2], label: 'Люк — сторона 2', after: done }) });
+}
+function tieHatch(o, e) { // выбрать сторону люка, обращённую к стене (параллельную ей и ближайшую)
+  const a = PX(ptById(e.a)), b = PX(ptById(e.b)), L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1e-9, u = [(b[0] - a[0]) / L, (b[1] - a[1]) / L];
+  const dl = q => Math.abs((q[0] - a[0]) * u[1] - (q[1] - a[1]) * u[0]); let best = null;
+  for (let i = 0; i < 4; i++) { const c = PX(ptById(o.ids[i])), d = PX(ptById(o.ids[(i + 1) % 4])), sl = Math.hypot(d[0] - c[0], d[1] - c[1]) || 1e-9;
+    const par = Math.abs(((d[0] - c[0]) * u[1] - (d[1] - c[1]) * u[0]) / sl); const dd = (dl(c) + dl(d)) / 2;
+    if (par < 0.35 && (!best || dd < best.dd)) best = { c: o.ids[i], d: o.ids[(i + 1) % 4], dd }; }
+  if (!best) { let k = 0; for (let i = 1; i < 4; i++) if (dl(PX(ptById(o.ids[i]))) < dl(PX(ptById(o.ids[k])))) k = i; best = { c: o.ids[k], d: o.ids[k] }; }
+  const old = M.meas.find(m => m.type === 'tie' && m.c === best.c && m.d === best.d && ((m.a === e.a && m.b === e.b) || (m.a === e.b && m.b === e.a)));
+  if (old) { tPush(); M.meas = M.meas.filter(x => x !== old); adjust(); }
+  makePending({ type: 'tie', a: e.a, b: e.b, c: best.c, d: best.d });
 }
 function markObjEdges() { for (const e of M.edges) delete e.obj; for (const o of M.objs || []) { const k = o.ids.length; for (let i = 0; i < k; i++) { const e = hasEdge(o.ids[i], o.ids[(i + 1) % k]); if (e) e.obj = o.id; } } }
 function chooseObjType(cur) {
@@ -4524,7 +4565,7 @@ function chooseObjType(cur) {
 async function askObjParams(o) {
   if (o.type === 'stair') { const v = await uiAsk('Число ступеней (можно оставить пустым):', o.steps ? String(o.steps) : ''); const k = parseInt(v); o.steps = k > 0 ? k : null; }
   if (o.type === 'ramp') { const v = await uiAsk('Уклон пандуса, % (например 8; можно пусто):', o.slope ? String(o.slope).replace('.', ',') : ''); const k = parseFloat(String(v || '').replace(',', '.')); o.slope = k > 0 ? k : null; }
-  if (o.type === 'note' || o.type === 'pit' || o.type === 'shaft' || o.type === 'column') { const v = await uiAsk('Подпись на плане:', objLabel(o)); if (v != null) o.text = v.trim() && v.trim() !== OBJT[o.type] ? v.trim() : null; }
+  if (o.type === 'note' || o.type === 'pit' || o.type === 'shaft' || o.type === 'column' || o.type === 'hatch') { const v = await uiAsk('Подпись на плане:', objLabel(o)); if (v != null) o.text = v.trim() && v.trim() !== OBJT[o.type] ? v.trim() : null; }
 }
 async function createObj(ids) {
   const type = await chooseObjType(); if (!type) { renderTape(); draw(); return; }
@@ -4612,7 +4653,7 @@ function tapSelect(w) { const cur = T.selSet ? [...T.selSet] : [], p = nearestPo
   const ed = nearestEdge(w, 14); if (ed) { selectPts([...new Set(cur.concat([ed.e.a, ed.e.b]))]); return; }
   selectPts([]); }
 function selectPts(ids) { T.selSet = ids.length ? new Set(ids) : null; draw(); showSelBox(); }
-function selMeas() { const S0 = T.selSet; return M.meas.filter(m => (m.type === 'dist' || m.type === 'thick') && m.on !== false && [m.a, m.b, m.c, m.d].filter(v => v !== undefined).every(id => S0.has(id))); }
+function selMeas() { const S0 = T.selSet; return M.meas.filter(m => (m.type === 'dist' || m.type === 'thick' || m.type === 'tie') && m.on !== false && [m.a, m.b, m.c, m.d].filter(v => v !== undefined).every(id => S0.has(id))); }
 function angIssues() { // углы, принятые прямыми, но замеры тянут их в сторону → линейная неувязка
   const out = []; for (const g of (T.result && T.result.angles) || []) { if (g.deg == null || !T.selSet.has(g.b)) continue; const t = Math.round(g.deg / 90) * 90; const dv = Math.abs(g.deg - t); if (dv < 0.05 || dv > (M.orthoTol || 15) || t % 360 === 0 || t === 180) continue; const pt = ptById(g.b); if (pt && pt.free) continue;
     const B = ptById(g.b), A = ptById(g.a), C = ptById(g.c); const L = Math.min(Math.hypot(A.x - B.x, A.y - B.y), Math.hypot(C.x - B.x, C.y - B.y)); out.push({ b: g.b, deg: g.deg, lin: dv * Math.PI / 180 * L }); }
@@ -4735,7 +4776,7 @@ function continueFrom(p) { // начать (продолжить) обход о�
   stat(`Обход продолжается от ${pname(p.id)}. Касайтесь следующего угла (на пустом месте — новая точка).`); renderTape(); draw();
 }
 function endChain() { if (T.pending && T.pending.got == null) T.pending = null; T.chain = null; T.mA = null; T.tA = null; T.roomIds = null; T.objIds = null; stat('Обход закончен. Коснитесь любой точки — продолжить от неё, или пустого места — начать с новой точки.'); renderTape(); draw(); }
-function setTapeTool(t) { T.opA = null; if (T.selSet && t !== 'box') { T.selSet = null; showSelBox(); } T.tool = t; T.chain = null; T.mA = null; T.tA = null; T.roomIds = null; T.objIds = null; T.noteTip = null; renderTape(); }
+function setTapeTool(t) { T.opA = null; if (t !== 'hatch') T.hatch = null; if (T.selSet && t !== 'box') { T.selSet = null; showSelBox(); } T.tool = t; T.chain = null; T.mA = null; T.tA = null; T.roomIds = null; T.objIds = null; T.noteTip = null; renderTape(); }
 function addPoint(w) { const p = { id: M.nextId++, x0: w[0], y0: w[1] }; M.pts.push(p); return p; }
 function nearestPoint(w, px = 7) { let best = null, bd = px * HITK() / S.view.s; for (const p of M.pts) { const [x, y] = PX(p); const d = Math.hypot(x - w[0], y - w[1]); if (d < bd) { bd = d; best = p; } } return best; }
 function nearestEdge(w, px = 8) { let best = null, bd = px * HITK() / S.view.s, bt = 0; for (const e of M.edges) { const a = PX(ptById(e.a)), b = PX(ptById(e.b)); const [d, t] = distSeg(w, a, b); if (d < bd) { bd = d; best = e; bt = t; } } return best ? { e: best, t: bt } : null; }
@@ -4962,6 +5003,10 @@ function acceptPending() {
     const A = PX(ptById(p.a)), B = PX(ptById(p.b)), C = PX(ptById(p.c));
     const side = Math.sign((B[0] - A[0]) * (C[1] - A[1]) - (B[1] - A[1]) * (C[0] - A[0])) || 1;
     M.meas.push({ id: M.nextMeas++, type: 'thick', a: p.a, b: p.b, c: p.c, d: p.d, v: p.got, side, on: true });
+  } else if (p.type === 'tie') {
+    const A = PX(ptById(p.a)), B = PX(ptById(p.b)), C = PX(ptById(p.c)), D = PX(ptById(p.d)), Mq = [(C[0] + D[0]) / 2, (C[1] + D[1]) / 2];
+    const side = Math.sign((B[0] - A[0]) * (Mq[1] - A[1]) - (B[1] - A[1]) * (Mq[0] - A[0])) || 1;
+    M.meas.push({ id: M.nextMeas++, type: 'tie', a: p.a, b: p.b, c: p.c, d: p.d, v: p.got, side, on: true });
   }
   T.pending = null;
   adjust();
@@ -5060,6 +5105,15 @@ function tapeDown(e, w) {
     uiAsk('Текст выноски (« / » — новая строка):', '').then(v => { if (!v || !v.trim()) { draw(); renderTape(); return; } tPush(); n.text = v.trim(); (M.notes = M.notes || []).push(n); draw(); renderTape(); stat('Выноска добавлена. Долгое нажатие на неё — изменить или удалить; пальцем — передвинуть.'); });
     return;
   }
+  if (t === 'hatch') {
+    const inH = objAt(w);
+    if (inH && inH.type === 'hatch') { T.hatch = inH.id; stat('Люк выбран. Коснитесь стены, к которой привязать его (сколько нужно стен).'); draw(); renderTape(); return; }
+    const H = T.hatch && (M.objs || []).find(o => o.id === T.hatch && o.type === 'hatch');
+    const ed = nearestWall(w, 16);
+    if (H && ed) { tieHatch(H, ed.e); stat('Расстояние от края люка до стены ' + pname(ed.e.a) + '–' + pname(ed.e.b) + ': измерьте или введите.'); draw(); return; }
+    if (H) { T.hatch = null; stat('Люк снят с выбора. Коснитесь пустого места — новый люк; коснитесь люка — выбрать его.'); draw(); renderTape(); return; }
+    createHatch(w); renderTape(); return;
+  }
   if (t === 'obj') {
     let p = e.altKey ? null : nearestPoint(w);
     if (!T.objIds) { tPush(); if (!p) p = addPoint(w); T.objIds = [p.id]; stat('Объект: коснитесь следующего угла; в конце — снова первой точки'); renderTape(); draw(); return; }
@@ -5077,8 +5131,8 @@ function insertBetween(arr, a, b, p, cyclic) {
   const n = arr.length;
   for (let i = 0; i < n - (cyclic ? 0 : 1); i++) { const x = arr[i], y = arr[(i + 1) % n]; if ((x === a && y === b) || (x === b && y === a)) { arr.splice(i + 1, 0, p); return; } }
 }
-function pendLabel(p) { return p.type === 'thick' ? `толщины стены ${pname(p.a)}–${pname(p.b)} ↔ ${pname(p.c)}–${pname(p.d)}` : `${pname(p.a)} → ${pname(p.b)}`; }
-function approxOf(p) { if (p.type !== 'dist') return null; const a = PX(ptById(p.a)), b = PX(ptById(p.b)); return Math.hypot(b[0] - a[0], b[1] - a[1]); }
+function pendLabel(p) { if (p.label) return p.label; if (p.type === 'tie') return `люк ↔ стена ${pname(p.a)}–${pname(p.b)}`; return p.type === 'thick' ? `толщины стены ${pname(p.a)}–${pname(p.b)} ↔ ${pname(p.c)}–${pname(p.d)}` : `${pname(p.a)} → ${pname(p.b)}`; }
+function approxOf(p) { if (p.type === 'tie') { const g = tieGeom(p, PX); return g ? Math.hypot(g.q[0] - g.p[0], g.q[1] - g.p[1]) : null; } if (p.type !== 'dist') return null; const a = PX(ptById(p.a)), b = PX(ptById(p.b)); return Math.hypot(b[0] - a[0], b[1] - a[1]); }
 function tapeMove(w) {
   if (T.mk) { T.mk.q = w.slice(); draw(); return true; }
   if (T.dragMark) { const d = T.dragMark; d.m.p = [w[0] + d.off[0], w[1] + d.off[1]]; draw(); return true; }
@@ -5196,7 +5250,7 @@ function drawTape() {
   }
   // объекты
   for (const o of M.objs || []) {
-    const g = objGeom(o, PX); if (!g) continue; const sel = T.sel && T.sel.obj === o;
+    const g = objGeom(o, PX); if (!g) continue; const sel = (T.sel && T.sel.obj === o) || (T.tool === 'hatch' && T.hatch === o.id);
     ctx.beginPath(); g.poly.forEach((q, i) => { const sp = W2S(...q); i ? ctx.lineTo(...sp) : ctx.moveTo(...sp); }); ctx.closePath();
     ctx.fillStyle = sel ? 'rgba(31,111,235,.16)' : o.type === 'column' ? 'rgba(60,60,60,.18)' : 'rgba(123,75,214,.07)'; ctx.fill();
     ctx.strokeStyle = sel ? '#1f6feb' : '#5b3aa8';
@@ -5261,7 +5315,7 @@ function drawTape() {
     ctx.beginPath(); ctx.moveTo(...sa); ctx.lineTo(...sb); ctx.stroke(); ctx.setLineDash([]);
     if (e.open && e.kind) { ctx.strokeStyle = sel ? '#1f6feb' : '#12a35a'; for (const [p1, p2, k] of openGeom(e, PX)) { ctx.lineWidth = (k === 'arc' ? 1.2 : 2.2) * dpr; ctx.beginPath(); ctx.moveTo(...W2S(...p1)); ctx.lineTo(...W2S(...p2)); ctx.stroke(); } }
     const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
-    if (L * S.view.s > 35) {
+    if (L * S.view.s > 35 && !(e.obj && A.soft)) {
       ctx.save(); ctx.translate((sa[0] + sb[0]) / 2, (sa[1] + sb[1]) / 2); let r = Math.atan2(sb[1] - sa[1], sb[0] - sa[0]); if (r > Math.PI / 2) r -= Math.PI; if (r < -Math.PI / 2) r += Math.PI; ctx.rotate(r);
       ctx.textAlign = 'center'; ctx.font = `bold ${12 * dpr}px Golos Text, Segoe UI`;
       if (m) { const bad = !M.cond && Math.abs(m.res || 0) > 0.005; ctx.fillStyle = bad ? '#c4372f' : '#111'; ctx.fillText(fm(m.v) + (bad ? ` (${m.res > 0 ? '+' : ''}${Math.round(m.res * 1000)} мм)` : ''), 0, -7 * dpr); }
@@ -5278,6 +5332,15 @@ function drawTape() {
     ctx.beginPath(); ctx.moveTo(...sa); ctx.lineTo(...sb); ctx.stroke(); ctx.setLineDash([]);
     ctx.fillStyle = ctx.strokeStyle; ctx.font = `${11 * dpr}px Golos Text, Segoe UI`; ctx.textAlign = 'center';
     ctx.fillText(fm(m.v) + (bad ? ` (${m.res > 0 ? '+' : ''}${Math.round(m.res * 1000)} мм)` : ''), (sa[0] + sb[0]) / 2, (sa[1] + sb[1]) / 2 - 5 * dpr); ctx.textAlign = 'start';
+  }
+  for (const m of M.meas) if (m.type === 'tie') { const g = tieGeom(m, PX); if (!g) continue;
+    const sp = W2S(...g.p), sq = W2S(...g.q), bad = !M.cond && Math.abs(m.res || 0) > 0.005; const col = m.on === false ? '#bbb' : bad ? '#c4372f' : '#d9480f';
+    ctx.strokeStyle = col; ctx.lineWidth = 1.3 * dpr; ctx.setLineDash([4 * dpr, 3 * dpr]); ctx.beginPath(); ctx.moveTo(...sp); ctx.lineTo(...sq); ctx.stroke(); ctx.setLineDash([]);
+    const L = Math.hypot(sq[0] - sp[0], sq[1] - sp[1]) || 1, nx = -(sq[1] - sp[1]) / L * 5 * dpr, ny = (sq[0] - sp[0]) / L * 5 * dpr;
+    for (const z of [sp, sq]) { ctx.beginPath(); ctx.moveTo(z[0] - nx, z[1] - ny); ctx.lineTo(z[0] + nx, z[1] + ny); ctx.stroke(); }
+    ctx.save(); ctx.translate((sp[0] + sq[0]) / 2, (sp[1] + sq[1]) / 2); let r = Math.atan2(sq[1] - sp[1], sq[0] - sp[0]); if (r > Math.PI / 2) r -= Math.PI; if (r < -Math.PI / 2) r += Math.PI; ctx.rotate(r);
+    ctx.font = `bold ${11 * dpr}px Golos Text, Segoe UI`; ctx.textAlign = 'center'; const tx = fm(m.v) + (bad ? ` (${m.res > 0 ? '+' : ''}${Math.round(m.res * 1000)} мм)` : ''); const tw = ctx.measureText(tx).width;
+    ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fillRect(-tw / 2 - 3 * dpr, -17 * dpr, tw + 6 * dpr, 14 * dpr); ctx.fillStyle = col; ctx.fillText(tx, 0, -6 * dpr); ctx.restore(); ctx.textAlign = 'start';
   }
   for (const m of M.meas) if (m.type === 'thick') {
     const a = PX(ptById(m.a)), b = PX(ptById(m.b)), c = PX(ptById(m.c)), d = PX(ptById(m.d));
@@ -5314,6 +5377,7 @@ function drawTape() {
     const [x, y] = W2S(...PX(p));
     const sel = T.sel && T.sel.pt === p, inCh = T.chain && T.chain[0] === p.id, isA = T.mA === p.id || T.opA === p.id || (T.roomIds && T.roomIds.includes(p.id)) || (T.objIds && T.objIds.includes(p.id));
     ctx.fillStyle = sel ? '#1f6feb' : inCh ? '#e07000' : isA ? '#7b4bd6' : '#fff'; ctx.strokeStyle = '#111'; ctx.lineWidth = 1.5 * dpr;
+    if (p.soft && !sel) { ctx.lineWidth = 1 * dpr; ctx.beginPath(); ctx.arc(x, y, 3 * dpr, 0, 7); ctx.fill(); ctx.stroke(); continue; }
     ctx.beginPath(); ctx.arc(x, y, 5 * dpr, 0, 7); ctx.fill(); ctx.stroke();
     ctx.fillStyle = '#333'; ctx.font = `${10 * dpr}px Golos Text, Segoe UI`; ctx.fillText(pname(p.id), x + 7 * dpr, y - 6 * dpr);
   }
@@ -5327,6 +5391,7 @@ const TTOOLS = [['walk', 'Обход', 'щёлкайте углы по поря�
   ['open', 'Дверь / окно', 'коснитесь отрезка стены — он весь станет дверью; или коснитесь двух точек — краёв проёма (любых). Касание по двери: повернуть (4 положения) → окно → пустой проём → стена'],
   ['thick', 'Толщина', 'щёлкните сторону стены в одном помещении, затем в соседнем — и введите толщину'],
   ['room', 'Помещение', 'щёлкните точки контура по порядку и снова первую'],
+  ['hatch', 'Люк', 'коснитесь места люка — появится прямоугольник, введите две его стороны. Затем касайтесь стен, к которым привязываете люк (сколько нужно), и вводите расстояние от края люка до стены. Коснуться люка — выбрать его для новых привязок'],
   ['obj', 'Объект', 'лестница, пандус, шахта, колонна: коснитесь углов по порядку (первые две точки — НИЗ лестницы или пандуса) и снова первой точки, затем выберите тип'],
   ['note', 'Выноска', 'коснитесь места, на которое указывает стрелка, затем места для текста и введите комментарий. Коснуться дважды в одно место — подпись без стрелки. Текст выноски можно двигать пальцем'],
   ['photo', 'Фото', 'встаньте пальцем туда, откуда снимали, и проведите в сторону съёмки — появится стрелка; затем номер фото (по умолчанию следующий)'],
@@ -5340,10 +5405,10 @@ function renderTape() {
   if (S.step !== 'tape') { ['trail', 'mcard', 'selbox', 'pgbar'].forEach(id => { const e = document.getElementById(id); if (e) e.remove(); }); return; }
   const pd = T.pending, ap = pd && approxOf(pd);
   const R = T.result || {};
-  const rows = M.meas.filter(m => m.type !== 'line' && m.type !== 'angle').slice().reverse();
+  const rows = M.meas.filter(m => m.type !== 'line' && m.type !== 'angle' && m.type !== 'right').slice().reverse();
   const warn = m => Math.abs(m.res || 0) > 0.015 ? 'bad' : Math.abs(m.res || 0) > 0.005 ? 'warn' : 'ok';
-  const TICON = { walk: '⬠', meas: '↔', online: '⊸', open: '🚪', thick: '▥', room: '▢', obj: '◆', note: '💬', photo: '📷', scan: '◬', rlab: '№', box: '⬚', drag: '✥', select: '✎' };
-  const TSHORT = { walk: 'Обход', meas: 'Замер', online: 'На стене', open: 'Дверь', thick: 'Толщина', room: 'Помещ.', obj: 'Объект', note: 'Выноска', photo: 'Фото', scan: 'Скан', rlab: '№ пом.', box: 'Выделить', drag: 'Двигать', select: 'Правка' };
+  const TICON = { walk: '⬠', meas: '↔', online: '⊸', open: '🚪', thick: '▥', room: '▢', obj: '◆', hatch: '⊠', note: '💬', photo: '📷', scan: '◬', rlab: '№', box: '⬚', drag: '✥', select: '✎' };
+  const TSHORT = { walk: 'Обход', meas: 'Замер', online: 'На стене', open: 'Дверь', thick: 'Толщина', room: 'Помещ.', obj: 'Объект', hatch: 'Люк', note: 'Выноска', photo: 'Фото', scan: 'Скан', rlab: '№ пом.', box: 'Выделить', drag: 'Двигать', select: 'Правка' };
   // панель инструментов на чертеже — всегда под рукой
   let rail = document.getElementById('trail'); if (!rail) { rail = document.createElement('div'); rail.id = 'trail'; $('#main').appendChild(rail); }
   rail.innerHTML = TTOOLS.map(t => `<button data-tt="${t[0]}" class="${T.tool === t[0] ? 'on' : ''}" title="${escH(t[1] + ': ' + t[2])}"><i>${TICON[t[0]] || '•'}</i><span>${TSHORT[t[0]] || t[1]}</span></button>`).join('');
@@ -5386,9 +5451,9 @@ function renderTape() {
   <div class="chk"><input type="checkbox" id="auto" ${T.auto ? 'checked' : ''}><label for="auto">Принимать замер с DISTO сразу, без «Принять»</label></div>
   <div class="chk"><input type="checkbox" id="orth" ${M.ortho !== false ? 'checked' : ''}><label for="orth">Углы около 90° считать прямыми</label></div>
   </details>
-  <details><summary>Помещения и замеры (${M.rooms.length} / ${M.meas.filter(m => m.type !== 'line' && m.type !== 'angle').length}) · невязка <b class="${(R.maxR || 0) > 0.015 ? 'bad' : (R.maxR || 0) > 0.005 ? 'warn' : 'ok'}">${Math.round((R.maxR || 0) * 1000)} мм</b></summary>
+  <details><summary>Помещения и замеры (${M.rooms.length} / ${M.meas.filter(m => m.type !== 'line' && m.type !== 'angle' && m.type !== 'right').length}) · невязка <b class="${(R.maxR || 0) > 0.015 ? 'bad' : (R.maxR || 0) > 0.005 ? 'warn' : 'ok'}">${Math.round((R.maxR || 0) * 1000)} мм</b></summary>
   ${M.rooms.map(Rm => { const i = TAPE.roomInfo(M, Rm); return `<div class="item" data-room="${Rm.num}"><input type="text" value="${escH(Rm.name)}" data-rn="${Rm.num}" style="width:120px">${Rm.num}<span class="q ${i.diags < i.need ? 'warn' : 'ok'}">${SHEET.fmtArea(i.area)} м² · стороны ${i.sides}/${i.k} · диаг. ${i.diags}${i.diags < i.need ? ' (нужно ' + i.need + ')' : ''}</span></div>`; }).join('')}
-  <div class="list" style="margin-top:6px">${rows.map(m => `<div class="item"><input type="checkbox" data-mon="${m.id}" ${m.on !== false ? 'checked' : ''}><span>${m.type === 'thick' ? 'δ ' : ''}${pname(m.a)}–${pname(m.type === 'thick' ? m.c : m.b)}</span><input type="text" data-mv="${m.id}" value="${fm(m.v)}" style="width:72px"><span class="q ${warn(m)}">${m.res != null ? (m.res > 0 ? '+' : '') + Math.round(m.res * 1000) + ' мм' : ''}</span><button data-mdel="${m.id}" style="padding:1px 6px">×</button></div>`).join('') || '<div class="hint" style="padding:6px">Замеров пока нет</div>'}</div>
+  <div class="list" style="margin-top:6px">${rows.map(m => `<div class="item"><input type="checkbox" data-mon="${m.id}" ${m.on !== false ? 'checked' : ''}><span>${m.type === 'tie' ? 'люк ↔ ' : m.type === 'thick' ? 'δ ' : ''}${pname(m.a)}–${pname(m.type === 'thick' ? m.c : m.b)}</span><input type="text" data-mv="${m.id}" value="${fm(m.v)}" style="width:72px"><span class="q ${warn(m)}">${m.res != null ? (m.res > 0 ? '+' : '') + Math.round(m.res * 1000) + ' мм' : ''}</span><button data-mdel="${m.id}" style="padding:1px 6px">×</button></div>`).join('') || '<div class="hint" style="padding:6px">Замеров пока нет</div>'}</div>
   </details>
   <div class="row" style="display:none"><button id="tUndo"></button><button id="tRedo"></button></div>`;
   $('#uLoad').onclick = () => $('#uFile').click();
@@ -5497,6 +5562,11 @@ async function exportOverlayPdf() {
     for (const m of M.meas) { if (m.type !== 'dist' || hasEdge(m.a, m.b) || m.on === false) continue; const A = ptById(m.a), B = ptById(m.b); if (!A || !B) continue; const a = P2(A), b = P2(B);
       page.drawLine({ start: { x: a[0], y: a[1] }, end: { x: b[0], y: b[1] }, thickness: lw * 0.8, color: VIO, dashArray: [lw * 4, lw * 3] });
       text(fm(m.v), [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], fs * 0.9, VIO, segAng(a, b)); }
+    for (const m of M.meas) if (m.type === 'tie' && m.on !== false) { const g = tieGeom(m, PX); if (!g) continue; const a = toPt(...g.p), b = toPt(...g.q);
+      page.drawLine({ start: { x: a[0], y: a[1] }, end: { x: b[0], y: b[1] }, thickness: lw * 0.8, color: RED, dashArray: [lw * 4, lw * 3] });
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, nx = -(b[1] - a[1]) / L * lw * 3, ny = (b[0] - a[0]) / L * lw * 3;
+      for (const z of [a, b]) page.drawLine({ start: { x: z[0] - nx, y: z[1] - ny }, end: { x: z[0] + nx, y: z[1] + ny }, thickness: lw * 0.8, color: RED });
+      text(fm(m.v), [(a[0] + b[0]) / 2 + nx * 1.6, (a[1] + b[1]) / 2 + ny * 1.6], fs * 0.85, RED, segAng(a, b)); }
     for (const m of M.meas) if (m.type === 'thick' && m.on !== false) { const q = [m.a, m.b, m.c, m.d].map(id => P2(ptById(id))); text('δ ' + fm(m.v), [(q[0][0] + q[1][0] + q[2][0] + q[3][0]) / 4, (q[0][1] + q[1][1] + q[2][1] + q[3][1]) / 4], fs * 0.85, RED); }
     for (const m of M.meas) if (m.type === 'angle' && m.on !== false) { const q = P2(ptById(m.b)); text('∠' + fdeg(m.v), [q[0] + fs, q[1] + fs], fs * 0.85, VIO, 0, 'l'); }
     // помещения
@@ -5526,7 +5596,7 @@ async function exportOverlayPdf() {
         page.drawSvgPath(`M0 0L${-h * Math.cos(a - 0.4)} ${h * Math.sin(a - 0.4)}L${-h * Math.cos(a + 0.4)} ${h * Math.sin(a + 0.4)}Z`, { x: tp[0], y: tp[1], color: ORG, borderWidth: 0 }); }
       ls.forEach((l, i) => text(l, [at[0], at[1] - (i - (ls.length - 1) / 2) * fsn * 1.25 - fsn * 0.35], fsn, ORG)); }
     // точки
-    for (const p of M.pts) { const q = P2(p); page.drawCircle({ x: q[0], y: q[1], size: lw * 1.6, color: rgb(1, 1, 1), borderColor: rgb(0.1, 0.1, 0.1), borderWidth: lw * 0.6 }); text(pname(p.id), [q[0] + fs * 0.4, q[1] + fs * 0.4], fs * 0.6, rgb(0.2, 0.2, 0.2), 0, 'l'); }
+    for (const p of M.pts) { if (p.soft) continue; const q = P2(p); page.drawCircle({ x: q[0], y: q[1], size: lw * 1.6, color: rgb(1, 1, 1), borderColor: rgb(0.1, 0.1, 0.1), borderWidth: lw * 0.6 }); text(pname(p.id), [q[0] + fs * 0.4, q[1] + fs * 0.4], fs * 0.6, rgb(0.2, 0.2, 0.2), 0, 'l'); }
     const d = new Date(); text(`Обмер рулеткой · ${d.toLocaleDateString('ru')} · ${M.cond ? 'условно по чертежу' : 'факт по замерам'} · размеры в метрах · Рулетка · © d1sco`, [10, 10], Math.max(4, Math.min(8, W / 160)), GRY, 0, 'l');
       })();
     }
@@ -5567,6 +5637,8 @@ function tapePlan() {
     for (const [a, b, w] of g.lines) extra.push({ a, b, w });
     for (const d of g.dots) { const r = 0.04; for (let i = 0; i < 6; i++) { const a1 = i * Math.PI / 3, a2 = (i + 1) * Math.PI / 3; extra.push({ a: [d[0] + r * Math.cos(a1), d[1] + r * Math.sin(a1)], b: [d[0] + r * Math.cos(a2), d[1] + r * Math.sin(a2)], w: 0.35 }); } }
     texts.push({ p: g.label.p, s: g.label.s, h: 2.2, rot: 0 }); }
+  for (const m of M.meas) if (m.type === 'tie' && m.on !== false) { const g = tieGeom(m, PR); if (!g) continue; extra.push({ a: g.p, b: g.q, w: 0.18, layer: 'PRIVYAZKI' });
+    let rot = Math.atan2(g.q[1] - g.p[1], g.q[0] - g.p[0]) * 180 / Math.PI; if (rot > 90) rot -= 180; if (rot <= -90) rot += 180; texts.push({ p: g.c, s: fm(m.v), h: 1.8, rot }); }
   for (const m of (M.marks || []).filter(x => x.type === 'rlab')) { const c = PR({ x0: m.p[0], y0: m.p[1], x: m.p[0], y: m.p[1] });
     if (m.num) texts.push({ p: [c[0], c[1] + 0.2], s: '№ ' + m.num, h: 2.6, rot: 0, layer: 'NOMERA_POM' }); if (m.name) texts.push({ p: [c[0], c[1] - 0.2], s: m.name, h: 2.2, rot: 0, layer: 'NOMERA_POM' }); }
   for (const m of (M.marks || []).filter(x => x.type !== 'rlab')) { const c = PR({ x0: m.p[0], y0: m.p[1], x: m.p[0], y: m.p[1] }); const r = 0.12;
