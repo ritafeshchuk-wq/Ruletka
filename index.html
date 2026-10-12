@@ -252,11 +252,11 @@ header .modes,#bOpen,.homein .lead{display:none!important}
   <button class="hb" id="bAbout" title="О программе, авторство, лицензии">О программе</button>
   <button class="hb" id="bOpen">Открыть проект</button>
   <span id="asInd" class="asind"></span><button class="hb" id="bSnaps" title="Вернуться к копии, сделанной раньше">Копии</button><button class="hb" id="bSave">💾 Сохранить</button>
-  <input type="file" id="fProj" accept=".json" hidden>
+  <input type="file" id="fProj" accept=".json,.txt,application/json,text/plain" hidden>
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 3.1 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 3.2 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -4100,12 +4100,20 @@ $('#bSave').onclick = () => {
   $('#main').appendChild(el);
   el.querySelectorAll('button').forEach(b => b[window.PointerEvent ? 'onpointerup' : 'onclick'] = ev => { ev.stopPropagation(); ev.preventDefault(); el.remove(); if (b.dataset.k === 'pdf') exportOverlayPdf(); else if (b.dataset.k === 'json') saveProjectFile(); });
 };
+// на iPhone/iPad фильтр по расширению не ставим: новые iOS делают файл проекта серым (не выбрать), если «Файлы» сохранили его не как .json
+if (IOS) $('#fProj').removeAttribute('accept');
 $('#bOpen').onclick = () => $('#fProj').click();
+async function readProjFile(f) {
+  const buf = new Uint8Array(await f.arrayBuffer());
+  let txt = new TextDecoder('utf-8').decode(buf).replace(/^\uFEFF/, '').trim();
+  if (!txt.startsWith('{')) throw new Error(`«${f.name}» — это не файл проекта Рулетки (ожидается …scanplan.json)`);
+  try { return JSON.parse(txt); } catch (e) { throw new Error(`файл «${f.name}» (${(f.size / 1048576).toFixed(1)} МБ) повреждён или сохранён не полностью`); }
+}
 $('#fProj').onchange = async e => {
-  const f = e.target.files[0]; if (!f) return;
-  try { const j = JSON.parse(await f.text()); await leaveProject(); resetWork(); await projCreate((j.sheetOpt && j.sheetOpt.info && j.sheetOpt.info.object) || f.name.replace(/\.scanplan\.json$|\.json$/i, ''), false); await applyProject(j); await autosave(true); }
-  catch (err) { uiAlert('Не удалось открыть проект: ' + err.message); }
-  e.target.value = '';
+  const f = e.target.files[0]; if (!f) return; busy('Открываю проект «' + f.name + '»…');
+  try { const j = await readProjFile(f); await leaveProject(); resetWork(); await projCreate((j.sheetOpt && j.sheetOpt.info && j.sheetOpt.info.object) || f.name.replace(/\.scanplan\.json$|\.json$/i, ''), false); await applyProject(j); await autosave(true); }
+  catch (err) { busy(''); uiAlert('Не удалось открыть проект: ' + (err && err.message || err)); }
+  busy(''); e.target.value = '';
 };
 async function applyProject(j) {
   {
