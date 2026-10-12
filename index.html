@@ -142,6 +142,9 @@ body.touch #tmenu button{padding:13px 14px;font-size:15px}
 .uidlg-t{font-weight:600;font-size:15px;line-height:1.35}
 .uidlg-x{color:var(--mute);font-size:13px}
 .uidlg-in{font-size:18px!important;padding:10px 12px!important}
+.rl-lab{font-size:12px;color:var(--mute);margin-bottom:-6px}
+.rl-chips{display:flex;flex-wrap:wrap;gap:6px}
+.rl-chips button{padding:6px 10px;border-radius:16px;border:1px solid #e3b3c8;background:#fdf1f6;color:#a3154c;font-size:14px}
 #busy{position:absolute;left:50%;top:16px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 16px;border-radius:20px;display:none;z-index:5;font-size:13px;box-shadow:0 4px 14px rgba(15,23,36,.25)}
 .pend{border:2px solid var(--tape);border-radius:12px;padding:10px 12px;margin:8px 0;background:var(--tape-soft)}
 .pend .big{font-size:30px;font-weight:600;margin:4px 0;letter-spacing:-.5px}
@@ -256,7 +259,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 3.2 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 3.3 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -1868,7 +1871,7 @@ const SHEET = (() => {
         text([p[0], p[1] - 2.0 * k], fmtArea(R.area), 2.5, 0, 'TEKST');
       }
     }
-    for (const t of plan.texts || []) text(t.p, t.s, t.h || 2.5, t.rot || 0, 'TEKST');
+    for (const t of plan.texts || []) text(t.p, t.s, t.h || 2.5, t.rot || 0, t.layer || 'TEKST');
     // dimensions
     const dims = autoDims(plan, k, show);
     for (const d of dims) {
@@ -1995,7 +1998,7 @@ const SHEET = (() => {
         }
         g += `<path d="${d}" stroke="#bbb" stroke-width="0.12" fill="none"/>`;
       }
-      const colors = { STENY: '#000', PROEMY: '#0a7', POMESCH: '#36c', RAZMERY: '#000', TOLSCH: '#c00', TEKST: '#000', OBJEKTY: '#000', DVERI: '#0a7', FOTO_SKAN: '#1f6feb' };
+      const colors = { STENY: '#000', PROEMY: '#0a7', POMESCH: '#36c', RAZMERY: '#000', TOLSCH: '#c00', TEKST: '#000', OBJEKTY: '#000', DVERI: '#0a7', FOTO_SKAN: '#1f6feb', NOMERA_POM: '#c2185b' };
       const byLayer = {};
       for (const l of prim.lines) (byLayer[l.layer + '|' + l.w] = byLayer[l.layer + '|' + l.w] || []).push(l);
       for (const key in byLayer) {
@@ -2051,7 +2054,7 @@ const SHEET = (() => {
     const o = [];
     const p = (c, v) => { o.push(String(c)); o.push(String(v)); };
     p(999, 'Скан-План 1.1. (c) d1sco, 2026. ' + 'sha256:328908ed1181127a9f21b77d19d70a47e4ad0be284785c97777810ddff0d519a'); p(0, 'SECTION'); p(2, 'HEADER'); p(9, '$ACADVER'); p(1, 'AC1009'); p(9, '$DWGCODEPAGE'); p(3, 'ANSI_1251'); p(9, '$INSUNITS'); p(70, opt.units === 'm' ? 6 : 4); p(0, 'ENDSEC');
-    const layers = { SREZ: 8, STENY: 7, PROEMY: 3, POMESCH: 5, RAZMERY: 7, TOLSCH: 1, TEKST: 7, STANCII: 4, OBJEKTY: 6, DVERI: 3, FOTO_SKAN: 5 };
+    const layers = { SREZ: 8, STENY: 7, PROEMY: 3, POMESCH: 5, RAZMERY: 7, TOLSCH: 1, TEKST: 7, STANCII: 4, OBJEKTY: 6, DVERI: 3, FOTO_SKAN: 5, NOMERA_POM: 6 };
     p(0, 'SECTION'); p(2, 'TABLES'); p(0, 'TABLE'); p(2, 'LAYER'); p(70, Object.keys(layers).length);
     for (const [n, c] of Object.entries(layers)) { p(0, 'LAYER'); p(2, n); p(70, 0); p(62, c); p(6, 'CONTINUOUS'); }
     p(0, 'ENDTAB'); p(0, 'ENDSEC');
@@ -4408,12 +4411,14 @@ function tapeMenu(w, cx, cy) {
     if (h.edge.open) items.push(['▭ Это стена (не проём)', () => { tPush(); h.edge.open = false; delete h.edge.kind; delete h.edge.dor; draw(); renderTape(); }]);
     items.push(['🗑 Удалить стену', () => { tPush(); M.edges = M.edges.filter(x => x !== h.edge); M.meas = M.meas.filter(x => !(x.type === 'dist' && ((x.a === h.edge.a && x.b === h.edge.b) || (x.a === h.edge.b && x.b === h.edge.a)))); adjust(); renderTape(); }, 'danger']);
   } else if (h.mark) {
-    const m = h.mark; title = `${MKN[m.type]} ${m.num}`;
+    const m = h.mark; title = m.type === 'rlab' ? 'Помещение ' + rlabText(m) : `${MKN[m.type]} ${m.num}`;
+    if (m.type === 'rlab') { items.push(['✎ Номер и название…', async () => { const v = await askRoomLabel(m.num, m.name, 'Помещение'); if (v) { tPush(); m.num = v.num; m.name = v.name; draw(); renderTape(); } }]); items.push(['✥ Передвинуть', () => stat('Ведите подпись пальцем')]); items.push(['🗑 Удалить', () => { tPush(); M.marks = M.marks.filter(x => x !== m); draw(); renderTape(); }, 'danger']); }
+    else {
     items.push(['№ Изменить номер…', async () => { const v = await uiAsk('Номер:', m.num); if (v && v.trim()) { tPush(); m.num = v.trim(); draw(); } }]);
     items.push(['↻ Повернуть направление на 45°', () => { tPush(); m.dir = (m.dir == null ? 0 : m.dir) + Math.PI / 4; draw(); }]);
     if (m.dir != null) items.push(['➝ Убрать направление', () => { tPush(); m.dir = null; draw(); }]);
     items.push(['✥ Передвинуть', () => stat('Ведите значок пальцем')]);
-    items.push(['🗑 Удалить', () => { tPush(); M.marks = M.marks.filter(x => x !== m); draw(); renderTape(); }, 'danger']);
+    items.push(['🗑 Удалить', () => { tPush(); M.marks = M.marks.filter(x => x !== m); draw(); renderTape(); }, 'danger']); }
   } else if (h.note) {
     const n = h.note; title = 'Выноска';
     items.push(['✎ Изменить текст…', async () => { tPush(); await noteEdit(n); renderTape(); draw(); }]);
@@ -4663,14 +4668,37 @@ async function switchPage(pg) {
 }
 function pagesWithWork() { savePage(); const ks = Object.keys(PGS.data).map(Number).filter(n => pgHas(n)).sort((a, b) => a - b); return ks.length ? ks : [U.srcPage || 1]; }
 // ---------- фото и сканы: номер, место, направление ----------
-const MKN = { photo: 'Фото', scan: 'Скан' };
+const MKN = { photo: 'Фото', scan: 'Скан', rlab: 'Помещение' };
+const RLAB_COL = '#c2185b';
+const RLAB_NAMES = ['Комната', 'Кухня', 'Коридор', 'Прихожая', 'Санузел', 'Ванная', 'Туалет', 'Кладовая', 'Гардероб', 'Лоджия', 'Балкон', 'Холл', 'Тамбур', 'Лестница', 'Кабинет', 'Подсобное'];
+const rlabText = m => (m.num ? '№ ' + m.num : '') + (m.name ? (m.num ? ' · ' : '') + m.name : '');
+// диалог: номер и название помещения сразу, с быстрыми названиями
+function askRoomLabel(num, name, title) {
+  return new Promise(res => {
+    const ov = document.createElement('div'); ov.className = 'uidlg';
+    ov.innerHTML = `<div class="uidlg-box" role="dialog"><div class="uidlg-t"></div><div class="rl-lab">Номер помещения</div><input type="text" class="uidlg-in rl-num" autocomplete="off"><div class="rl-lab">Название</div><input type="text" class="uidlg-in rl-name" autocomplete="off" autocapitalize="sentences"><div class="rl-chips">${RLAB_NAMES.map(n => `<button type="button" data-n="${n}">${n}</button>`).join('')}</div><div class="row"><button class="pri uidlg-ok">Готово</button><button class="uidlg-c">Отмена</button></div></div>`;
+    ov.querySelector('.uidlg-t').textContent = title || 'Помещение';
+    const a = ov.querySelector('.rl-num'), b = ov.querySelector('.rl-name'); a.value = num || ''; b.value = name || '';
+    const done = v => { ov.remove(); res(v); };
+    const ok = () => { const n = a.value.trim(), t = b.value.trim(); done(n || t ? { num: n, name: t } : null); };
+    ov.querySelectorAll('.rl-chips button').forEach(x => x.onclick = () => { b.value = x.dataset.n; b.focus(); });
+    ov.querySelector('.uidlg-ok').onclick = ok; ov.querySelector('.uidlg-c').onclick = () => done(null);
+    ov.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); if (document.activeElement === a) b.focus(); else ok(); } else if (e.key === 'Escape') done(null); });
+    document.body.appendChild(ov); setTimeout(() => a.focus(), 30);
+  });
+}
+async function addRoomLabel(p) {
+  draw(); const v = await askRoomLabel(nextNum('rlab'), '', 'Номер и название помещения'); if (!v) { draw(); return; }
+  tPush(); (M.marks = M.marks || []).push({ id: (M.marks || []).reduce((m, x) => Math.max(m, x.id), 0) + 1, type: 'rlab', p: p.slice(), dir: null, num: v.num, name: v.name });
+  M.lastNum = M.lastNum || {}; if (v.num) M.lastNum.rlab = v.num; draw(); renderTape(); stat(`Помещение ${rlabText(v)} подписано. Коснитесь следующего — номер подставится следующий.`);
+}
 function nextNum(type) { const l = (M.lastNum || {})[type]; if (l == null) return ''; const m = String(l).match(/^(.*?)(\d+)(\D*)$/); return m ? m[1] + String(+m[2] + 1).padStart(m[2].length, '0') + m[3] : ''; }
 async function addMark(type, p, dir) {
   draw(); const v = await uiAsk(`Номер ${type === 'photo' ? 'фото' : 'скана'}:`, nextNum(type)); if (v == null || !String(v).trim()) { draw(); return; }
   tPush(); const num = String(v).trim(); (M.marks = M.marks || []).push({ id: (M.marks || []).reduce((m, x) => Math.max(m, x.id), 0) + 1, type, p: p.slice(), dir, num });
   M.lastNum = M.lastNum || {}; M.lastNum[type] = num; draw(); renderTape(); stat(`${MKN[type]} ${num} отмечено${dir == null ? '' : ' с направлением'}. Следующее — тем же движением.`);
 }
-function markAt(sx, sy) { for (const r of (T.markRects || []).slice().reverse()) if (Math.hypot(sx - r.x, sy - r.y) < 18) return r.m; return null; }
+function markAt(sx, sy) { for (const r of (T.markRects || []).slice().reverse()) if (r.rw ? Math.abs(sx - r.x) < r.rw + 4 && Math.abs(sy - r.y) < r.rh + 4 : Math.hypot(sx - r.x, sy - r.y) < 18) return r.m; return null; }
 function continueFrom(p) { // начать (продолжить) обход от существующей точки
   if (T.pending && T.pending.got == null) T.pending = null;
   T.tool = 'walk'; T.mA = null; T.tA = null; T.roomIds = null;
@@ -4993,6 +5021,7 @@ function tapeDown(e, w) {
     const e1 = T.tA, e2 = ed.e; T.tA = null; if (e1 === e2) return;
     makePending({ type: 'thick', a: e1.a, b: e1.b, c: e2.a, d: e2.b }); return;
   }
+  if (t === 'rlab') { const sp = W2S(...w), ex = markAt(sp[0] / devicePixelRatio, sp[1] / devicePixelRatio); if (ex && ex.type === 'rlab') { askRoomLabel(ex.num, ex.name, 'Помещение').then(v => { if (v) { tPush(); ex.num = v.num; ex.name = v.name; draw(); renderTape(); } }); return; } addRoomLabel(w); return; }
   if (t === 'photo' || t === 'scan') { T.mk = { type: t, p: w.slice(), q: w.slice() }; draw(); return; }
   if (t === 'box') { T.box = { w0: w.slice(), w1: w.slice() }; draw(); return; }
   if (t === 'note') {
@@ -5141,7 +5170,15 @@ function drawTape() {
   }
   // фото и сканы
   T.markRects = [];
-  const drawMark = (m, ghost) => { const c = W2S(...m.p), col = m.type === 'photo' ? '#1f6feb' : '#0f8a8a', r = 8 * dpr; ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 2 * dpr; ctx.globalAlpha = ghost ? 0.6 : 1;
+  const drawRlab = m => { const c = W2S(...m.p), l1 = m.num ? '№ ' + m.num : '', l2 = m.name || '', f1 = 15 * dpr, f2 = 12.5 * dpr;
+    ctx.font = `bold ${f1}px Golos Text, Segoe UI`; const w1 = l1 ? ctx.measureText(l1).width : 0; ctx.font = `600 ${f2}px Golos Text, Segoe UI`; const w2 = l2 ? ctx.measureText(l2).width : 0;
+    const pad = 7 * dpr, W = Math.max(w1, w2) + 2 * pad, H = (l1 ? f1 * 1.15 : 0) + (l2 ? f2 * 1.2 : 0) + pad * 1.2, x0 = c[0] - W / 2, y0 = c[1] - H / 2;
+    const sel = T.sel && T.sel.mark === m; ctx.fillStyle = 'rgba(255,255,255,.94)'; ctx.strokeStyle = RLAB_COL; ctx.lineWidth = (sel ? 3 : 2) * dpr; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x0, y0, W, H, 6 * dpr) : ctx.rect(x0, y0, W, H); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = RLAB_COL; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; let y = y0 + pad * 0.6;
+    if (l1) { ctx.font = `bold ${f1}px Golos Text, Segoe UI`; y += f1; ctx.fillText(l1, c[0], y); y += f1 * 0.15; }
+    if (l2) { ctx.font = `600 ${f2}px Golos Text, Segoe UI`; y += f2; ctx.fillText(l2, c[0], y); }
+    ctx.textAlign = 'start'; T.markRects.push({ m, x: c[0] / dpr, y: c[1] / dpr, rw: W / 2 / dpr, rh: H / 2 / dpr }); };
+  const drawMark = (m, ghost) => { if (m.type === 'rlab') return drawRlab(m); const c = W2S(...m.p), col = m.type === 'photo' ? '#1f6feb' : '#0f8a8a', r = 8 * dpr; ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 2 * dpr; ctx.globalAlpha = ghost ? 0.6 : 1;
     if (m.dir != null) { const a = -m.dir, L = 34 * dpr, tip = [c[0] + Math.cos(a) * L, c[1] + Math.sin(a) * L]; ctx.beginPath(); ctx.moveTo(c[0] + Math.cos(a) * r, c[1] + Math.sin(a) * r); ctx.lineTo(...tip); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(...tip); ctx.lineTo(tip[0] - 9 * dpr * Math.cos(a - 0.45), tip[1] - 9 * dpr * Math.sin(a - 0.45)); ctx.lineTo(tip[0] - 9 * dpr * Math.cos(a + 0.45), tip[1] - 9 * dpr * Math.sin(a + 0.45)); ctx.closePath(); ctx.fill();
       if (m.type === 'photo') { ctx.lineWidth = 1 * dpr; ctx.setLineDash([3 * dpr, 3 * dpr]); for (const s0 of [-0.45, 0.45]) { ctx.beginPath(); ctx.moveTo(...c); ctx.lineTo(c[0] + Math.cos(a + s0) * L * 0.9, c[1] + Math.sin(a + s0) * L * 0.9); ctx.stroke(); } ctx.setLineDash([]); ctx.lineWidth = 2 * dpr; } }
@@ -5253,6 +5290,7 @@ const TTOOLS = [['walk', 'Обход', 'щёлкайте углы по поря�
   ['note', 'Выноска', 'коснитесь места, на которое указывает стрелка, затем места для текста и введите комментарий. Коснуться дважды в одно место — подпись без стрелки. Текст выноски можно двигать пальцем'],
   ['photo', 'Фото', 'встаньте пальцем туда, откуда снимали, и проведите в сторону съёмки — появится стрелка; затем номер фото (по умолчанию следующий)'],
   ['scan', 'Скан', 'коснитесь места станции сканера (можно провести — направление); номер скана подставится следующий'],
+  ['rlab', '№ помещения', 'коснитесь внутри помещения — введите номер и название (номер подставится следующий, название — одним касанием из списка). Подпись выделена малиновым; её можно двигать пальцем'],
   ['box', 'Выделить', 'проведите пальцем рамку вокруг части чертежа (или «Выделить всё») — появится проверка невязок и кнопка «Уравнять»'],
   ['drag', 'Двигать точку', 'перетащите точку, если начальное положение по БТИ сильно неверно (Shift + перетаскивание фона — сдвиг подложки)'],
   ['select', '✎ Правка', 'коснитесь точки, стены или размера — откроется меню: перемерить, изменить число, выключить, удалить. В любом инструменте то же меню — долгое нажатие или правый щелчок']];
@@ -5263,8 +5301,8 @@ function renderTape() {
   const R = T.result || {};
   const rows = M.meas.filter(m => m.type !== 'line' && m.type !== 'angle').slice().reverse();
   const warn = m => Math.abs(m.res || 0) > 0.015 ? 'bad' : Math.abs(m.res || 0) > 0.005 ? 'warn' : 'ok';
-  const TICON = { walk: '⬠', meas: '↔', online: '⊸', open: '🚪', thick: '▥', room: '▢', obj: '◆', note: '💬', photo: '📷', scan: '◬', box: '⬚', drag: '✥', select: '✎' };
-  const TSHORT = { walk: 'Обход', meas: 'Замер', online: 'На стене', open: 'Дверь', thick: 'Толщина', room: 'Помещ.', obj: 'Объект', note: 'Выноска', photo: 'Фото', scan: 'Скан', box: 'Выделить', drag: 'Двигать', select: 'Правка' };
+  const TICON = { walk: '⬠', meas: '↔', online: '⊸', open: '🚪', thick: '▥', room: '▢', obj: '◆', note: '💬', photo: '📷', scan: '◬', rlab: '№', box: '⬚', drag: '✥', select: '✎' };
+  const TSHORT = { walk: 'Обход', meas: 'Замер', online: 'На стене', open: 'Дверь', thick: 'Толщина', room: 'Помещ.', obj: 'Объект', note: 'Выноска', photo: 'Фото', scan: 'Скан', rlab: '№ пом.', box: 'Выделить', drag: 'Двигать', select: 'Правка' };
   // панель инструментов на чертеже — всегда под рукой
   let rail = document.getElementById('trail'); if (!rail) { rail = document.createElement('div'); rail.id = 'trail'; $('#main').appendChild(rail); }
   rail.innerHTML = TTOOLS.map(t => `<button data-tt="${t[0]}" class="${T.tool === t[0] ? 'on' : ''}" title="${escH(t[1] + ': ' + t[2])}"><i>${TICON[t[0]] || '•'}</i><span>${TSHORT[t[0]] || t[1]}</span></button>`).join('');
@@ -5425,7 +5463,14 @@ async function exportOverlayPdf() {
       let area = 0; try { area = TAPE.roomInfo(M, R).area; } catch (e) { }
       text(`${R.num}. ${R.name}`, [c[0], c[1] + fs * 0.7], fs * 1.05, BLUE); text(SHEET.fmtArea(area) + ' м²', [c[0], c[1] - fs * 0.7], fs, BLUE); }
     // фото и сканы
-    for (const m of M.marks || []) { const c = toPt(...m.p), col = m.type === 'photo' ? rgb(0.12, 0.43, 0.92) : rgb(0.06, 0.54, 0.54), r = fs * 0.55;
+    const RLC = rgb(0.76, 0.09, 0.36);
+    for (const m of (M.marks || []).filter(x => x.type === 'rlab')) { const c = toPt(...m.p), l1 = m.num ? '№ ' + m.num : '', l2 = m.name || '', f1 = fs * 1.15, f2 = fs * 0.95;
+      const w1 = l1 ? font.getAdvanceWidth(l1, f1) : 0, w2 = l2 ? font.getAdvanceWidth(l2, f2) : 0, pad = fs * 0.45, W = Math.max(w1, w2) + 2 * pad, H = (l1 ? f1 * 1.15 : 0) + (l2 ? f2 * 1.2 : 0) + pad * 1.1;
+      page.drawRectangle({ x: c[0] - W / 2, y: c[1] - H / 2, width: W, height: H, color: rgb(1, 1, 1), opacity: 0.92, borderColor: RLC, borderWidth: lw * 1.4 });
+      let y = c[1] + H / 2 - pad * 0.55;
+      if (l1) { y -= f1; page.drawSvgPath(font.getPath(l1, 0, 0, f1).toPathData(3), { x: c[0] - w1 / 2, y, color: RLC, borderWidth: 0 }); y -= f1 * 0.15; }
+      if (l2) { y -= f2; page.drawSvgPath(font.getPath(l2, 0, 0, f2).toPathData(3), { x: c[0] - w2 / 2, y, color: RLC, borderWidth: 0 }); } }
+    for (const m of (M.marks || []).filter(x => x.type !== 'rlab')) { const c = toPt(...m.p), col = m.type === 'photo' ? rgb(0.12, 0.43, 0.92) : rgb(0.06, 0.54, 0.54), r = fs * 0.55;
       if (m.dir != null) { const q = toPt(m.p[0] + Math.cos(m.dir), m.p[1] + Math.sin(m.dir)); const a = Math.atan2(q[1] - c[1], q[0] - c[0]), L = fs * 2.6, tip = [c[0] + Math.cos(a) * L, c[1] + Math.sin(a) * L];
         page.drawLine({ start: { x: c[0] + Math.cos(a) * r, y: c[1] + Math.sin(a) * r }, end: { x: tip[0], y: tip[1] }, thickness: lw, color: col });
         page.drawSvgPath(`M0 0L${-fs * 0.7 * Math.cos(a - 0.45)} ${fs * 0.7 * Math.sin(a - 0.45)}L${-fs * 0.7 * Math.cos(a + 0.45)} ${fs * 0.7 * Math.sin(a + 0.45)}Z`, { x: tip[0], y: tip[1], color: col, borderWidth: 0 }); }
@@ -5481,7 +5526,9 @@ function tapePlan() {
     for (const [a, b, w] of g.lines) extra.push({ a, b, w });
     for (const d of g.dots) { const r = 0.04; for (let i = 0; i < 6; i++) { const a1 = i * Math.PI / 3, a2 = (i + 1) * Math.PI / 3; extra.push({ a: [d[0] + r * Math.cos(a1), d[1] + r * Math.sin(a1)], b: [d[0] + r * Math.cos(a2), d[1] + r * Math.sin(a2)], w: 0.35 }); } }
     texts.push({ p: g.label.p, s: g.label.s, h: 2.2, rot: 0 }); }
-  for (const m of M.marks || []) { const c = PR({ x0: m.p[0], y0: m.p[1], x: m.p[0], y: m.p[1] }); const r = 0.12;
+  for (const m of (M.marks || []).filter(x => x.type === 'rlab')) { const c = PR({ x0: m.p[0], y0: m.p[1], x: m.p[0], y: m.p[1] });
+    if (m.num) texts.push({ p: [c[0], c[1] + 0.2], s: '№ ' + m.num, h: 2.6, rot: 0, layer: 'NOMERA_POM' }); if (m.name) texts.push({ p: [c[0], c[1] - 0.2], s: m.name, h: 2.2, rot: 0, layer: 'NOMERA_POM' }); }
+  for (const m of (M.marks || []).filter(x => x.type !== 'rlab')) { const c = PR({ x0: m.p[0], y0: m.p[1], x: m.p[0], y: m.p[1] }); const r = 0.12;
     if (m.type === 'scan') { const v = [0, 1, 2].map(i => { const a = Math.PI / 2 + i * 2 * Math.PI / 3; return [c[0] + Math.cos(a) * r * 1.2, c[1] + Math.sin(a) * r * 1.2]; }); for (let i = 0; i < 3; i++) extra.push({ a: v[i], b: v[(i + 1) % 3], w: 0.25, layer: 'FOTO_SKAN' }); }
     else { const q = [[-r, -r * 0.7], [r, -r * 0.7], [r, r * 0.7], [-r, r * 0.7]].map(d => [c[0] + d[0], c[1] + d[1]]); for (let i = 0; i < 4; i++) extra.push({ a: q[i], b: q[(i + 1) % 4], w: 0.25, layer: 'FOTO_SKAN' }); }
     if (m.dir != null) { const t0 = PR({ x0: m.p[0] + Math.cos(m.dir), y0: m.p[1] + Math.sin(m.dir), x: m.p[0] + Math.cos(m.dir), y: m.p[1] + Math.sin(m.dir) }); const a = Math.atan2(t0[1] - c[1], t0[0] - c[0]), L = 0.55, tip = [c[0] + Math.cos(a) * L, c[1] + Math.sin(a) * L];
