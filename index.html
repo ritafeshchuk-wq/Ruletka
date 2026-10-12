@@ -211,10 +211,11 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 #selbox .sb-h{font-weight:700}#selbox .row{display:flex;flex-wrap:wrap;gap:6px}#selbox button{min-height:40px}
 #trail{position:absolute;left:8px;top:8px;bottom:8px;display:flex;flex-direction:column;gap:4px;overflow-y:auto;z-index:6;padding:4px;background:rgba(27,36,48,.88);border-radius:14px;scrollbar-width:none;width:66px}
 #trail::-webkit-scrollbar{display:none}
-#trail button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:3px 2px;min-height:36px;max-height:56px;border:0;border-radius:10px;background:transparent;color:#E7ECF2;font-size:10.5px;line-height:1.1;flex:1 1 0}
+#trail button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:3px 2px;min-height:33px;max-height:56px;border:0;border-radius:10px;background:transparent;color:#E7ECF2;font-size:10.5px;line-height:1.1;flex:1 1 0}
 @media (max-height:700px){#trail button i{font-size:17px!important}#trail{gap:2px}}
 #trail button i{font-style:normal;font-size:20px;line-height:1}
 #trail button.on{background:var(--tape,#E3A21A);color:#1B2430}
+#trail button.del{color:#ff8a80;border-top:1px solid rgba(255,255,255,.12);border-radius:0 0 10px 10px}#trail button.del.on{background:#C4372F;color:#fff}
 #mcard{position:absolute;top:8px;left:calc(50% + 37px);transform:translateX(-50%);width:min(440px,calc(100% - 100px));z-index:6;background:#fff;border:2px solid var(--line);border-radius:14px;box-shadow:0 6px 20px rgba(15,23,36,.18);padding:8px 10px;display:flex;flex-direction:column;gap:6px}
 #mcard.wait{border-color:var(--tape,#E3A21A);background:#FFFBF1}#mcard.got{border-color:#1E8A55}
 #mcard.idle{padding:5px 8px;opacity:.94}
@@ -260,7 +261,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 3.9 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 4.0 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -2920,11 +2921,22 @@ function zipStore(name, bytes) {
   const end = new DataView(new ArrayBuffer(22)); [[0, 0x06054b50, 4], [4, 0, 2], [6, 0, 2], [8, 1, 2], [10, 1, 2], [12, cdLen, 4], [16, cdOff, 4], [20, 0, 2]].forEach(([o, v, z]) => z === 4 ? end.setUint32(o, v, true) : end.setUint16(o, v, true));
   return new Blob([lh, nm, bytes, ch, nm, end], { type: 'application/zip' });
 }
+// окно «файл готов» — нажатие на кнопку даёт системное окно сохранения (там выбирается папка и создаётся новая)
+async function saveFileDialog(name, data, type, title) {
+  const txt = IOS ? 'Нажмите «Сохранить в Файлы…» → в окне «Поделиться» выберите «Сохранить в Файлы» → выберите папку (новая папка — значок папки с «+» вверху) → «Сохранить». Если файл с таким именем уже есть — «Заменить».'
+    : 'Нажмите «Сохранить…» — откроется окно, где можно выбрать папку или создать новую.';
+  const k = await ask3(title, `«${name}». ${txt}`, [['save', IOS ? '💾 Сохранить в Файлы…' : '💾 Сохранить…', 'pri'], ['no', 'Отмена', '']]);
+  if (k === 'save') await download(name, data, type);
+}
 async function download(name, data, type) {
   if (DLCAP) {
     let blob = data instanceof Blob ? data : new Blob([data], { type });
     if (!/\.(json|txt|csv|pdf|svg|png|jpg|html|zip|md)$/i.test(name)) { blob = zipStore(name, new Uint8Array(await blob.arrayBuffer())); name = name.replace(/\.[^.]+$/, '') + '.zip'; }
     DLCAP.save({ filename: name, data: blob }).catch(e => stat('Файл не сохранён: ' + (e && (e.message || e.code) || e))); return; }
+  if (!IOS && window.showSaveFilePicker) { // компьютер (Chrome/Edge): своё окно с выбором папки и «Новая папка»
+    try { const ext = (name.match(/\.([^.]+)$/) || [, 'bin'])[1]; const h = await window.showSaveFilePicker({ suggestedName: name, types: [{ description: ext.toUpperCase(), accept: { [type || 'application/octet-stream']: ['.' + ext] } }] });
+      const w = await h.createWritable(); await w.write(data instanceof Blob ? data : new Blob([data], { type })); await w.close(); stat('Сохранено: ' + h.name); return; }
+    catch (e) { if (e && e.name === 'AbortError') return; } }
   if (IOS) { try { const f = new File([data], name, { type: type || 'application/octet-stream' }); if (navigator.canShare && navigator.canShare({ files: [f] })) { navigator.share({ files: [f], title: name }).catch(e => { if (!/abort|cancel/i.test(e && e.message || '')) stat('Не удалось передать файл: ' + (e && e.message || e)); }); return; } } catch (e) { } }
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data], { type })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
@@ -4118,7 +4130,7 @@ function buildProject() {
 function saveProjectFile() {
   const proj = buildProject(); proj.pid = AS.pid; proj.pname = AS.pname;
   if (proj.tape && proj.tape.U && U.src && U.src.bytes) { let bs = ''; const u = U.src.bytes; for (let i = 0; i < u.length; i += 32768) bs += String.fromCharCode.apply(null, u.subarray(i, i + 32768)); proj.tape.U.srcB64 = btoa(bs); proj.tape.U.srcKind = U.src.kind; }
-  download((AS.pname || S.sheetOpt.info.object || 'проект').replace(/[\\/:*?"<>|]/g, '_') + '.scanplan.json', JSON.stringify(proj), 'application/json');
+  const js = JSON.stringify(proj); saveFileDialog((AS.pname || S.sheetOpt.info.object || 'проект').replace(/[\\/:*?"<>|]/g, '_') + '.scanplan.json', js, 'application/json', `Файл проекта готов: ${(js.length / 1048576).toFixed(1)} МБ`);
   AS.fileAt = Date.now(); showAS();
 }
 $('#bSave').onclick = () => {
@@ -5201,6 +5213,7 @@ function tapeDown(e, w) {
   }
   if (t === 'drag') { if (grabAt(w, 0, 0, true)) return; else if (U.img && e.shiftKey) { T.dragU = { w0: w, tx: U.tx, ty: U.ty }; } return; }
   if (t === 'select') { if (!tapeMenu(w, e.clientX, e.clientY)) { T.sel = null; renderTape(); } return; }
+  if (t === 'erase') { eraseAt(w); return; }
   if (T.pending && T.pending.got == null && t !== 'online') { stat('Сначала выполните замер ' + pendLabel(T.pending) + ' (или Esc — пропустить)'); return; }
   if (t === 'walk') {
     let p = e.altKey ? null : nearestPoint(w);
@@ -5327,6 +5340,20 @@ function tapeUp() { if (T.dragMark) { T.dragMark = null; asSoon(); draw(); }
   if (T.dragPt) T.snapG = null;
   if (T.mk) { const k = T.mk; T.mk = null; const L = Math.hypot(k.q[0] - k.p[0], k.q[1] - k.p[1]) * S.view.s; const dir = L > 18 ? Math.atan2(k.q[1] - k.p[1], k.q[0] - k.p[0]) : null; addMark(k.type, k.p, dir); return; } if (T.box) { const b = T.box; T.box = null; const big = Math.hypot(b.w1[0] - b.w0[0], b.w1[1] - b.w0[1]) * S.view.s > 15;
     if (big) { const x0 = Math.min(b.w0[0], b.w1[0]), x1 = Math.max(b.w0[0], b.w1[0]), y0 = Math.min(b.w0[1], b.w1[1]), y1 = Math.max(b.w0[1], b.w1[1]); selectPts(M.pts.filter(p => { const q = PX(p); return q[0] >= x0 && q[0] <= x1 && q[1] >= y0 && q[1] <= y1; }).map(p => p.id)); T.selRect = T.selSet ? [x0, y0, x1, y1] : null; } else { tapSelect(b.w0); } return; } if (T.dragNote) { T.dragNote = null; asSoon(); renderTape(); draw(); } if (T.dragPt || T.dragU) { asSoon(); T.dragPt = null; T.dragOff = null; T.dragU = null; renderTape(); draw(); } }
+function railDelete() {
+  if (T.selSet && T.selSet.size) { selDelete(); return; }
+  if (T.sel) { tapeDelete(); closeTapeMenu(); draw(); stat('Удалено. «↶ Отменить» — вернуть.'); return; }
+  if (T.tool === 'erase') { setTapeTool('walk'); stat('Ластик выключен.'); return; }
+  setTapeTool('erase'); stat('Ластик: коснитесь того, что удалить — точки, стены, размера, люка, выноски, фото. Выключить — снова «Удалить» или любой инструмент.');
+}
+function eraseAt(w) {
+  const h = hitTape(w); if (!h) { stat('Здесь нечего удалить — коснитесь точки, линии, размера или значка.'); return; }
+  if (h.obj && h.obj.type === 'hatch') { tPush(); const o = h.obj, ids = new Set(o.ids); M.objs = M.objs.filter(x => x !== o); M.pts = M.pts.filter(p => !ids.has(p.id)); M.edges = M.edges.filter(e => !ids.has(e.a) && !ids.has(e.b)); M.meas = M.meas.filter(m => ![m.a, m.b, m.c, m.d, m.p].some(id => ids.has(id))); markObjEdges(); adjust(); renderTape(); draw(); stat('Люк удалён. «↶ Отменить» — вернуть.'); return; }
+  if (h.edge) { tPush(); const e = h.edge; M.edges = M.edges.filter(x => x !== e); M.meas = M.meas.filter(m => !(m.type === 'dist' && ((m.a === e.a && m.b === e.b) || (m.a === e.b && m.b === e.a)))); adjust(); renderTape(); draw(); stat('Стена и её размер удалены. «↶ Отменить» — вернуть.'); return; }
+  T.sel = h.mark ? { mark: h.mark } : h.note ? { note: h.note } : h.pt ? { pt: h.pt } : h.meas ? { meas: h.meas } : h.obj ? { obj: h.obj } : null;
+  if (!T.sel) return; const what = h.mark ? 'Отметка' : h.note ? 'Выноска' : h.pt ? 'Точка ' + pname(h.pt.id) : h.meas ? 'Размер' : 'Объект';
+  tapeDelete(); draw(); stat(what + ' удалена. «↶ Отменить» — вернуть.');
+}
 function tapeDelete() {
   if (!T.sel) return; tPush();
   if (T.sel.pt) {
@@ -5562,7 +5589,7 @@ function drawTape() {
 }
 
 // ---------- panel ----------
-const TTOOLS = [['walk', 'Обход', 'щёлкайте углы по порядку; каждый отрезок ждёт замер. Щелчок по первой точке замыкает помещение. Alt — новая точка без привязки к соседним'],
+const TTOOLS = [['erase', 'Удалить (ластик)', 'коснитесь того, что удалить: точки, стены, размера, люка или объекта, выноски, фото. Ошиблись — «↶ Отменить»'], ['walk', 'Обход', 'щёлкайте углы по порядку; каждый отрезок ждёт замер. Щелчок по первой точке замыкает помещение. Alt — новая точка без привязки к соседним'],
   ['meas', 'Замер / диагональ', 'щёлкните две существующие точки — между ними будет замер (диагональ, привязка через проём)'],
   ['online', 'Точка на стене', 'щелчок по стене ставит точку на её прямой (откос, угол проёма); замер идёт от начала стены'],
   ['open', 'Дверь / окно', 'коснитесь отрезка стены — он весь станет дверью; или коснитесь двух точек — краёв проёма (любых). Касание по двери: повернуть (4 положения) → окно → пустой проём → стена'],
@@ -5589,7 +5616,9 @@ function renderTape() {
   const TSHORT = { walk: 'Обход', meas: 'Замер', online: 'На стене', open: 'Дверь', thick: 'Толщина', room: 'Помещ.', obj: 'Объект', hatch: 'Люк', note: 'Выноска', photo: 'Фото', scan: 'Скан', rlab: '№ пом.', box: 'Выделить', drag: 'Двигать', select: 'Правка' };
   // панель инструментов на чертеже — всегда под рукой
   let rail = document.getElementById('trail'); if (!rail) { rail = document.createElement('div'); rail.id = 'trail'; $('#main').appendChild(rail); }
-  rail.innerHTML = TTOOLS.map(t => `<button data-tt="${t[0]}" class="${T.tool === t[0] ? 'on' : ''}" title="${escH(t[1] + ': ' + t[2])}"><i>${TICON[t[0]] || '•'}</i><span>${TSHORT[t[0]] || t[1]}</span></button>`).join('');
+  rail.innerHTML = TTOOLS.filter(t => t[0] !== 'erase').map(t => `<button data-tt="${t[0]}" class="${T.tool === t[0] ? 'on' : ''}" title="${escH(t[1] + ': ' + t[2])}"><i>${TICON[t[0]] || '•'}</i><span>${TSHORT[t[0]] || t[1]}</span></button>`).join('')
+    + `<button data-act="del" class="del ${T.tool === 'erase' ? 'on' : ''}" title="Удалить выделенное; если ничего не выделено — ластик: касание удаляет"><i>🗑</i><span>Удалить</span></button>`;
+  { const db = rail.querySelector('[data-act="del"]'); if (db) db.onclick = railDelete; }
   let pb = document.getElementById('pgbar');
   if (U.img && (U.pages > 1)) { if (!pb) { pb = document.createElement('div'); pb.id = 'pgbar'; $('#main').appendChild(pb); }
     const n = U.srcPage || 1, done = Object.keys(PGS.data).filter(k => pgHas(+k)).length;
@@ -5677,14 +5706,23 @@ function pdfKit() {
   PDFK = { L: window.PDFLib, font: window.opentype.parse(u8.buffer) }; return PDFK;
 }
 async function exportOverlayPdf() {
-  const pages = (U.src && U.src.kind === 'pdf') ? pagesWithWork() : [U.srcPage || 1]; const curPg = U.srcPage || 1;
-  if (!M.pts.length && !pages.some(n => pgHas(n))) { uiAlert('Пока нечего сохранять: нет ни одной точки.'); return; }
+  const isPdf = !!(U.src && U.src.kind === 'pdf'); if (isPdf) await ensurePdf();
+  const work = isPdf ? pagesWithWork().filter(n => pgHas(n) || (n === U.srcPage && M.pts.length)) : [U.srcPage || 1]; const curPg = U.srcPage || 1;
+  if (!M.pts.length && !work.length) { uiAlert('Пока нечего сохранять: нет ни одной точки.'); return; }
+  let pages = work.length ? work : [curPg];
+  if (isPdf && U.pages > 1 && pages.length < U.pages) {
+    const k = await ask3('Какие листы сохранить в PDF?', `В исходном PDF листов: ${U.pages}, с замерами: ${work.length ? work.join(', ') : 'нет'}. Всё сохранится одним файлом.`, [['all', `Все ${U.pages} листов одним файлом`, 'pri'], ['work', `Только с замерами (${work.length})`, ''], ['stay', 'Отмена', '']]);
+    if (k === 'stay') return; if (k === 'all') pages = Array.from({ length: U.pages }, (_, i) => i + 1); }
+  const withWork = new Set(work);
   busy('Готовлю PDF…'); AS.hold = (AS.hold || 0) + 1; let held = true;
   const back = () => { if (pages.length > 1 || pages[0] !== curPg) { loadPageModel(curPg); const d = PGS.data[curPg]; if (d && d.u) Object.assign(U, { s: d.u.s, rot: d.u.rot, tx: d.u.tx, ty: d.u.ty, ptPerPx: d.u.ptPerPx, pw: d.u.pw, ph: d.u.ph }); U.srcPage = curPg; adjust(); draw(); } };
   try {
     const { L: PL, font } = pdfKit(); const { PDFDocument, rgb, degrees, pushGraphicsState, popGraphicsState, concatTransformationMatrix, drawObject } = PL;
     const doc = await PDFDocument.create(); doc.setTitle((U.name || 'Обмер') + ' — замеры'); doc.setCreator('Рулетка · © d1sco'); doc.setProducer('Рулетка');
+    const srcDoc = isPdf ? await PDFDocument.load(U.src.bytes, { ignoreEncryption: true }) : null; let nDone = 0;
     for (const pg of pages) {
+      busy(`Готовлю PDF… лист ${++nDone} из ${pages.length}`);
+      if (srcDoc && !withWork.has(pg)) { const [cp] = await doc.copyPages(srcDoc, [pg - 1]); doc.addPage(cp); continue; } // лист без замеров — как в исходнике
       if (pages.length > 1 || pg !== curPg) { loadPageModel(pg); const d = PGS.data[pg]; if (d && d.u) Object.assign(U, { s: d.u.s, rot: d.u.rot, tx: d.u.tx, ty: d.u.ty, ptPerPx: d.u.ptPerPx, pw: d.u.pw, ph: d.u.ph }); U.srcPage = pg; adjust(); }
       await (async () => {
     let W, H, toPt, page;
@@ -5695,9 +5733,9 @@ async function exportOverlayPdf() {
       let drawn = false;
       if (U.src && U.src.kind === 'pdf') {
         try {
-          const src = await PDFDocument.load(U.src.bytes, { ignoreEncryption: true }); const pi = (U.srcPage || 1) - 1;
+          const src = srcDoc; const pi = (U.srcPage || 1) - 1;
           const [emb] = await doc.embedPdf(src, [pi]); const mb = src.getPage(pi).getMediaBox();
-          const pj = await pdfjsLib.getDocument({ data: U.src.bytes.slice(0) }).promise; const vp = (await pj.getPage(pi + 1)).getViewport({ scale: 1 });
+          const vp = (await U.pdf.getPage(pi + 1)).getViewport({ scale: 1 });
           const sx = W / vp.width, sy = H / vp.height; const [a, b, c, d, e, f] = vp.transform;
           let m = [a * sx, -b * sy, c * sx, -d * sy, e * sx, H - f * sy];
           m = [m[0], m[1], m[2], m[3], m[0] * mb.x + m[2] * mb.y + m[4], m[1] * mb.x + m[3] * mb.y + m[5]];
@@ -5828,8 +5866,9 @@ async function exportOverlayPdf() {
     }
     back(); AS.hold--; held = false;
     const bytes = await doc.save();
-    busy(''); download(((AS.pname || U.name || 'Обмер').replace(/\.[^.]+$/, '').replace(/[\\/:*?"<>|]/g, '_')) + '_замеры.pdf', bytes, 'application/pdf');
-    stat(`PDF готов: ${pages.length > 1 ? 'листов ' + pages.length + ' (' + pages.join(', ') + '), ' : ''}подложка в исходном качестве, замеры поверх — векторные.`);
+    busy(''); const fname = ((AS.pname || U.name || 'Обмер').replace(/\.[^.]+$/, '').replace(/[\\/:*?"<>|]/g, '_')) + '_замеры.pdf';
+    stat(`PDF готов: листов ${pages.length}${work.length && pages.length > 1 ? ' (с замерами: ' + work.join(', ') + ')' : ''}, подложка в исходном качестве, замеры поверх — векторные.`);
+    await saveFileDialog(fname, bytes, 'application/pdf', `PDF готов: ${pages.length === 1 ? '1 лист' : 'листов ' + pages.length}, ${(bytes.length / 1048576).toFixed(1)} МБ`);
   } catch (e) { busy(''); console.error(e); uiAlert('Не удалось сделать PDF: ' + (e.message || e)); }
   finally { if (held) { back(); AS.hold = Math.max(0, (AS.hold || 1) - 1); asSoon(); } }
 }
