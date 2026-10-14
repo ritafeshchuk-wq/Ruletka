@@ -269,7 +269,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 4.6 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 4.7 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -4388,7 +4388,7 @@ async function projCreate(name, keepWork) {
 }
 function showProjName() { const el = $('#projName'); if (el) el.textContent = AS.pname || ''; }
 function resetWork() {
-  Object.assign(M, { axis: null, snap90: true, pts: [], meas: [], edges: [], rooms: [], chains: [], objs: [], notes: [], marks: [], lastNum: {}, nextId: 1, nextMeas: 1, cond: false, scaleFit: false, scaleAsked: false });
+  Object.assign(M, { axis: null, snap90: true, pts: [], meas: [], edges: [], rooms: [], chains: [], objs: [], notes: [], marks: [], lastNum: {}, nextId: 1, nextMeas: 1, cond: false, scaleFit: false, scaleAsked: false, zoomLog: [] });
   Object.assign(U, { img: null, pdf: null, pages: 0, page: 1, name: '', src: null, ptPerPx: null, srcPage: 1, _imgKey: null, _imgKeyFor: null, _imgSaved: false, _srcKey: null, _data: null, _dataFor: null, mip: null, mipSrc: null, pdfPage: null, s: 0.01, rot: 0, tx: 0, ty: 0 });
   Object.assign(T, { mk: null, dragMark: null, dragSel: null, dragEdge: null, snapG: null, selSet: null, box: null, noteTip: null, undo: [], redo: [], pending: null, chain: null, sel: null, buffer: null, objIds: null, roomIds: null, mA: null, tA: null, fitted: false });
   PGS.data = {}; AS.last = ''; AS.savedAt = 0; AS.epoch = (AS.epoch || 0) + 1;
@@ -5053,10 +5053,10 @@ function showSelBox() {
 }
 // ---------- несколько листов одного PDF в одном проекте ----------
 const PGS = { data: {} };
-const MKEYS = ['pts', 'meas', 'edges', 'rooms', 'chains', 'objs', 'notes', 'marks', 'lastNum', 'nextId', 'nextMeas', 'cond', 'axis', 'snap90', 'scaleFit', 'scaleAsked', 'ortho'];
+const MKEYS = ['pts', 'meas', 'edges', 'rooms', 'chains', 'objs', 'notes', 'marks', 'lastNum', 'nextId', 'nextMeas', 'cond', 'axis', 'snap90', 'scaleFit', 'scaleAsked', 'ortho', 'zoomLog'];
 function savePage() { if (!U.img || !U.srcPage || AS.hold) return; const m = {}; MKEYS.forEach(k => m[k] = M[k]); PGS.data[U.srcPage] = { m: JSON.stringify(m), u: { s: U.s, rot: U.rot, tx: U.tx, ty: U.ty, alpha: U.alpha, ptPerPx: U.ptPerPx, pw: U.pw || (U.img && U.img.width), ph: U.ph || (U.img && U.img.height) } }; }
 function pgHas(n) { const d = PGS.data[n]; if (!d) return false; try { return JSON.parse(d.m).pts.length > 0; } catch (e) { return false; } }
-function loadPageModel(pg) { const d = PGS.data[pg]; Object.assign(M, { pts: [], meas: [], edges: [], rooms: [], chains: [], objs: [], notes: [], marks: [], nextId: 1, nextMeas: 1, axis: null, scaleFit: false, scaleAsked: false }); if (d) { Object.assign(M, JSON.parse(d.m)); } M.objs = M.objs || []; M.notes = M.notes || []; M.marks = M.marks || []; markObjEdges(); return d; }
+function loadPageModel(pg) { const d = PGS.data[pg]; Object.assign(M, { pts: [], meas: [], edges: [], rooms: [], chains: [], objs: [], notes: [], marks: [], nextId: 1, nextMeas: 1, axis: null, scaleFit: false, scaleAsked: false, zoomLog: [] }); if (d) { Object.assign(M, JSON.parse(d.m)); } M.objs = M.objs || []; M.notes = M.notes || []; M.marks = M.marks || []; markObjEdges(); return d; }
 async function ensurePdf() { if (U.pdf || !U.src || U.src.kind !== 'pdf') return !!U.pdf; U.pdf = await pdfjsLib.getDocument({ data: U.src.bytes.slice(0) }).promise; U.pages = U.pdf.numPages; try { U.titles = await pdfTitles(U.pdf); } catch (e) { } return true; }
 async function switchPage(pg) {
   if (!(await ensurePdf())) return; if (pg === U.srcPage) return;
@@ -5093,13 +5093,13 @@ function askRoomLabel(num, name, title) {
 }
 async function addRoomLabel(p) {
   draw(); const v = await askRoomLabel(nextNum('rlab'), '', 'Номер и название помещения'); if (!v) { draw(); return; }
-  tPush(); (M.marks = M.marks || []).push({ id: (M.marks || []).reduce((m, x) => Math.max(m, x.id), 0) + 1, type: 'rlab', p: p.slice(), dir: null, num: v.num, name: v.name });
+  tPush(); zoomNote(); (M.marks = M.marks || []).push({ id: (M.marks || []).reduce((m, x) => Math.max(m, x.id), 0) + 1, type: 'rlab', p: p.slice(), dir: null, num: v.num, name: v.name });
   M.lastNum = M.lastNum || {}; if (v.num) M.lastNum.rlab = v.num; draw(); renderTape(); stat(`Помещение ${rlabText(v)} подписано. Коснитесь следующего — номер подставится следующий.`);
 }
 function nextNum(type) { const l = (M.lastNum || {})[type]; if (l == null) return ''; const m = String(l).match(/^(.*?)(\d+)(\D*)$/); return m ? m[1] + String(+m[2] + 1).padStart(m[2].length, '0') + m[3] : ''; }
 async function addMark(type, p, dir) {
   draw(); const v = await uiAsk(`Номер ${type === 'photo' ? 'фото' : 'скана'}:`, nextNum(type)); if (v == null || !String(v).trim()) { draw(); return; }
-  tPush(); const num = String(v).trim(); (M.marks = M.marks || []).push({ id: (M.marks || []).reduce((m, x) => Math.max(m, x.id), 0) + 1, type, p: p.slice(), dir, num });
+  tPush(); zoomNote(); const num = String(v).trim(); (M.marks = M.marks || []).push({ id: (M.marks || []).reduce((m, x) => Math.max(m, x.id), 0) + 1, type, p: p.slice(), dir, num });
   M.lastNum = M.lastNum || {}; M.lastNum[type] = num; draw(); renderTape(); stat(`${MKN[type]} ${num} отмечено${dir == null ? '' : ' с направлением'}. Следующее — тем же движением.`);
 }
 function markAt(sx, sy) { for (const r of (T.markRects || []).slice().reverse()) if (r.rw ? Math.abs(sx - r.x) < r.rw + 4 && Math.abs(sy - r.y) < r.rh + 4 : Math.hypot(sx - r.x, sy - r.y) < 18) return r.m; return null; }
@@ -5353,9 +5353,10 @@ function makePending(p) { // p: {type, a,b,(c,d), approx}
   if (T.buffer && Date.now() - T.buffer.t < 120000) { p.got = T.buffer.v; T.buffer = null; if (T.auto) return acceptPending(); }
   renderTape();
 }
+function zoomNote() { try { const z = S.view && S.view.s; if (!(z > 0)) return; const zz = Math.round(z * 100) / 100; (M.zoomLog = M.zoomLog || []).push(zz); if (M.zoomLog.length > 40) M.zoomLog.splice(0, M.zoomLog.length - 40); (T.zoomAll = T.zoomAll || []).push(zz); if (T.zoomAll.length > 80) T.zoomAll.shift(); } catch (e) { } }
 function acceptPending() {
   const p = T.pending; if (!p || p.got == null) return;
-  tPush();
+  tPush(); zoomNote();
   if (p.type === 'dist') M.meas.push({ id: M.nextMeas++, type: 'dist', a: p.a, b: p.b, v: p.got, on: true, src: T.last && T.last.src, ...(p.prom ? { prom: true } : {}) });
   else if (p.type === 'thick') {
     const A = PX(ptById(p.a)), B = PX(ptById(p.b)), C = PX(ptById(p.c));
@@ -5461,7 +5462,7 @@ function tapeDown(e, w) {
     if (!T.noteTip) { const p = nearestPoint(w); T.noteTip = { tip: p ? PX(p) : w.slice(), pt: p ? p.id : null }; stat('Теперь коснитесь места, где будет текст (в ту же точку — подпись без стрелки)'); draw(); renderTape(); return; }
     const tp = T.noteTip; T.noteTip = null; const same = Math.hypot(w[0] - tp.tip[0], w[1] - tp.tip[1]) * S.view.s < 12;
     const n = { id: (M.notes || []).reduce((m, x) => Math.max(m, x.id), 0) + 1, at: w.slice(), tip: same ? null : tp.tip, pt: same ? null : tp.pt, text: '', arrow: !same };
-    uiAsk('Текст выноски (« / » — новая строка):', '').then(v => { if (!v || !v.trim()) { draw(); renderTape(); return; } tPush(); n.text = v.trim(); (M.notes = M.notes || []).push(n); draw(); renderTape(); stat('Выноска добавлена. Долгое нажатие на неё — изменить или удалить; пальцем — передвинуть.'); });
+    uiAsk('Текст выноски (« / » — новая строка):', '').then(v => { if (!v || !v.trim()) { draw(); renderTape(); return; } tPush(); zoomNote(); n.text = v.trim(); (M.notes = M.notes || []).push(n); draw(); renderTape(); stat('Выноска добавлена. Долгое нажатие на неё — изменить или удалить; пальцем — передвинуть.'); });
     return;
   }
   if (t === 'hatch') {
@@ -5856,8 +5857,8 @@ function renderTape() {
   <div class="chk"><input type="checkbox" id="auto" ${T.auto ? 'checked' : ''}><label for="auto">Принимать замер с DISTO сразу, без «Принять»</label></div>
   <div class="chk"><input type="checkbox" id="orth" ${M.ortho !== false ? 'checked' : ''}><label for="orth">Углы около 90° считать прямыми</label></div>
   <p class="hint" style="margin-bottom:2px">Размер подписей и значков в PDF:</p>
-  <div class="row seg2">${Object.entries(PDFSZ).map(([k, v]) => `<button data-pdfsz="${k}" class="${pdfSz() === k ? 'on' : ''}">${k === 's' ? 'Мелко' : v.t}</button>`).join('')}</div>
-  <p class="hint">${pdfSz() === 's' ? 'Как на экране: подписи мелкие, в масштабе чертежа, ничего не закрывают — для чтения увеличьте лист.' : 'Подписи крупнее, чем на экране, — удобно для печати мелкого масштаба.'}</p>
+  <div class="row seg2">${Object.entries(PDFSZ).map(([k, v]) => `<button data-pdfsz="${k}" class="${pdfSz() === k ? 'on' : ''}">${v.t}</button>`).join('')}</div>
+  <p class="hint">${pdfSz() === 's' ? 'Подписи в PDF такого же размера относительно чертежа, как на экране при том увеличении, на котором вы мерили.' : 'Подписи крупнее, чем на экране, — удобно для печати мелкого масштаба.'}</p>
   </details>
   <details><summary>Помещения и замеры (${M.rooms.length} / ${M.meas.filter(m => m.type !== 'line' && m.type !== 'angle' && m.type !== 'right').length}) · невязка <b class="${(R.maxR || 0) > 0.015 ? 'bad' : (R.maxR || 0) > 0.005 ? 'warn' : 'ok'}">${Math.round((R.maxR || 0) * 1000)} мм</b></summary>
   ${M.rooms.map(Rm => { const i = TAPE.roomInfo(M, Rm); return `<div class="item" data-room="${Rm.num}"><input type="text" value="${escH(Rm.name)}" data-rn="${Rm.num}" style="width:120px">${Rm.num}<span class="q ${i.diags < i.need ? 'warn' : 'ok'}">${SHEET.fmtArea(i.area)} м² · стороны ${i.sides}/${i.k} · диаг. ${i.diags}${i.diags < i.need ? ' (нужно ' + i.need + ')' : ''}</span></div>`; }).join('')}
@@ -5907,7 +5908,7 @@ function pdfKit() {
   const b = atob(document.getElementById('fontb64').textContent.trim()), u8 = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u8[i] = b.charCodeAt(i);
   PDFK = { L: window.PDFLib, font: window.opentype.parse(u8.buffer) }; return PDFK;
 }
-const PDFSZ = { s: { m: 0.12, t: 'Мелко — как на экране' }, m: { m: 0.2, t: 'Средне' }, l: { m: 0.35, t: 'Крупно' } };
+const PDFSZ = { s: { m: 1, t: 'Как на экране' }, m: { m: 1.6, t: 'Крупнее' }, l: { m: 2.5, t: 'Крупно' } };
 function pdfSz() { try { return localStorage.getItem('rul_pdfsz') || 's'; } catch (e) { return 's'; } }
 async function exportOverlayPdf(opt = {}) {
   const isPdf = !!(U.src && U.src.kind === 'pdf'); if (isPdf) await ensurePdf();
@@ -5974,7 +5975,10 @@ async function exportOverlayPdf(opt = {}) {
     const lens = M.edges.map(e => { const A = ptById(e.a), B = ptById(e.b); if (!A || !B) return 0; const a = P2(A), b = P2(B); return Math.hypot(b[0] - a[0], b[1] - a[1]); }).filter(v => v > 0).sort((a, b) => a - b);
     // размер подписей — в метрах на местности, как в программе: мелко и в масштабе чертежа (увеличиваете лист — читаете)
     const med = lens.length ? lens[Math.floor(lens.length / 2)] : 100, o0 = toPt(0, 0), o1 = toPt(1, 0), ppm = Math.hypot(o1[0] - o0[0], o1[1] - o0[1]) || 28;
-    const fs = Math.max(0.6, Math.min(11, med * 0.1, ppm * (PDFSZ[pdfSz()] || PDFSZ.s).m)); const lw = Math.max(0.06, fs * 0.09);
+    // как на экране: подпись на экране 12 px при том увеличении, на котором вы работаете (медиана по замерам) → те же метры на листе
+    const zl = ((M.zoomLog && M.zoomLog.length ? M.zoomLog : T.zoomAll) || []).slice().sort((a, b) => a - b), zw = zl.length ? zl[Math.floor(zl.length / 2)] : null;
+    const fsM = Math.max(0.06, Math.min(0.8, zw ? 13.5 / zw : 0.22)); void med;
+    const fs = Math.max(0.6, Math.min(16, ppm * fsM * (PDFSZ[pdfSz()] || PDFSZ.s).m)); const lw = Math.max(0.06, fs * 0.09);
     const sc = (x, d) => { const c = x && x.st && x.st.c; if (!c) return d; const n = parseInt(c.slice(1), 16); return rgb(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255); };
     const RED = rgb(0.80, 0.02, 0.10), BLUE = rgb(0.05, 0.25, 0.75), VIO = rgb(0.42, 0.20, 0.72), GRN = rgb(0.05, 0.55, 0.25), GRY = rgb(0.45, 0.48, 0.52);
     const text = (str, p, size, col, ang = 0, anchor = 'c') => { // вектор: буквы контурами, без встраивания шрифта
