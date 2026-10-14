@@ -134,6 +134,7 @@ body.touch #steps li{padding:10px 6px 8px}
 #tmenu .tm-h{font-weight:600;font-size:13px;padding:6px 10px 8px;border-bottom:1px solid var(--line);margin-bottom:4px}
 #tmenu button{border:0;text-align:left;padding:10px 12px;border-radius:8px;font-size:14px;background:transparent}
 #tmenu button:hover{background:var(--soft)}
+.holdveil{position:fixed;inset:0;z-index:900;background:rgba(255,255,255,.01);cursor:progress}
 #tmenu .tm-st{padding:6px 8px 8px;border-bottom:1px solid var(--line);margin-bottom:4px;display:flex;flex-direction:column;gap:8px}
 #tmenu .tm-st-r{display:flex;align-items:center;gap:8px}#tmenu .tm-st-r input{flex:1;accent-color:#1f6feb;height:28px}
 #tmenu .tm-st-r .a1{font-size:11px;font-weight:700}#tmenu .tm-st-r .a2{font-size:19px;font-weight:700}#tmenu .tm-st-r b{min-width:42px;text-align:right;font-size:13px;font-variant-numeric:tabular-nums}
@@ -269,7 +270,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 4.7 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 4.8 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -4238,18 +4239,25 @@ function showAS() {
 async function packProj() {
   const proj = buildProject(); const d = proj.tape && proj.tape.U && proj.tape.U.data;
   if (d && d.url) { if (U._imgKeyFor !== U.img) { U._imgKey = 'img:' + Date.now(); U._imgKeyFor = U.img; U._imgSaved = false; }
-    if (!U._imgSaved) { const ok = await asPutK(U._imgKey, d.url); if (!ok) return null; U._imgSaved = true; }
-    proj.tape.U.data = { k: d.k, ref: U._imgKey }; }
+    const key = U._imgKey, forImg = U._imgKeyFor;
+    if (!U._imgSaved) { const ok = await asPutK(key, d.url); if (!ok) return null; if (U._imgKeyFor === forImg) U._imgSaved = true; }
+    proj.tape.U.data = { k: d.k, ref: key }; }
   if (U.src && proj.tape && proj.tape.U) { if (!U._srcKey) { const key = 'src:' + Date.now(); if (await asPutK(key, U.src)) U._srcKey = key; } if (U._srcKey) proj.tape.U.srcRef = U._srcKey; }
   return JSON.stringify(proj);
 }
 async function unpackProj(txt) {
   const j = JSON.parse(txt); const d = j.tape && j.tape.U && j.tape.U.data;
-  if (d && d.ref && !d.url) { const url = await asGetK(d.ref); if (url && url !== true) d.url = url; else j.tape.U = null; }
-  if (j.tape && j.tape.U && j.tape.U.srcRef) { const so = await asGetK(j.tape.U.srcRef); if (so && so.bytes) j.tape.U.srcObj = so; }
+  const rd = async k => { for (let i = 0; i < 4; i++) { const v = await asGetK(k); if (v && v !== true) return v; await new Promise(z => setTimeout(z, 400)); } return null; };
+  if (d && d.ref && !d.url) { const url = await rd(d.ref); if (url) d.url = url; else throw new Error('подложка проекта не прочиталась из памяти iPad (попробуйте открыть ещё раз)'); }
+  if (j.tape && j.tape.U && j.tape.U.srcRef) { const so = await rd(j.tape.U.srcRef); if (so && so.bytes) j.tape.U.srcObj = so; else throw new Error('исходный PDF проекта не прочитался из памяти iPad (попробуйте открыть ещё раз)'); }
   return j;
 }
-function quickSave() { try { if (AS.hold || AS.restoring || AS.restoreFailed || !AS.pid || !AS.dirty) return; localStorage.setItem('ruletka_quick', JSON.stringify({ when: Date.now(), pid: AS.pid, page: U.srcPage || 1, M, pages: PGS.data, U: U.img ? { s: U.s, rot: U.rot, tx: U.tx, ty: U.ty, alpha: U.alpha, name: U.name } : null })); } catch (e) { } }
+const pgMsig = o => JSON.stringify(Object.keys(o || {}).sort((x, y) => x - y).map(k => [k, o[k] && o[k].m]));
+function quickSave() { // аварийная копия при закрытии/сворачивании: все листы + положение подложки; в IndexedDB (большие проекты) и, если влезет, в localStorage
+  try { if (AS.hold || AS.restoring || AS.restoreFailed || !AS.pid || !AS.dirty) return; savePage();
+    const q = { v: 2, when: Date.now(), pid: AS.pid, page: U.srcPage || 1, M, pages: PGS.data, U: U.img ? { sn: U.s / (U.ptPerPx || 1), rot: U.rot, tx: U.tx, ty: U.ty, alpha: U.alpha } : null };
+    const txt = JSON.stringify(q); asPutK('quick:' + AS.pid, txt);
+    try { localStorage.setItem('ruletka_quick', txt); } catch (e) { try { localStorage.setItem('ruletka_quick', JSON.stringify({ ...q, pages: null, big: true })); } catch (e2) { } } } catch (e) { } }
 // сохранения идут строго по очереди: вызов во время записи не теряется, а ставится следом (с самым свежим состоянием)
 let AS_Q = Promise.resolve();
 function autosave(force) {
@@ -4403,14 +4411,23 @@ async function leaveProject() { // true — можно уходить
 async function projOpen(id) {
   if (!(await leaveProject())) return; await projIndex(); const p = PJ.list.find(x => x.id === id); if (!p) return;
   let q = null; try { q = JSON.parse(localStorage.getItem('ruletka_quick') || 'null'); } catch (e) { }
+  try { const qi = await asGetK('quick:' + id); if (typeof qi === 'string') { const qj = JSON.parse(qi); if (!q || q.pid !== id || q.big || (qj.when || 0) >= (q.when || 0)) q = qj; } } catch (e) { }
   const txt = await asGetK('proj:' + id); resetWork(); AS.restoreFailed = false; AS.pid = id; AS.pname = p.name; AS.sid = Date.now(); AS.snapAt = 0; showProjName();
   let ok = true;
   if (txt && txt !== true) ok = await restoreFrom({ when: p.updated, proj: txt }, p.name, true); else { T.fitted = true; setMode('tape'); fitTape(); draw(); renderTape(); markSaved(); }
   { // аварийная копия новее сохранённого — программа закрылась без «Сохранить»
-    if (ok && q && q.pid === id && q.M && Array.isArray(q.M.pts) && q.when > (p.updated || 0) && (q.page || 1) === (U.srcPage || 1) && msig(q.M) !== msig(M)
+    if (ok && q && q.v === 2 && q.pid === id && q.M && q.when > (p.updated || 0) && (U.img ? (savePage(), pgMsig(q.pages) !== pgMsig(PGS.data)) : msig(q.M) !== msig(M))
+      && await uiDialog({ title: 'Вернуть несохранённые изменения?', text: `Программа закрылась ${tfmt(q.when)}, а последние изменения не были сохранены. Вернуть их (все листы)? В проект они попадут, только когда нажмёте «Сохранить проект».`, ok: 'Вернуть', cancel: 'Нет, открыть сохранённое' })) {
+      const cur = U.srcPage || 1;
+      if (U.img && q.pages) { PGS.data = Object.assign({}, PGS.data, q.pages); const d = loadPageModel(cur);
+        if (d && d.u) Object.assign(U, { s: d.u.ptPerPx && U.ptPerPx ? d.u.s * U.ptPerPx / d.u.ptPerPx : d.u.s, rot: d.u.rot, tx: d.u.tx, ty: d.u.ty }); }
+      else { Object.assign(M, q.M); M.objs = M.objs || []; M.notes = M.notes || []; M.marks = M.marks || []; markObjEdges(); }
+      T.undo = []; T.redo = []; adjust(); if (U.img && (q.page || 1) !== cur) await switchPage(q.page);
+      checkDirty(); fitTape(); draw(); renderTape(); stat('Несохранённые изменения возвращены — проверьте и нажмите «Сохранить проект».'); }
+    else if (ok && q && q.v !== 2 && q.pid === id && q.M && Array.isArray(q.M.pts) && q.when > (p.updated || 0) && (q.page || 1) === (U.srcPage || 1) && msig(q.M) !== msig(M)
       && await uiDialog({ title: 'Вернуть несохранённые изменения?', text: `Программа закрылась ${tfmt(q.when)}, а последние изменения не были сохранены. Вернуть их? В проект они попадут, только когда нажмёте «Сохранить проект».`, ok: 'Вернуть', cancel: 'Нет, открыть сохранённое' })) {
       if (q.pages) for (const [k, d] of Object.entries(q.pages)) if (+k !== (U.srcPage || 1)) PGS.data[k] = d;
-      Object.assign(M, q.M); M.objs = M.objs || []; M.notes = M.notes || []; M.marks = M.marks || []; markObjEdges(); adjust(); draw(); renderTape(); checkDirty();
+      Object.assign(M, q.M); if (q.U && U.img && q.U.sn) Object.assign(U, { s: q.U.sn * (U.ptPerPx || 1), rot: q.U.rot, tx: q.U.tx, ty: q.U.ty }); M.objs = M.objs || []; M.notes = M.notes || []; M.marks = M.marks || []; markObjEdges(); adjust(); draw(); renderTape(); checkDirty();
       fitTape(); draw(); stat('Несохранённые изменения возвращены — проверьте и нажмите «Сохранить проект».'); } }
   if (S.sheetOpt && S.sheetOpt.info) S.sheetOpt.info.object = p.name;
 }
@@ -4532,10 +4549,13 @@ const T = { tool: 'walk', chain: null, pending: null, buffer: null, auto: false,
 const ptById = id => M.pts.find(p => p.id === id);
 const PX = p => M.cond ? [p.x0, p.y0] : [p.x !== undefined ? p.x : p.x0, p.y !== undefined ? p.y : p.y0];
 const pname = id => 'Т' + id;
-function tSnap() { return JSON.stringify({ pts: M.pts, meas: M.meas, edges: M.edges, rooms: M.rooms, chains: M.chains, objs: M.objs || [], notes: M.notes || [], marks: M.marks || [], nextId: M.nextId, nextMeas: M.nextMeas }); }
-function tPush() { asSoon(); T.redo = []; T.undo.push(JSON.stringify({ pts: M.pts, meas: M.meas, edges: M.edges, rooms: M.rooms, chains: M.chains, objs: M.objs || [], notes: M.notes || [], marks: M.marks || [], nextId: M.nextId, nextMeas: M.nextMeas })); if (T.undo.length > 100) T.undo.shift(); }
-function tUndo() { if (T.pending && T.pending.got == null && !T.pending.re) { skipPending(); } if (!T.undo.length) { renderTape(); return; } T.redo.push(tSnap()); Object.assign(M, JSON.parse(T.undo.pop())); T.pending = null; T.chain = null; T.sel = null; closeTapeMenu(); adjust(); renderTape(); stat('Отменено. ↷ Вернуть — если отменили лишнее.'); }
-function tRedo() { if (!T.redo.length) return; T.undo.push(tSnap()); Object.assign(M, JSON.parse(T.redo.pop())); T.pending = null; T.chain = null; T.sel = null; closeTapeMenu(); adjust(); renderTape(); }
+function tSnap() { return JSON.stringify({ pts: M.pts, meas: M.meas, edges: M.edges, rooms: M.rooms, chains: M.chains, objs: M.objs || [], notes: M.notes || [], marks: M.marks || [], nextId: M.nextId, nextMeas: M.nextMeas, scaleFit: M.scaleFit, scaleAsked: M.scaleAsked, axis: M.axis,
+  _u: U.img ? { sn: U.s / (U.ptPerPx || 1), rot: U.rot, tx: U.tx, ty: U.ty, pg: U.srcPage || 1 } : null }); }
+function tApply(txt) { const j = JSON.parse(txt), u = j._u; delete j._u; Object.assign(M, j); M.objs = M.objs || []; M.notes = M.notes || []; M.marks = M.marks || []; markObjEdges();
+  if (u && U.img && u.pg === (U.srcPage || 1)) Object.assign(U, { s: u.sn * (U.ptPerPx || 1), rot: u.rot, tx: u.tx, ty: u.ty }); }
+function tPush() { asSoon(); T.redo = []; T.undo.push(tSnap()); if (T.undo.length > 100) T.undo.shift(); }
+function tUndo() { if (T.pending && T.pending.got == null && !T.pending.re) { skipPending(); } if (!T.undo.length) { renderTape(); return; } T.redo.push(tSnap()); tApply(T.undo.pop()); T.pending = null; T.chain = null; T.sel = null; closeTapeMenu(); adjust(); renderTape(); stat('Отменено. ↷ Вернуть — если отменили лишнее.'); }
+function tRedo() { if (!T.redo.length) return; T.undo.push(tSnap()); tApply(T.redo.pop()); T.pending = null; T.chain = null; T.sel = null; closeTapeMenu(); adjust(); renderTape(); }
 // ---------- edit menu: tap (Правка), long press, right click ----------
 function distToSeg(w, a, b) { const dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy || 1e-12; let t = ((w[0] - a[0]) * dx + (w[1] - a[1]) * dy) / L2; t = Math.max(0, Math.min(1, t)); return Math.hypot(w[0] - a[0] - t * dx, w[1] - a[1] - t * dy); }
 function hitTape(w) {
@@ -5056,9 +5076,10 @@ const PGS = { data: {} };
 const MKEYS = ['pts', 'meas', 'edges', 'rooms', 'chains', 'objs', 'notes', 'marks', 'lastNum', 'nextId', 'nextMeas', 'cond', 'axis', 'snap90', 'scaleFit', 'scaleAsked', 'ortho', 'zoomLog'];
 function savePage() { if (!U.img || !U.srcPage || AS.hold) return; const m = {}; MKEYS.forEach(k => m[k] = M[k]); PGS.data[U.srcPage] = { m: JSON.stringify(m), u: { s: U.s, rot: U.rot, tx: U.tx, ty: U.ty, alpha: U.alpha, ptPerPx: U.ptPerPx, pw: U.pw || (U.img && U.img.width), ph: U.ph || (U.img && U.img.height) } }; }
 function pgHas(n) { const d = PGS.data[n]; if (!d) return false; try { return JSON.parse(d.m).pts.length > 0; } catch (e) { return false; } }
-function loadPageModel(pg) { const d = PGS.data[pg]; Object.assign(M, { pts: [], meas: [], edges: [], rooms: [], chains: [], objs: [], notes: [], marks: [], nextId: 1, nextMeas: 1, axis: null, scaleFit: false, scaleAsked: false, zoomLog: [] }); if (d) { Object.assign(M, JSON.parse(d.m)); } M.objs = M.objs || []; M.notes = M.notes || []; M.marks = M.marks || []; markObjEdges(); return d; }
+function loadPageModel(pg) { const d = PGS.data[pg]; Object.assign(M, { pts: [], meas: [], edges: [], rooms: [], chains: [], objs: [], notes: [], marks: [], nextId: 1, nextMeas: 1, axis: null, scaleFit: false, scaleAsked: false, zoomLog: [] }); if (d) { Object.assign(M, { cond: false, snap90: true, ortho: true }, JSON.parse(d.m)); } M.objs = M.objs || []; M.notes = M.notes || []; M.marks = M.marks || []; markObjEdges(); return d; }
 async function ensurePdf() { if (U.pdf || !U.src || U.src.kind !== 'pdf') return !!U.pdf; U.pdf = await pdfjsLib.getDocument({ data: U.src.bytes.slice(0) }).promise; U.pages = U.pdf.numPages; try { U.titles = await pdfTitles(U.pdf); } catch (e) { } return true; }
 async function switchPage(pg) {
+  if (AS.hold) { stat('Подождите: идёт сохранение — лист переключится после.'); return; }
   if (!(await ensurePdf())) return; if (pg === U.srcPage) return;
   busy('Открываю лист ' + pg + '…'); const ep = AS.epoch || 0; let r;
   try { r = await rasterPdfPage(pg); } catch (e) { busy(''); uiAlert('Не удалось открыть лист ' + pg + ': ' + (e.message || e)); return; }
@@ -5141,7 +5162,7 @@ function distMeas(a, b) { return M.meas.find(m => m.type === 'dist' && m.v != nu
 function drawnLen(m) { const A = ptById(m.a), B = ptById(m.b); return A && B ? Math.hypot(B.x0 - A.x0, B.y0 - A.y0) : 0; }
 function scaleRatio() { const r = M.meas.filter(m => m.type === 'dist' && m.on !== false && m.v > 0.3).map(m => m.v / drawnLen(m)).filter(v => isFinite(v) && v > 0).sort((a, b) => a - b); return r.length ? { k: r[Math.floor(r.length / 2)], n: r.length } : null; }
 function fitScale(k) { // масштабировать подложку и точки так, чтобы чертёж совпал с замерами
-  if (!(k > 0) || Math.abs(k - 1) < 1e-4) return;
+  if (!(k > 0) || Math.abs(k - 1) < 1e-4) return; tPush();
   const xs = M.pts.map(p => [p.x0, p.y0]); const c = xs.length ? [xs.reduce((s, q) => s + q[0], 0) / xs.length, xs.reduce((s, q) => s + q[1], 0) / xs.length] : [0, 0];
   const tr = q => [c[0] + (q[0] - c[0]) * k, c[1] + (q[1] - c[1]) * k];
   const t = tr([U.tx, U.ty]); U.tx = t[0]; U.ty = t[1]; U.s *= k;
@@ -5164,10 +5185,11 @@ async function loadUnderlay(file) {
   try {
     if (/\.pdf$/i.test(file.name)) {
       if (!window.pdfjsLib) throw new Error('Модуль PDF не загружен');
-      const data = new Uint8Array(await file.arrayBuffer()); U.src = { kind: 'pdf', bytes: data.slice(0) }; U._srcKey = null; PGS.data = {};
-      U.pdf = await pdfjsLib.getDocument({ data }).promise; U.pages = U.pdf.numPages; U.page = 1;
+      const data = new Uint8Array(await file.arrayBuffer()); const was = { pdf: U.pdf, pages: U.pages, page: U.page, titles: U.titles };
+      U.pdf = await pdfjsLib.getDocument({ data: data.slice(0) }).promise; U.pages = U.pdf.numPages; U.page = 1;
       U.titles = await pdfTitles(U.pdf);
-      if (U.pages > 1) { busy(''); const pg = await pickPage(); if (!pg) { U.pdf = null; U.pages = 0; return; } U.page = pg; busy('Открываю лист…'); }
+      if (U.pages > 1) { busy(''); const pg = await pickPage(); if (!pg) { Object.assign(U, was); stat('Подложка не заменена.'); return; } U.page = pg; busy('Открываю лист…'); }
+      U.src = { kind: 'pdf', bytes: data }; U._srcKey = null; PGS.data = {};
       await renderPdfPage();
     } else {
       const img = await createImageBitmap(file); U.src = { kind: /png/i.test(file.type || file.name) ? 'png' : 'jpg', bytes: new Uint8Array(await file.arrayBuffer()) }; U._srcKey = null; U.ptPerPx = 0.75;
@@ -5256,7 +5278,7 @@ function applyRaster({ c, z, page }) {
 function fitUnderlay() { if (!U.img) return; const c = [[0, 0], [U.img.width, 0], [U.img.width, U.img.height], [0, U.img.height]].map(([u, v]) => u2w(u, v)); fitBounds([Math.min(...c.map(p => p[0])), Math.min(...c.map(p => p[1])), Math.max(...c.map(p => p[0])), Math.max(...c.map(p => p[1]))]); }
 function u2w(u, v) { const c = Math.cos(U.rot), s = Math.sin(U.rot); const x = u * U.s, y = -v * U.s; return [U.tx + c * x - s * y, U.ty + s * x + c * y]; }
 function calibrate(p1, p2, L, makeHoriz) {
-  const d = Math.hypot(p2[0] - p1[0], p2[1] - p1[1]); if (!(d > 0) || !(L > 0)) return;
+  const d = Math.hypot(p2[0] - p1[0], p2[1] - p1[1]); if (!(d > 0) || !(L > 0)) return; tPush();
   const k = L / d;
   // scale about p1, and optionally rotate so that p1->p2 is axis aligned
   let dr = 0;
@@ -5337,6 +5359,7 @@ function parseManual(s) {
 }
 function onReading(v, src) {
   if (!(v > 0 && v < 300)) return;
+  if (AS.hold) { T.buffer = T.last = { v, src, t: Date.now() }; beep(); stat(`Идёт сохранение PDF — замер ${fm(v)} м отложен в буфер; укажите его на плане, когда сохранение закончится.`); return; }
   T.last = { v, src, t: Date.now() };
   beep();
   if (T.pending) {
@@ -5377,6 +5400,7 @@ function skipPending() { const p = T.pending; T.pending = null; if (p && p.after
 
 // ---------- canvas interaction for tape ----------
 function tapeDown(e, w) {
+  if (AS.hold) { stat('Подождите: идёт сохранение PDF — чертёж сейчас занят.'); return; }
   const t = T.tool;
   if (T.calMode) {
     T.cal.push(nearestPoint(w) ? PX(nearestPoint(w)) : w);
@@ -5920,7 +5944,7 @@ async function exportOverlayPdf(opt = {}) {
     const k = await ask3('Какие листы сохранить в PDF?', `В исходном PDF листов: ${U.pages}, с замерами: ${work.length ? work.join(', ') : 'нет'}. Всё сохранится одним файлом.`, [['all', `Все ${U.pages} листов одним файлом`, 'pri'], ['work', `Только с замерами (${work.length})`, ''], ['stay', 'Отмена', '']]);
     if (k === 'stay') return; if (k === 'all') pages = Array.from({ length: U.pages }, (_, i) => i + 1); }
   const withWork = new Set(work);
-  busy('Готовлю PDF…'); AS.hold = (AS.hold || 0) + 1; let held = true;
+  busy('Готовлю PDF…'); AS.hold = (AS.hold || 0) + 1; let held = true; const veil = document.createElement('div'); veil.className = 'holdveil'; document.body.appendChild(veil);
   const back = () => { if (pages.length > 1 || pages[0] !== curPg) { loadPageModel(curPg); const d = PGS.data[curPg]; if (d && d.u) Object.assign(U, { s: d.u.s, rot: d.u.rot, tx: d.u.tx, ty: d.u.ty, ptPerPx: d.u.ptPerPx, pw: d.u.pw, ph: d.u.ph }); U.srcPage = curPg; adjust(); draw(); } };
   try {
     const { L: PL, font } = pdfKit(); const { PDFDocument, rgb, degrees, pushGraphicsState, popGraphicsState, concatTransformationMatrix, drawObject } = PL;
@@ -5943,8 +5967,7 @@ async function exportOverlayPdf(opt = {}) {
         try {
           const pi = pg - 1, mb = srcDoc.getPage(pi).getMediaBox(), vp = (await U.pdf.getPage(pi + 1)).getViewport({ scale: 1 });
           const sx = W / vp.width, sy = H / vp.height; const [a, b, c, d, e, f] = vp.transform;
-          let m = [a * sx, -b * sy, c * sx, -d * sy, e * sx, H - f * sy];
-          m = [m[0], m[1], m[2], m[3], m[0] * mb.x + m[2] * mb.y + m[4], m[1] * mb.x + m[3] * mb.y + m[5]];
+          const m = [a * sx, -b * sy, c * sx, -d * sy, e * sx, H - f * sy]; void mb; // лист скопирован как есть: его координаты — исходные, без сдвига MediaBox
           const det = m[0] * m[3] - m[1] * m[2]; const inv = [m[3] / det, -m[1] / det, -m[2] / det, m[0] / det, (m[2] * m[5] - m[3] * m[4]) / det, (m[1] * m[4] - m[0] * m[5]) / det];
           page = doc.addPage(copied.get(pg)); page.pushOperators(pushGraphicsState(), concatTransformationMatrix(...inv)); wrapped = true; drawn = true;
         } catch (e) { console.warn('pdf page', e); page = null; }
@@ -6094,13 +6117,13 @@ async function exportOverlayPdf(opt = {}) {
     if (wrapped) page.pushOperators(popGraphicsState());
       })();
     }
-    back(); AS.hold--; held = false;
+    back(); AS.hold--; held = false; veil.remove();
     const bytes = await doc.save();
     busy(''); const fname = ((AS.pname || U.name || 'Обмер').replace(/\.[^.]+$/, '').replace(/[\\/:*?"<>|]/g, '_')) + '_замеры.pdf';
     stat(`PDF готов: листов ${pages.length}${work.length && pages.length > 1 ? ' (с замерами: ' + work.join(', ') + ')' : ''}, подложка в исходном качестве, замеры поверх — векторные.`);
     await fileReady(fname, bytes, 'application/pdf', `PDF готов: ${pages.length === 1 ? '1 лист' : 'листов ' + pages.length}, ${(bytes.length / 1048576).toFixed(1).replace('.', ',')} МБ`);
   } catch (e) { busy(''); console.error(e); uiAlert('Не удалось сделать PDF: ' + (e.message || e)); }
-  finally { if (held) { back(); AS.hold = Math.max(0, (AS.hold || 1) - 1); asSoon(); } }
+  finally { veil.remove(); if (held) { back(); AS.hold = Math.max(0, (AS.hold || 1) - 1); asSoon(); } }
 }
 // ---------- conversion to sheet plan ----------
 function tapePlan() {
@@ -6158,12 +6181,13 @@ async function upgradeUnderlay() {
   try {
     if (src.kind === 'pdf') {
       await ensurePdf(); const pg = U.srcPage || 1; const r = await rasterPdfPage(pg);
+      while (AS.hold) await new Promise(z => setTimeout(z, 250)); // идёт выгрузка PDF — U временно чужой
       if (U.img !== img0 || (U.srcPage || 1) !== pg) return; // пока грузили — сменили лист/подложку
       const k = U.ptPerPx ? (1 / r.z) / U.ptPerPx : img0.width / r.c.width;
       if (U._imgKeyFor === img0 && U._data) { U._imgKeyFor = r.c; U._data = { url: U._data.url, k: U._data.k * k }; U._dataFor = r.c; }
       U.s *= k; U.img = r.c; U.zoomPdf = r.z; U.ptPerPx = 1 / r.z; U.pw = r.c.width; U.ph = r.c.height; U.pdfPage = r.page; U.page = pg;
     } else {
-      const bmp = await createImageBitmap(new Blob([src.bytes])); if (U.img !== img0) return;
+      const bmp = await createImageBitmap(new Blob([src.bytes])); while (AS.hold) await new Promise(z => setTimeout(z, 250)); if (U.img !== img0) return;
       const k = img0.width / bmp.width; if (U._imgKeyFor === img0 && U._data) { U._imgKeyFor = bmp; U._data = { url: U._data.url, k: U._data.k * k }; U._dataFor = bmp; }
       U.s *= k; if (U.ptPerPx) U.ptPerPx *= k; U.img = bmp; U.pw = bmp.width; U.ph = bmp.height;
     }
@@ -6172,7 +6196,7 @@ async function upgradeUnderlay() {
 }
 async function tapeRestore(j) {
   if (!j) return;
-  Object.assign(M, j.M); M.objs = M.objs || []; markObjEdges(); T.undo = []; T.pending = null; T.chain = null; PGS.data = j.pages || {};
+  AS.epoch = (AS.epoch || 0) + 1; Object.assign(M, { cond: false, snap90: true, ortho: true, scaleFit: false, scaleAsked: false, axis: null, zoomLog: [] }, j.M); M.objs = M.objs || []; M.notes = M.notes || []; M.marks = M.marks || []; markObjEdges(); T.undo = []; T.redo = []; T.pending = null; T.chain = null; T.sel = null; T.selSet = null; PGS.data = j.pages || {};
   if (j.U && j.U.data) { const img = new Image(); img.src = j.U.data.url; await img.decode(); const bmp = await createImageBitmap(img); Object.assign(U, j.U); U.img = bmp; U.s = j.U.s / j.U.data.k; if (j.U.data.ref) { U._imgKey = j.U.data.ref; U._imgKeyFor = bmp; U._imgSaved = true; U._data = { url: j.U.data.url, k: 1 }; U._dataFor = bmp; } U.ptPerPx = j.U.ptPerPx ? j.U.ptPerPx / j.U.data.k : null; U.src = j.U.srcObj || null; U._srcKey = j.U.srcRef || null; delete U.srcObj; U.pdf = null; U.pdfPage = null; U.pages = 0; U.pw = bmp.width; U.ph = bmp.height; hqReset();
     if (j.U.srcB64 && !U.src) { const b = atob(j.U.srcB64), u8 = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u8[i] = b.charCodeAt(i); U.src = { kind: j.U.srcKind || 'pdf', bytes: u8 }; U._srcKey = null; } delete U.srcB64;
     U.page = U.srcPage || 1; upgradeUnderlay(); }
