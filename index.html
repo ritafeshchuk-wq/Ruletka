@@ -262,7 +262,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 4.4 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 4.5 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -5812,6 +5812,9 @@ function renderTape() {
   <p class="hint">${M.cond ? 'Точки стоят, где вы их поставили; замеры — подписи и данные для листов.' : 'Точки встают по замерам рулетки, углы около 90° — прямые.'}</p>
   <div class="chk"><input type="checkbox" id="auto" ${T.auto ? 'checked' : ''}><label for="auto">Принимать замер с DISTO сразу, без «Принять»</label></div>
   <div class="chk"><input type="checkbox" id="orth" ${M.ortho !== false ? 'checked' : ''}><label for="orth">Углы около 90° считать прямыми</label></div>
+  <p class="hint" style="margin-bottom:2px">Размер подписей и значков в PDF:</p>
+  <div class="row seg2">${Object.entries(PDFSZ).map(([k, v]) => `<button data-pdfsz="${k}" class="${pdfSz() === k ? 'on' : ''}">${k === 's' ? 'Мелко' : v.t}</button>`).join('')}</div>
+  <p class="hint">${pdfSz() === 's' ? 'Как на экране: подписи мелкие, в масштабе чертежа, ничего не закрывают — для чтения увеличьте лист.' : 'Подписи крупнее, чем на экране, — удобно для печати мелкого масштаба.'}</p>
   </details>
   <details><summary>Помещения и замеры (${M.rooms.length} / ${M.meas.filter(m => m.type !== 'line' && m.type !== 'angle' && m.type !== 'right').length}) · невязка <b class="${(R.maxR || 0) > 0.015 ? 'bad' : (R.maxR || 0) > 0.005 ? 'warn' : 'ok'}">${Math.round((R.maxR || 0) * 1000)} мм</b></summary>
   ${M.rooms.map(Rm => { const i = TAPE.roomInfo(M, Rm); return `<div class="item" data-room="${Rm.num}"><input type="text" value="${escH(Rm.name)}" data-rn="${Rm.num}" style="width:120px">${Rm.num}<span class="q ${i.diags < i.need ? 'warn' : 'ok'}">${SHEET.fmtArea(i.area)} м² · стороны ${i.sides}/${i.k} · диаг. ${i.diags}${i.diags < i.need ? ' (нужно ' + i.need + ')' : ''}</span></div>`; }).join('')}
@@ -5844,6 +5847,7 @@ function renderTape() {
   rail.querySelectorAll('[data-tt]').forEach(b => b.onclick = () => { if (b.dataset.tt === 'fig') setTimeout(pickFigKind, 0); else if (T.tool === 'fig') T.hatch = null; if (T.selSet && b.dataset.tt !== 'box') { T.selSet = null; showSelBox(); } T.opA = null; T.tool = b.dataset.tt; T.mA = null; T.tA = null; T.roomIds = null; T.objIds = null; T.noteTip = null; if (T.tool !== 'walk') T.chain = null; const tt = TTOOLS.find(t => t[0] === T.tool); if (tt) stat(tt[1] + ': ' + tt[2]); renderTape(); });
   $('#tUndo').onclick = tUndo; $('#tRedo').onclick = tRedo;
   $('#orth').onchange = e => { M.ortho = e.target.checked; adjust(); renderTape(); };
+  document.querySelectorAll('[data-pdfsz]').forEach(b => b.onclick = () => { try { localStorage.setItem('rul_pdfsz', b.dataset.pdfsz); } catch (e) { } stat('Подписи в PDF: ' + PDFSZ[b.dataset.pdfsz].t.toLowerCase() + '.'); renderTape(); });
   side.querySelectorAll('[data-mon]').forEach(c => c.onchange = () => { const m = M.meas.find(x => x.id === +c.dataset.mon); tPush(); m.on = c.checked; adjust(); renderTape(); });
   side.querySelectorAll('[data-mv]').forEach(c => c.onchange = () => { const m = M.meas.find(x => x.id === +c.dataset.mv); const v = parseManual(c.value); if (v) { tPush(); m.v = v; adjust(); } renderTape(); });
   side.querySelectorAll('[data-mdel]').forEach(c => c.onclick = () => { tPush(); M.meas = M.meas.filter(x => x.id !== +c.dataset.mdel); adjust(); renderTape(); });
@@ -5860,6 +5864,8 @@ function pdfKit() {
   const b = atob(document.getElementById('fontb64').textContent.trim()), u8 = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u8[i] = b.charCodeAt(i);
   PDFK = { L: window.PDFLib, font: window.opentype.parse(u8.buffer) }; return PDFK;
 }
+const PDFSZ = { s: { m: 0.12, t: 'Мелко — как на экране' }, m: { m: 0.2, t: 'Средне' }, l: { m: 0.35, t: 'Крупно' } };
+function pdfSz() { try { return localStorage.getItem('rul_pdfsz') || 's'; } catch (e) { return 's'; } }
 async function exportOverlayPdf(opt = {}) {
   const isPdf = !!(U.src && U.src.kind === 'pdf'); if (isPdf) await ensurePdf();
   const work = isPdf ? pagesWithWork().filter(n => pgHas(n) || (n === U.srcPage && M.pts.length)) : [U.srcPage || 1]; const curPg = U.srcPage || 1;
@@ -5923,7 +5929,9 @@ async function exportOverlayPdf(opt = {}) {
     const P2 = p => toPt(...PX(p));
     // размер шрифта — от длины стен на листе
     const lens = M.edges.map(e => { const A = ptById(e.a), B = ptById(e.b); if (!A || !B) return 0; const a = P2(A), b = P2(B); return Math.hypot(b[0] - a[0], b[1] - a[1]); }).filter(v => v > 0).sort((a, b) => a - b);
-    const med = lens.length ? lens[Math.floor(lens.length / 2)] : 100; const fs = Math.max(3.2, Math.min(11, med * 0.1)); const lw = Math.max(0.35, fs * 0.09);
+    // размер подписей — в метрах на местности, как в программе: мелко и в масштабе чертежа (увеличиваете лист — читаете)
+    const med = lens.length ? lens[Math.floor(lens.length / 2)] : 100, o0 = toPt(0, 0), o1 = toPt(1, 0), ppm = Math.hypot(o1[0] - o0[0], o1[1] - o0[1]) || 28;
+    const fs = Math.max(0.6, Math.min(11, med * 0.1, ppm * (PDFSZ[pdfSz()] || PDFSZ.s).m)); const lw = Math.max(0.06, fs * 0.09);
     const RED = rgb(0.80, 0.02, 0.10), BLUE = rgb(0.05, 0.25, 0.75), VIO = rgb(0.42, 0.20, 0.72), GRN = rgb(0.05, 0.55, 0.25), GRY = rgb(0.45, 0.48, 0.52);
     const text = (str, p, size, col, ang = 0, anchor = 'c') => { // вектор: буквы контурами, без встраивания шрифта
       const w = font.getAdvanceWidth(str, size); const off = anchor === 'c' ? w / 2 : anchor === 'r' ? w : 0;
