@@ -274,7 +274,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 5.1 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 5.1.1 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -5285,7 +5285,7 @@ async function gpsTap(w, e) {
 function gpsPanel() {
   const D = T.gpsDb, n = M.pts.filter(p => p.gpsPt).length, ng = M.pts.filter(p => p.gps).length;
   return `<div class="gpsbox"><div class="row" style="align-items:center"><b style="flex:1">🛰 Исп GPS</b><span class="hint" style="margin:0">пикетов ${n}${n ? ' · по координатам ' + ng : ''}</span></div>
-  <div class="row"><button id="gLoad" class="pri" style="flex:1">📂 Загрузить PCO</button><input type="file" id="gFile" accept=".pco,.PCO,.txt,.csv" hidden></div>
+  <div class="row"><button id="gLoad" class="pri" style="flex:1">📂 Загрузить PCO</button><input type="file" id="gFile" hidden></div>
   ${D ? `<div class="row"><span class="hint" style="flex:1;margin:0">${escH(D.name)} · ${D.pts.length} точек</span><button id="gApply">↻ Подставить</button></div>` : ''}
   <div class="chk"><input type="checkbox" id="gLine" ${gpsLine() ? 'checked' : ''}><label for="gLine">Соединять пикеты линией</label></div>
   ${T.gpsPrev && ptById(T.gpsPrev) ? `<div class="row"><span style="flex:1">Линия от <b>${escH(pname(T.gpsPrev))}</b></span><button id="gBreak">✂ Разорвать</button></div>` : ''}
