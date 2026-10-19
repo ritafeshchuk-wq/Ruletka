@@ -228,6 +228,16 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 #trail button i{font-style:normal;font-size:20px;line-height:1}
 #trail button.on{background:var(--tape,#E3A21A);color:#1B2430}
 #trail .tsep{flex:0 0 1px;background:rgba(255,255,255,.16);margin:2px 8px}
+#trail button.grp{position:relative}#trail button.grp em{position:absolute;right:3px;bottom:2px;font-style:normal;font-size:9px;opacity:.7}
+#tfly{position:fixed;z-index:60;background:#fff;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.25);padding:6px;display:flex;flex-direction:column;gap:2px;min-width:250px;max-width:330px}
+#tfly .tf-h{font-size:12px;color:#5D6877;padding:4px 10px 2px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+#tfly button{display:flex;gap:10px;align-items:center;text-align:left;border:0;background:transparent;padding:9px 10px;border-radius:10px;font-size:15px;color:#1B2430}
+#tfly button i{font-style:normal;font-size:22px;width:28px;text-align:center}
+#tfly button span{display:flex;flex-direction:column}#tfly button small{color:#5D6877;font-size:12px;line-height:1.25}
+#tfly button.on{background:#FCF2DC}
+.stephead{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;margin:14px 0 6px;color:#1B2430}
+.stepn{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:#E3A21A;color:#1B2430;font-size:12px;font-weight:700;flex:0 0 22px;margin-right:6px}
+.stephead .stepn{margin-right:0}
 #trail button.del{color:#ff8a80}#trail button.del.on{background:#C4372F;color:#fff}
 #mcard{position:absolute;top:8px;left:calc(50% + 37px);transform:translateX(-50%);width:min(440px,calc(100% - 100px));z-index:6;background:#fff;border:2px solid var(--line);border-radius:14px;box-shadow:0 6px 20px rgba(15,23,36,.18);padding:8px 10px;display:flex;flex-direction:column;gap:6px}
 #mcard.wait{border-color:var(--tape,#E3A21A);background:#FFFBF1}#mcard.got{border-color:#1E8A55}
@@ -274,7 +284,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 5.5 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 6.0 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -6039,9 +6049,15 @@ const TTOOLS = [['erase', 'Удалить (ластик)', 'коснитесь �
 { const f = id => TTOOLS.find(t => t[0] === id);
   Object.assign(f('meas'), { 1: 'Промер', 2: 'коснитесь двух мест — точки, стены (точка встанет на стену) или пустого места: между ними будет размер с засечками, без стен и контура. Для промеров, диагоналей, привязок' });
   Object.assign(f('open'), { 1: 'Дверь', 2: 'коснитесь отрезка стены — весь станет дверью; или двух точек — краёв проёма. Касание по двери: повернуть (4 положения) → пустой проём → стена' });
-  TTOOLS.push(['fig', 'Фигуры', 'условные обозначения: колонна круглая / квадратная / прямоугольная, стояк, трап, вентшахта, оборудование, опора. Выберите фигуру, коснитесь места — введите диаметр или стороны; следующая такая же — тот же размер одним «✓ Принять». Затем касайтесь стен — привязки от края фигуры. Нажать «Фигуры» ещё раз — сменить фигуру']);
+  TTOOLS.push(['fig', 'Фигуры', 'условные обозначения: колонна круглая / квадратная / прямоугольная, стояк, трап, вентшахта, оборудование, опора. Выберите фигуру, коснитесь места — введите диаметр или стороны; следующая такая же — тот же размер одним «✓ Принять». Затем касайтесь стен — привязки от края фигуры. Сменить фигуру — «Объекты ▸» → «Фигуры»']);
   TTOOLS.push(['gps', 'Исп GPS', 'точки съёмки GPS: коснитесь места пикета — введите его номер (как в приёмнике). Длины не спрашиваются. Следующая точка соединяется линией с предыдущей (касание последней точки ещё раз — разорвать линию). Касание существующей точки — сделать её пикетом. Потом в левой панели «📂 Загрузить PCO» — точки встанут по координатам, длины посчитаются сами']);
   TTOOLS.push(['window', 'Окно', 'коснитесь отрезка стены — весь станет окном; или двух точек — краёв окна. Касание по окну: пустой проём → стена']); }
+// колонка: частое — одним касанием; родственные инструменты — в группах (касание группы включает последний из неё и показывает выбор)
+const RAIL = ['walk', 'G:meas', 'thick', 'gps', '|', 'G:open', '|', 'rlab', 'G:obj', '|', 'G:note', '|', 'box', 'drag', 'select', 'erase'];
+const RGROUPS = { meas: { name: 'Промер', subs: ['meas', 'online'] }, open: { name: 'Проём', subs: ['open', 'window'] }, obj: { name: 'Объекты', subs: ['hatch', 'fig', 'obj', 'room'] }, note: { name: 'Пометки', subs: ['note', 'photo', 'scan'] } };
+const RHINT = { meas: 'размер между двумя местами: точки, стены, пустое место', online: 'новая точка на стене (угол, откос) — делит стену', open: 'дверь: касание стены или двух точек', window: 'окно: касание стены или двух точек', hatch: 'люк, приступок — прямоугольник с размерами и привязками', fig: 'колонна, вентшахта, стояк, трап… (условные)', obj: 'лестница, пандус, шахта — по углам', room: 'контур помещения по точкам', note: 'выноска: стрелка и текст', photo: 'место и направление фото', scan: 'станция сканера' };
+function closeFly() { const f = document.getElementById('tfly'); if (f) f.remove(); document.removeEventListener('pointerdown', flyOut, true); }
+function flyOut(e) { const f = document.getElementById('tfly'); if (!f) { document.removeEventListener('pointerdown', flyOut, true); return; } if (f.contains(e.target) || (e.target.closest && e.target.closest('#trail [data-tg]'))) return; closeFly(); }
 const TORDER = ['walk', 'meas', 'online', 'thick', 'gps', '|', 'open', 'window', '|', 'room', 'rlab', 'hatch', 'fig', 'obj', '|', 'note', 'photo', 'scan', '|', 'box', 'drag', 'select', 'erase'];
 TTOOLS.sort((a, b) => TORDER.indexOf(a[0]) - TORDER.indexOf(b[0]));
 function renderTape() {
@@ -6056,7 +6072,9 @@ function renderTape() {
   const TSHORT = { walk: 'Обход', meas: 'Промер', online: 'На стене', open: 'Дверь', window: 'Окно', thick: 'Толщина', room: 'Помещ.', obj: 'Объект', hatch: 'Люк', fig: 'Фигуры', gps: 'Исп GPS', note: 'Выноска', photo: 'Фото', scan: 'Скан', rlab: '№ пом.', box: 'Выделить', drag: 'Двигать', select: 'Правка' };
   // панель инструментов на чертеже — всегда под рукой
   let rail = document.getElementById('trail'); if (!rail) { rail = document.createElement('div'); rail.id = 'trail'; $('#main').appendChild(rail); }
-  rail.innerHTML = TORDER.map(id => { if (id === '|') return '<div class="tsep"></div>';
+  const gCur = g => { const G = RGROUPS[g]; if (G.subs.includes(T.tool)) return T.tool; let l = null; try { l = localStorage.getItem('rul_g_' + g); } catch (e) { } return G.subs.includes(l) ? l : G.subs[0]; };
+  rail.innerHTML = RAIL.map(id => { if (id === '|') return '<div class="tsep"></div>';
+    if (id.startsWith('G:')) { const g = id.slice(2), G = RGROUPS[g], cur = gCur(g), on = G.subs.includes(T.tool); return `<button data-tg="${g}" class="grp ${on ? 'on' : ''}" title="${escH(G.name + ': ' + G.subs.map(x => (TTOOLS.find(t => t[0] === x) || [])[1]).join(', '))}"><i>${TICON[cur] || '•'}</i><span>${on || g === 'meas' || g === 'open' ? TSHORT[cur] : G.name}</span><em>▸</em></button>`; }
     if (id === 'erase') return `<button data-act="del" class="del ${T.tool === 'erase' ? 'on' : ''}" title="Удалить выделенное; если ничего не выделено — ластик: касание удаляет"><i>🗑</i><span>Удалить</span></button>`;
     const t = TTOOLS.find(x => x[0] === id); if (!t) return ''; return `<button data-tt="${t[0]}" class="${T.tool === t[0] ? 'on' : ''}" title="${escH(t[1] + ': ' + t[2])}"><i>${TICON[t[0]] || '•'}</i><span>${TSHORT[t[0]] || t[1]}</span></button>`; }).join('');
   { const db = rail.querySelector('[data-act="del"]'); if (db) db.onclick = railDelete; }
@@ -6077,24 +6095,26 @@ function renderTape() {
     ${!pd && T.last ? `<div class="mc-last">последний: ${fm(T.last.v)} м${T.buffer ? ' — в буфере, укажите точки' : ''}</div>` : ''}`;
   const btShort = !navigator.bluetooth ? `<p class="hint" style="color:#C4372F;margin:4px 0 0">Нет Bluetooth в этом браузере — откройте программу в <b>Bluefy</b>. Вводить замеры можно вручную.</p>` : '';
   side.innerHTML = `
+  <details ${U.img ? '' : 'open'}><summary><span class="stepn">1</span>Подложка — план${U.img ? ' · ' + escH(U.name || 'загружена') : ''}</summary>
+  <div class="row"><button id="uLoad">${U.img ? 'Заменить' : 'Загрузить PDF / картинку'}</button><input type="file" id="uFile" accept=".pdf,.png,.jpg,.jpeg" hidden></div>
+  ${U.pages > 1 ? `<div class="row"><button id="uPick">Выбрать лист…</button><select id="uPage" style="flex:1;min-width:0">${Array.from({ length: U.pages }, (_, i) => `<option value="${i + 1}" ${U.page === i + 1 ? 'selected' : ''}>${i + 1} · ${escH(pageLabel(i + 1))}</option>`).join('')}</select></div>` : ''}
+  ${U.img ? `<div class="row"><button id="mFit" ${M.meas.length ? '' : 'disabled'}>Масштаб по замерам</button><button id="uCal" class="${T.calMode ? 'on' : ''}">Масштаб по 2 точкам</button><label style="display:none"><input type="checkbox" id="calH" checked></label></div>
+  <div class="row"><label>Прозрачность</label><input type="range" id="uA" min="0.1" max="1" step="0.05" value="${U.alpha}" style="flex:1"></div>` : '<p class="hint">Без подложки — обмер на сетке 1 м.</p>'}
+  </details>
+  <div class="stephead"><span class="stepn">2</span>Рулетка</div>
   <div class="row"><span class="btdot ${T.btState === 'подключена' ? 'on' : /…/.test(T.btState) ? 'wait' : ''}"></span><button class="btbig ${T.btState === 'подключена' ? 'on' : 'pri'}" id="bBt">${T.btState === 'подключена' ? '✓ ' + escH(T.btName) : 'Подключить DISTO'}</button>${T.btState === 'отключена' ? '<button id="bRe" class="pri">Переподключить</button>' : ''}${T.cmd && T.btState === 'подключена' ? '<button id="bMeas" class="btbig">◉ Замер</button>' : ''}<span class="hint" style="margin:0">${T.btState === 'нет' ? '' : escH(T.btState)}${T.batt != null ? ' · ' + T.batt + '%' : ''}</span></div>
   ${btShort}
+  <div class="stephead"><span class="stepn">3</span>Обмер — сейчас: ${escH((TTOOLS.find(t => t[0] === T.tool) || [])[1] || '')}</div>
   ${T.tool === 'gps' ? gpsPanel() : ''}
-  ${T.tool === 'gps' ? '' : T.tool === 'walk' && T.chain ? `<div class="row cur-walk"><span style="flex:1">Обход идёт от <b>${pname(T.chain[T.chain.length - 1])}</b></span><button id="bEnd" class="pri">■ Закончить обход</button></div>` : `<p class="hint cur-tool"><b>${escH((TTOOLS.find(t => t[0] === T.tool) || [])[1] || '')}:</b> ${escH((TTOOLS.find(t => t[0] === T.tool) || [])[2] || '')}</p>`}
-  <h3>Готово — проверить и сдать</h3>
+  ${T.tool === 'gps' ? '' : T.tool === 'walk' && T.chain ? `<div class="row cur-walk"><span style="flex:1">Обход идёт от <b>${pname(T.chain[T.chain.length - 1])}</b></span><button id="bEnd" class="pri">■ Закончить обход</button></div>` : `<p class="hint cur-tool">${escH((TTOOLS.find(t => t[0] === T.tool) || [])[2] || '')}</p>`}
+  <div class="stephead"><span class="stepn">4</span>Проверить и сдать</div>
   <div class="acts">
     <button id="bSelAll" ${M.meas.length ? '' : 'disabled'}>⬚ Проверить невязки</button>
     <button id="bStr" ${M.pts.length > 2 ? '' : 'disabled'}>▦ Выровнять 90°</button>
     <button id="bOvPdf" class="pri" ${M.pts.length ? '' : 'disabled'}>📄 PDF на подложке</button>
     <button id="toSheetT" ${M.rooms.length || M.edges.length ? '' : 'disabled'}>🗎 Листы и DXF</button>
   </div>
-  <details ${U.img ? '' : 'open'}><summary>Подложка (план БТИ)${U.img ? ' — ' + escH(U.name || 'загружена') : ''}</summary>
-  <div class="row"><button id="uLoad">${U.img ? 'Заменить' : 'Загрузить PDF / картинку'}</button><input type="file" id="uFile" accept=".pdf,.png,.jpg,.jpeg" hidden></div>
-  ${U.pages > 1 ? `<div class="row"><button id="uPick">Выбрать лист…</button><select id="uPage" style="flex:1;min-width:0">${Array.from({ length: U.pages }, (_, i) => `<option value="${i + 1}" ${U.page === i + 1 ? 'selected' : ''}>${i + 1} · ${escH(pageLabel(i + 1))}</option>`).join('')}</select></div>` : ''}
-  ${U.img ? `<div class="row"><button id="mFit" ${M.meas.length ? '' : 'disabled'}>Масштаб по замерам</button><button id="uCal" class="${T.calMode ? 'on' : ''}">Масштаб по 2 точкам</button><label style="display:none"><input type="checkbox" id="calH" checked></label></div>
-  <div class="row"><label>Прозрачность</label><input type="range" id="uA" min="0.1" max="1" step="0.05" value="${U.alpha}" style="flex:1"></div>` : '<p class="hint">Без подложки — обмер на сетке 1 м.</p>'}
-  </details>
-  <details><summary>Настройки обмера</summary>
+  <details><summary>⚙ Настройки обмера</summary>
   <div class="row seg2"><button id="mFact" class="${M.cond ? '' : 'on'}">Факт по замерам</button><button id="mCond" class="${M.cond ? 'on' : ''}">Условно по чертежу</button></div>
   <p class="hint">${M.cond ? 'Точки стоят, где вы их поставили; замеры — подписи и данные для листов.' : 'Точки встают по замерам рулетки, углы около 90° — прямые.'}</p>
   <div class="chk"><input type="checkbox" id="auto" ${T.auto ? 'checked' : ''}><label for="auto">Принимать замер с DISTO сразу, без «Принять»</label></div>
@@ -6132,7 +6152,17 @@ function renderTape() {
   const pa = $('#pAcc'); if (pa) pa.onclick = acceptPending; const pr = $('#pRej'); if (pr) pr.onclick = rejectPending;
   const ps = $('#pSkip'); if (ps) ps.onclick = e => { e.preventDefault(); skipPending(); };
   const mfi = $('#mFit'); void mfi;
-  rail.querySelectorAll('[data-tt]').forEach(b => b.onclick = () => { T.numbering = null; if (b.dataset.tt === 'fig') setTimeout(pickFigKind, 0); else if (T.tool === 'fig') T.hatch = null; if (T.selSet && b.dataset.tt !== 'box') { T.selSet = null; showSelBox(); } T.opA = null; T.tool = b.dataset.tt; T.mA = null; T.tA = null; T.roomIds = null; T.objIds = null; T.noteTip = null; if (T.tool !== 'walk') T.chain = null; if (T.tool !== 'gps') T.gpsPrev = null; const tt = TTOOLS.find(t => t[0] === T.tool); if (tt) stat(tt[1] + ': ' + tt[2]); renderTape(); });
+  const pick = (id, figAsk) => { T.numbering = null; if (id === 'fig' && (figAsk || !T.figKind)) setTimeout(pickFigKind, 0); else if (T.tool === 'fig' && id !== 'fig') T.hatch = null; if (T.selSet && id !== 'box') { T.selSet = null; showSelBox(); } T.opA = null; T.tool = id; T.mA = null; T.tA = null; T.roomIds = null; T.objIds = null; T.noteTip = null; if (T.tool !== 'walk') T.chain = null; if (T.tool !== 'gps') T.gpsPrev = null;
+    for (const [g, G] of Object.entries(RGROUPS)) if (G.subs.includes(id)) try { localStorage.setItem('rul_g_' + g, id); } catch (e) { }
+    const tt = TTOOLS.find(t => t[0] === T.tool); if (tt) stat(tt[1] + ': ' + tt[2]); renderTape(); };
+  rail.querySelectorAll('[data-tt]').forEach(b => b.onclick = () => { closeFly(); pick(b.dataset.tt, true); });
+  rail.querySelectorAll('[data-tg]').forEach(b => b.onclick = () => { const g = b.dataset.tg, was = document.getElementById('tfly'), same = was && was.dataset.g === g; closeFly(); if (same) return; pick(gCur(g), false); openFly(g); });
+  function openFly(g) { const G = RGROUPS[g], bt = document.querySelector(`#trail [data-tg="${g}"]`); if (!bt) return; const r = bt.getBoundingClientRect();
+    const el = document.createElement('div'); el.id = 'tfly'; el.dataset.g = g;
+    el.innerHTML = `<div class="tf-h">${escH(G.name)}</div>` + G.subs.map(id => `<button data-fs="${id}" class="${T.tool === id ? 'on' : ''}"><i>${TICON[id] || '•'}</i><span><b>${escH((TTOOLS.find(t => t[0] === id) || [])[1] || id)}</b><small>${escH(RHINT[id] || '')}</small></span></button>`).join('');
+    document.body.appendChild(el); const h = el.offsetHeight; el.style.left = (r.right + 8) + 'px'; el.style.top = Math.max(8, Math.min(innerHeight - h - 8, r.top - 6)) + 'px';
+    el.querySelectorAll('[data-fs]').forEach(x => x.onclick = e => { e.stopPropagation(); closeFly(); pick(x.dataset.fs, true); });
+    setTimeout(() => document.addEventListener('pointerdown', flyOut, true), 0); }
   $('#tUndo').onclick = tUndo; $('#tRedo').onclick = tRedo;
   $('#orth').onchange = e => { M.ortho = e.target.checked; adjust(); renderTape(); };
   document.querySelectorAll('[data-pdfsz]').forEach(b => b.onclick = () => { try { localStorage.setItem('rul_pdfsz', b.dataset.pdfsz); } catch (e) { } stat('Подписи в PDF: ' + PDFSZ[b.dataset.pdfsz].t.toLowerCase() + '.'); renderTape(); });
