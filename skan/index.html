@@ -16,7 +16,8 @@ button:disabled{opacity:.4}button.on{background:#dbe7ff;border-color:#9bb7f5}but
 #foot{position:fixed;left:0;right:0;bottom:0;height:30px;background:#fff;border-top:1px solid var(--line);display:flex;align-items:center;gap:10px;padding:0 10px;font-size:13px}
 #status{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#saved{color:var(--mute)}#ver{color:var(--mute)}
 #rotbar{position:fixed;right:12px;bottom:42px;display:flex;gap:4px;background:rgba(22,32,44,.9);padding:6px;border-radius:12px;z-index:4}#rotbar button{background:#243142;color:#fff;border-color:#344357}
-#asm{width:100%;height:100%;display:block;touch-action:none;background:#fff}
+#asm,#plan{width:100%;height:100%;display:block;touch-action:none;background:#fff}
+#pcard{position:absolute;right:12px;top:12px;width:min(330px,calc(100% - 24px));background:#fff;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:10px;z-index:3}.pc-h{font-weight:700;margin-bottom:6px}.pc-r{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin:5px 0}.pc-r label{color:var(--mute);font-size:13px}.pc-r input{width:90px;font:inherit;font-size:16px;padding:6px 8px;border:1px solid var(--line);border-radius:8px}.pc-s{color:var(--mute);font-size:12px;margin-top:6px}button.dang{color:#c81e1e}.pc-anc button{font-size:12px;padding:5px 8px}
 #grid{display:grid;gap:8px;padding:8px}
 .tile{background:#fff;border:2px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}.tile.sel{border-color:var(--acc)}
 .tile .th{display:flex;align-items:center;gap:6px;padding:5px 8px;border-bottom:1px solid var(--line);font-size:13px}.tile .th i{width:12px;height:12px;border-radius:3px;flex:0 0 12px}.tile .th span{flex:1;display:flex;gap:3px;flex-wrap:wrap}.tile .th button{padding:2px 8px}
@@ -40,7 +41,7 @@ canvas.band{width:100%;height:32px;display:block;border-radius:6px;touch-action:
 </style></head><body>
 <div id="top"><b class="lg">Скан</b>
   <button id="bAdd" class="pri">＋ Сканы</button><span class="sep"></span>
-  <div class="grp"><button data-view="grid">▦ Все сканы</button><button data-view="asm">⧉ Сборка</button></div><span class="sep"></span>
+  <div class="grp"><button data-view="grid">▦ Все сканы</button><button data-view="asm">⧉ Сборка</button><button data-view="plan">📐 План</button></div><span class="sep"></span>
   <div class="grp"><button data-tool="hand">✋ Обзор</button><button data-tool="line">／ Линия</button><button data-tool="point">• Точка</button><button data-tool="erase">🗑 Метка</button></div><span class="sep"></span>
   <button id="bStitch" class="pri">🧩 Сшить</button><button id="bUndo">↶</button><button id="bRedo">↷</button><button id="bFit">⤢</button>
   <span id="colsBox" class="grp"><span class="sep"></span><button data-cols="1">1</button><button data-cols="2">2</button><button data-cols="3">3</button><button data-cols="4">4</button></span><span class="sep"></span>
@@ -49,7 +50,7 @@ canvas.band{width:100%;height:32px;display:block;border-radius:6px;touch-action:
 <div id="side"><div id="list"></div></div>
 <div id="main"></div>
 <div id="rotbar" title="Повернуть выбранный скан"><button id="bR1">⟲ 1°</button><button id="bR01">⟲ 0,1°</button><button id="bRm01">⟳ 0,1°</button><button id="bRm1">⟳ 1°</button><button id="bR90">⟲ 90°</button></div>
-<div id="foot"><span id="status"></span><span id="saved"></span><span id="ver">Скан 2.0 · © d1sco, 2026</span></div>
+<div id="foot"><span id="status"></span><span id="saved"></span><span id="ver">Скан 2.1 · © d1sco, 2026</span></div>
 <div id="busy" hidden><span>…</span></div>
 <input type="file" id="fileIn" multiple accept=".e57" hidden><input type="file" id="projIn" hidden>
 <div id="help" hidden><div class="lh"><h3>Как сшивать</h3><button id="helpX">✕</button></div>
@@ -62,6 +63,7 @@ canvas.band{width:100%;height:32px;display:block;border-radius:6px;touch-action:
 <li><b>⚓ Опорный</b> скан стоит на месте, остальные встают к нему. По умолчанию опорный — первый.</li>
 <li><b>🧩 Сшить</b> — программа ставит сканы по меткам и показывает невязку каждой буквы в мм. Больше 10 мм — красным: вероятно, отмечены разные стены одной буквой.</li>
 <li><b>⧉ Сборка</b> — все сканы вместе. Касание — выбрать скан (он ярче, остальные бледнее). Тянуть — сдвиг, кружок ↻ или два пальца на скане — поворот, правая кнопка мыши — поворот. Кнопки внизу справа — поворот на 0,1° / 1° / 90°, стрелки клавиатуры — сдвиг на 1 см (с Shift — 10 см).</li>
+<li><b>📐 План</b> — когда сканы сшиты: «🔎 Найти стены» строит линии стен и проёмы по всем сканам. Править: касание стены — выбрать; тянуть стену — сдвиг параллельно (углы остаются замкнутыми); тянуть кружок на конце — длина (липнет к соседним стенам); длину можно ввести числом — «начало на месте / от середины / конец на месте» (соседние стены переезжают, комната становится шире или уже). «🎯 По точкам» — подогнать стену по точкам сканов, «⊾ К оси» — выпрямить, «＋ Проём» — дверь, окно или проём: тянуть его, края — ширина, ширина и привязка числом. ／ Линия — нарисовать стену (липнет к углам, около 0°/90° выпрямляется). Оранжевые точки — незамкнутые углы, «⌐ Замкнуть углы». «⬇ DXF» — для камералки (мм, слои).</li>
 <li><b>↶ ↷</b> — отмена и возврат любого шага. <b>💾 Файл</b> — сохранить метки и положения файлом (без точек), <b>📂</b> — открыть его.</li>
 </ol></div>
 <script id="e57src" type="text/plain">
@@ -370,7 +372,7 @@ function prepScan(sc) {
   // рамка по основной массе точек (без редких точек за окнами)
   const xs = [], ys = []; for (let q = 0; q < idx.length; q += Math.max(1, Math.floor(idx.length / 4000))) { xs.push(P[idx[q]]); ys.push(P[idx[q] + 1]); } xs.sort((a, b) => a - b); ys.sort((a, b) => a - b);
   const qf = (A, f) => A.length ? A[Math.floor(A.length * f)] : 0; sc.core = [qf(xs, 0.01) - 0.5, qf(ys, 0.01) - 0.5, qf(xs, 0.99) + 0.5, qf(ys, 0.99) + 0.5];
-  sc.rast = { cv, x0, y1, res, w, h, cnt, levels };
+  sc.rast = { cv, x0, y1, res, w, h, cnt, levels, F: levels.length ? F : null };
   // индекс: ячейки 0,25 м
   const C = 0.25, gw = Math.ceil((x1 - x0) / C), gh = Math.ceil((y1 - y0) / C), cell = new Int32Array(idx.length), cc = new Int32Array(gw * gh + 1);
   idx.forEach((i, j) => { const g = Math.floor((P[i + 1] - y0) / C) * gw + Math.floor((P[i] - x0) / C); cell[j] = g; cc[g + 1]++; });
@@ -486,7 +488,7 @@ function stitch() {
   for (let round = 0; round < 2; round++) { refitCommon(poses); solveLS(free, poses); }
   for (const s of S.scans) if (known.has(s.id)) s.pose = poses.get(s.id);
   S.lastSolve = report(); renderAll(); saveSoon(); if (S.view !== 'asm') setView('asm');
-  const R = S.lastSolve; stat(`Сшито: сканов ${known.size}, меток ${S.marks.length}. Наибольшая невязка ${R.max != null ? Math.round(R.max * 1000) + ' мм' : '—'}${R.bad.length ? ' — проверьте метки: ' + R.bad.join(', ') : ''}.${R.loose.length ? ' Не хватает меток: ' + R.loose.join(', ') : ''}`);
+  const R = S.lastSolve; stat(`Сшито: сканов ${known.size}, меток ${S.marks.length}. Дальше — «📐 План» → «Найти стены». Наибольшая невязка ${R.max != null ? Math.round(R.max * 1000) + ' мм' : '—'}${R.bad.length ? ' — проверьте метки: ' + R.bad.join(', ') : ''}.${R.loose.length ? ' Не хватает меток: ' + R.loose.join(', ') : ''}`);
 }
 function refitCommon(poses) {
   const by = {}; for (const m of S.marks) if (m.kind === 'line') (by[m.lab] = by[m.lab] || []).push(m);
@@ -508,8 +510,8 @@ function report() { // невязки по буквам
 }
 
 // ---------- отмена ----------
-const snapState = () => JSON.stringify({ scans: S.scans.map(s => ({ id: s.id, pose: s.pose, band: s.band, anchor: s.anchor, vis: s.vis })), marks: S.marks });
-function applyState(t) { const j = JSON.parse(t); for (const q of j.scans) { const s = scanById(q.id); if (!s) continue; const bandChanged = s.band[0] !== q.band[0] || s.band[1] !== q.band[1]; Object.assign(s, { pose: q.pose, band: q.band, anchor: q.anchor, vis: q.vis }); if (bandChanged) prepScan(s); } S.marks = j.marks; }
+const snapState = () => JSON.stringify({ scans: S.scans.map(s => ({ id: s.id, pose: s.pose, band: s.band, anchor: s.anchor, vis: s.vis })), marks: S.marks, plan: S.plan });
+function applyState(t) { const j = JSON.parse(t); for (const q of j.scans) { const s = scanById(q.id); if (!s) continue; const bandChanged = s.band[0] !== q.band[0] || s.band[1] !== q.band[1]; Object.assign(s, { pose: q.pose, band: q.band, anchor: q.anchor, vis: q.vis }); if (bandChanged) prepScan(s); } S.marks = j.marks; if (j.plan) S.plan = j.plan; }
 function pushUndo() { S.undo.push(snapState()); if (S.undo.length > 200) S.undo.shift(); S.redo = []; }
 function undo() { if (!S.undo.length) return; S.redo.push(snapState()); applyState(S.undo.pop()); S.lastSolve = null; renderAll(); saveSoon(); stat('Отменено.'); }
 function redo() { if (!S.redo.length) return; S.undo.push(snapState()); applyState(S.redo.pop()); renderAll(); saveSoon(); stat('Возвращено.'); }
@@ -521,13 +523,13 @@ async function put(k, v) { const d = await db(); if (!d) return false; return ne
 async function get(k) { const d = await db(); if (!d) return null; return new Promise(res => { try { const tx = d.transaction('kv', 'readonly'), r = tx.objectStore('kv').get(k); r.onsuccess = () => res(r.result); r.onerror = () => res(null); } catch (e) { res(null); } }); }
 async function del(k) { const d = await db(); if (!d) return; return new Promise(res => { const tx = d.transaction('kv', 'readwrite'); tx.objectStore('kv').delete(k); tx.oncomplete = () => res(); tx.onerror = () => res(); }); }
 let saveT = 0;
-function stateObj() { return { v: 1, nextMark: S.nextMark, nextScan: S.nextScan, asmV: S.asmV, cols: S.cols, scans: S.scans.map(s => ({ id: s.id, key: s.key, name: s.name, floor: s.floor, ceil: s.ceil, hist: s.hist, color: s.color, pose: s.pose, band: s.band, anchor: s.anchor, vis: s.vis, tile: s.tile })), marks: S.marks }; }
+function stateObj() { return { v: 1, nextMark: S.nextMark, nextScan: S.nextScan, asmV: S.asmV, cols: S.cols, plan: S.plan, scans: S.scans.map(s => ({ id: s.id, key: s.key, name: s.name, floor: s.floor, ceil: s.ceil, hist: s.hist, color: s.color, pose: s.pose, band: s.band, anchor: s.anchor, vis: s.vis, tile: s.tile })), marks: S.marks }; }
 function saveSoon() { clearTimeout(saveT); saveT = setTimeout(async () => { const ok = await put('state', JSON.stringify(stateObj())); $('#saved').textContent = ok ? '✓ сохранено ' + new Date().toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '⚠ не сохранилось'; }, 500); }
 async function restore() {
   const t = await get('state'); if (!t) return false; let j; try { j = JSON.parse(t); } catch (e) { return false; }
   busy('Открываю сохранённую работу…'); let miss = 0;
   for (const q of j.scans || []) { const buf = await get('pts:' + q.key); if (!buf) { miss++; continue; } const s = Object.assign({}, q, { pts: new Float32Array(buf) }); prepScan(s); S.scans.push(s); }
-  S.marks = (j.marks || []).filter(m => scanById(m.sid)); S.nextMark = j.nextMark || 1; S.nextScan = j.nextScan || S.scans.length + 1; if (j.asmV) S.asmV = j.asmV; if (j.cols) S.cols = j.cols;
+  S.marks = (j.marks || []).filter(m => scanById(m.sid)); S.nextMark = j.nextMark || 1; S.nextScan = j.nextScan || S.scans.length + 1; if (j.asmV) S.asmV = j.asmV; if (j.cols) S.cols = j.cols; if (j.plan) S.plan = j.plan;
   busy(''); renderAll(); stat(`Работа восстановлена: сканов ${S.scans.length}, меток ${S.marks.length}${miss ? ` (не прочитались из памяти: ${miss})` : ''}.`); return true;
 }
 
@@ -617,7 +619,7 @@ function scanBBoxW(sc) { const [x0, y0, x1, y1] = sc.core; return [[x0, y0], [x1
 function bandCenter(sc) { return L2W(sc, [0, 0]); }
 function knob(sc) { const c = bandCenter(sc), R = Math.max(1.5, 60 / S.asmV.s); return { c, p: [c[0], c[1] + R] }; }
 function renderAll() { renderList(); renderMain(); renderBar(); }
-function renderBar() {
+function renderBar() { $('#rotbar').hidden = S.view !== 'asm';
   $$('[data-view]').forEach(b => b.classList.toggle('on', b.dataset.view === S.view)); $$('[data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === S.tool));
   $('#bUndo').disabled = !S.undo.length; $('#bRedo').disabled = !S.redo.length; $$('[data-cols]').forEach(b => b.classList.toggle('on', +b.dataset.cols === S.cols)); $('#colsBox').hidden = S.view !== 'grid';
 }
@@ -629,6 +631,8 @@ function renderMain() {
     main.innerHTML = `<div id="grid" style="grid-template-columns:repeat(${S.cols},minmax(0,1fr))">${vis.map(s => `<div class="tile ${S.sel === s.id ? 'sel' : ''}" id="tile-${s.id}"><div class="th"><i style="background:${s.color}"></i><b>${escH(s.name)}</b><span>${S.marks.filter(m => m.sid === s.id).map(m => `<em style="background:${labColor(m.lab)}">${escH(m.lab)}</em>`).join('')}</span><button data-solo="${s.id}" title="Сравнить: только этот и выбранный">⇄</button></div><canvas></canvas></div>`).join('')}</div>`;
     sizeTiles(); for (const s of vis) { bindCanvas($(`#tile-${s.id} canvas`), { kind: 'tile', sid: s.id }); drawTile(s); }
     $$('[data-solo]').forEach(b => b.onclick = () => soloWith(+b.dataset.solo));
+  } else if (S.view === 'plan') {
+    main.innerHTML = '<canvas id="plan"></canvas>'; const cv = $('#plan'); sizeCanvas(cv); bindPlan(cv); drawPlan();
   } else {
     main.innerHTML = '<canvas id="asm"></canvas>'; const cv = $('#asm'); sizeCanvas(cv); bindCanvas(cv, { kind: 'asm' }); drawAsm();
   }
@@ -636,9 +640,9 @@ function renderMain() {
 function sizeCanvas(cv) { const r = cv.getBoundingClientRect(); cv.width = Math.max(10, Math.round(r.width * dpr())); cv.height = Math.max(10, Math.round(r.height * dpr())); }
 function sizeTiles() { for (const s of S.scans) { const cv = $(`#tile-${s.id} canvas`); if (!cv) continue; sizeCanvas(cv); if (!s.tile) fitTile(s); } }
 function fitTile(s) { const cv = $(`#tile-${s.id} canvas`); const c = s.core; const w = cv ? cv.width / dpr() : 400, h = cv ? cv.height / dpr() : 300; const W = c[2] - c[0], H = c[3] - c[1]; s.tile = { cx: (c[0] + c[2]) / 2, cy: (c[1] + c[3]) / 2, s: Math.min(w / W, h / H) * 0.95 }; }
-function fitAsm() { const cv = $('#asm'); const vis = S.scans.filter(s => s.vis); if (!vis.length) return; let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; for (const s of vis) for (const p of scanBBoxW(s)) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); } const w = cv ? cv.width / dpr() : innerWidth - 340, h = cv ? cv.height / dpr() : innerHeight - 120; S.asmV = { cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, s: Math.min(w / (x1 - x0), h / (y1 - y0)) * 0.92 }; drawAsm(); }
+function fitAsm() { const cv = $('#asm') || $('#plan'); const vis = S.scans.filter(s => s.vis); if (!vis.length) return; let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; for (const s of vis) for (const p of scanBBoxW(s)) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); } const w = cv ? cv.width / dpr() : innerWidth - 340, h = cv ? cv.height / dpr() : innerHeight - 120; S.asmV = { cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, s: Math.min(w / (x1 - x0), h / (y1 - y0)) * 0.92 }; redraw(); }
 function soloWith(id) { const keep = new Set([id]); if (S.sel && S.sel !== id) keep.add(S.sel); else { const other = S.scans.find(s => s.id !== id && s.vis && S.marks.some(m => m.sid === s.id && S.marks.some(o => o.sid === id && o.lab === m.lab))); if (other) keep.add(other.id); } for (const s of S.scans) s.vis = keep.has(s.id); S.cols = Math.min(2, keep.size); renderAll(); saveSoon(); stat('Рядом два скана. Вернуть все — «👁 Все» в списке.'); }
-function redraw() { if (S.view === 'grid') S.scans.forEach(s => s.vis && drawTile(s)); else drawAsm(); }
+function redraw() { if (S.view === 'grid') S.scans.forEach(s => s.vis && drawTile(s)); else if (S.view === 'plan') drawPlan(); else drawAsm(); }
 
 // ---------- список сканов слева: видимость, опора, полоса высот ----------
 function renderList() {
@@ -763,17 +767,17 @@ async function openProjectFile(f) { let j; try { j = JSON.parse(await f.text());
   renderAll(); saveSoon(); stat(`Из файла применено: сканов ${n} из ${(j.scans || []).length}, меток ${ms.length}.${n < (j.scans || []).length ? ' Остальные сканы загрузите (E57 с теми же именами) и откройте файл ещё раз.' : ''}`); }
 
 // ---------- вид ----------
-function setView(v) { S.view = v; renderAll(); if (v === 'asm' && !S.asmFitted) { S.asmFitted = true; fitAsm(); } }
+function setView(v) { S.view = v; if (v !== 'plan') S.planSel = null; renderAll(); if ((v === 'asm' || v === 'plan') && !S.asmFitted) { S.asmFitted = true; fitAsm(); if (v === 'plan') drawPlan(); } }
 function setTool(t) { S.tool = t; renderBar(); stat({ hand: 'Обзор: тянуть — сдвиг вида, два пальца — масштаб. В «Сборке»: тянуть скан — сдвиг, ↻ или два пальца на скане — поворот, правая кнопка мыши — поворот.', line: 'Линия: проведите вдоль стены или края на скане — программа подгонит линию по точкам. Затем выберите букву: на соседнем скане та же стена — та же буква.', point: 'Точка: коснитесь угла, центра колонны, стояка — и выберите букву. Линии точнее точек.', erase: 'Удалить метку: коснитесь её.' }[t]); }
 
-window.addEventListener('resize', () => { if (S.view === 'grid') { sizeTiles(); redraw(); } else { const cv = $('#asm'); if (cv) { sizeCanvas(cv); drawAsm(); } } });
+window.addEventListener('resize', () => { if (S.view === 'grid') { sizeTiles(); redraw(); } else { const cv = $('#asm') || $('#plan'); if (cv) { sizeCanvas(cv); redraw(); } } });
 document.addEventListener('keydown', e => { if (e.target.closest('input')) return; if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }
   else if (S.view === 'asm' && S.sel && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'q', 'e', 'й', 'у'].includes(e.key)) { const s = scanById(S.sel), st = e.shiftKey ? 0.1 : 0.01; pushUndo(); if (e.key === 'ArrowLeft') s.pose.x -= st; if (e.key === 'ArrowRight') s.pose.x += st; if (e.key === 'ArrowUp') s.pose.y += st; if (e.key === 'ArrowDown') s.pose.y -= st; if (e.key === 'q' || e.key === 'й') setRot(s, { ...s.pose }, bandCenter(s), (e.shiftKey ? 1 : 0.1) * Math.PI / 180); if (e.key === 'e' || e.key === 'у') setRot(s, { ...s.pose }, bandCenter(s), -(e.shiftKey ? 1 : 0.1) * Math.PI / 180); e.preventDefault(); drawAsm(); saveSoon(); } });
 document.addEventListener('DOMContentLoaded', async () => {
   $('#bAdd').onclick = () => $('#fileIn').click(); $('#fileIn').onchange = e => { const f = e.target.files; if (f && f.length) loadFiles(f); e.target.value = ''; };
   $$('[data-view]').forEach(b => b.onclick = () => setView(b.dataset.view)); $$('[data-tool]').forEach(b => b.onclick = () => setTool(b.dataset.tool));
   $$('[data-cols]').forEach(b => b.onclick = () => { S.cols = +b.dataset.cols; S.scans.forEach(s => s.tile = null); renderAll(); saveSoon(); });
-  $('#bStitch').onclick = stitch; $('#bUndo').onclick = undo; $('#bRedo').onclick = redo; $('#bFit').onclick = () => { if (S.view === 'asm') fitAsm(); else { S.scans.forEach(fitTile); redraw(); } };
+  $('#bStitch').onclick = stitch; $('#bUndo').onclick = undo; $('#bRedo').onclick = redo; $('#bFit').onclick = () => { if (S.view === 'asm' || S.view === 'plan') fitAsm(); else { S.scans.forEach(fitTile); redraw(); } };
   $('#bR1').onclick = () => rotSel(1); $('#bR01').onclick = () => rotSel(0.1); $('#bRm01').onclick = () => rotSel(-0.1); $('#bRm1').onclick = () => rotSel(-1); $('#bR90').onclick = () => rotSel(90);
   $('#bSave').onclick = saveProjectFile; $('#bOpen').onclick = () => $('#projIn').click(); $('#projIn').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) openProjectFile(f); };
   $('#bNew').onclick = async () => { if (!(await uiDialog({ title: 'Начать новую сшивку?', text: 'Все сканы и метки этой работы будут убраны из программы. Если нужно — сначала «Сохранить файл».', ok: 'Начать заново', cancel: 'Отмена' }))) return; for (const s of S.scans) await del('pts:' + s.key); await del('state'); location.reload(); };
@@ -781,5 +785,242 @@ document.addEventListener('DOMContentLoaded', async () => {
   const main = $('#main'); main.ondragover = e => e.preventDefault(); main.ondrop = e => { e.preventDefault(); if (e.dataTransfer.files.length) loadFiles(e.dataTransfer.files); };
   renderAll(); await restore(); setTool('hand');
 });
+
+// ===================== ПЛАН: стены по сшитым сканам и быстрая правка =====================
+S.plan = S.plan || { walls: [], ops: [], nextW: 1, nextO: 1 };
+const PL = () => S.plan;
+const wById = id => PL().walls.find(w => w.id === id);
+const sub = (a, b) => [a[0] - b[0], a[1] - b[1]], addv = (a, b) => [a[0] + b[0], a[1] + b[1]], mul = (a, k) => [a[0] * k, a[1] * k], dot = (a, b) => a[0] * b[0] + a[1] * b[1], len = a => Math.hypot(a[0], a[1]);
+const unit = a => { const l = len(a) || 1e-9; return [a[0] / l, a[1] / l]; };
+const wDir = w => unit(sub(w.b, w.a)), wLen = w => len(sub(w.b, w.a));
+function lineX(a1, b1, a2, b2) { const d1 = sub(b1, a1), d2 = sub(b2, a2), den = d1[0] * d2[1] - d1[1] * d2[0]; if (Math.abs(den) < 1e-9) return null; const t = ((a2[0] - a1[0]) * d2[1] - (a2[1] - a1[1]) * d2[0]) / den; return addv(a1, mul(d1, t)); }
+function distSeg(p, a, b) { const d = sub(b, a), L = dot(d, d) || 1e-12; let t = dot(sub(p, a), d) / L; const tc = Math.max(0, Math.min(1, t)); return { d: len(sub(p, addv(a, mul(d, tc)))), t }; }
+
+// --- точки стен всех сшитых сканов в общей системе ---
+function worldWallPts(maxN = 450000) {
+  const out = []; const scans = S.scans.filter(s => s.vis && s.rast && s.rast.F);
+  let tot = 0; for (const s of scans) tot += s.nBand || 0; const step = Math.max(1, Math.round(tot / maxN));
+  for (const s of scans) { const P = s.pts, r = s.rast, z0 = s.floor + s.band[0], z1 = s.floor + s.band[1], c = Math.cos(s.pose.a), sn = Math.sin(s.pose.a); let k = 0;
+    for (let i = 0; i < P.length; i += 3) { const z = P[i + 2]; if (z < z0 || z > z1) continue; if ((k++ % step) !== 0) continue; const x = P[i], y = P[i + 1];
+      const u = Math.floor((x - r.x0) / r.res), v = Math.floor((r.y1 - y) / r.res); if (u < 0 || v < 0 || u >= r.w || v >= r.h || r.F[v * r.w + u] < 0.45) continue;
+      out.push(c * x - sn * y + s.pose.x, sn * x + c * y + s.pose.y); } }
+  return new Float32Array(out);
+}
+function buildWalls() {
+  const used = S.scans.filter(s => s.vis); if (!used.length) { uiAlert('Нет видимых сканов.'); return; }
+  busy('Ищу стены по сшитым сканам…');
+  setTimeout(() => { try {
+    const P = worldWallPts(); const n = P.length / 2; if (n < 200) { busy(''); uiAlert('Слишком мало точек стен — проверьте полосы высот.'); return; }
+    // сетка 0,1 м
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; for (let i = 0; i < P.length; i += 2) { x0 = Math.min(x0, P[i]); x1 = Math.max(x1, P[i]); y0 = Math.min(y0, P[i + 1]); y1 = Math.max(y1, P[i + 1]); }
+    const C = 0.1, gw = Math.ceil((x1 - x0) / C) + 1, gh = Math.ceil((y1 - y0) / C) + 1, alive = new Uint8Array(n).fill(1);
+    const head = new Int32Array(gw * gh).fill(-1), nxt = new Int32Array(n); for (let i = 0; i < n; i++) { const g = Math.floor((P[2 * i + 1] - y0) / C) * gw + Math.floor((P[2 * i] - x0) / C); nxt[i] = head[g]; head[g] = i; }
+    const near = (x, y, r, f) => { const ga = Math.max(0, Math.floor((x - r - x0) / C)), gb = Math.min(gw - 1, Math.floor((x + r - x0) / C)), ha = Math.max(0, Math.floor((y - r - y0) / C)), hb = Math.min(gh - 1, Math.floor((y + r - y0) / C)); for (let gy = ha; gy <= hb; gy++) for (let gx = ga; gx <= gb; gx++) for (let i = head[gy * gw + gx]; i >= 0; i = nxt[i]) if (alive[i]) f(i); };
+    let seed = 12345; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const segs = []; let fails = 0;
+    while (fails < 1200 && segs.length < 320) {
+      const i0 = Math.floor(rnd() * n); if (!alive[i0]) { fails++; continue; }
+      const px = P[2 * i0], py = P[2 * i0 + 1]; let m = 0, mx = 0, my = 0; const loc = []; near(px, py, 0.25, i => { loc.push(i); mx += P[2 * i]; my += P[2 * i + 1]; m++; });
+      if (m < 25) { fails++; continue; } mx /= m; my /= m; let sxx = 0, sxy = 0, syy = 0; for (const i of loc) { const a = P[2 * i] - mx, b = P[2 * i + 1] - my; sxx += a * a; sxy += a * b; syy += b * b; }
+      const tr = sxx + syy, det = sxx * syy - sxy * sxy, l1 = tr / 2 + Math.sqrt(Math.max(0, tr * tr / 4 - det)), l2 = tr - l1; if (l2 / l1 > 0.02) { fails++; continue; }
+      const th = 0.5 * Math.atan2(2 * sxy, sxx - syy); let ux = Math.cos(th), uy = Math.sin(th);
+      // растим вдоль прямой: шагами по сетке, собирая точки в коридоре ±2 см
+      const inl = []; const walk = dir => { let t = 0, miss = 0; while (miss < 4 && Math.abs(t) < 30) { const cx = mx + ux * t, cy = my + uy * t; let got = 0; near(cx, cy, 0.12, i => { const a = P[2 * i] - mx, b = P[2 * i + 1] - my; if (Math.abs(-uy * a + ux * b) < 0.025) { const tt = ux * a + uy * b; if (Math.abs(tt - t) <= 0.1) { inl.push(i); got++; } } }); miss = got ? 0 : miss + 1; t += dir * 0.1; } };
+      walk(1); walk(-1);
+      const uniq = [...new Set(inl)]; if (uniq.length < 40) { fails++; continue; }
+      // уточнение прямой по всем найденным точкам
+      let ax = 0, ay = 0; for (const i of uniq) { ax += P[2 * i]; ay += P[2 * i + 1]; } ax /= uniq.length; ay /= uniq.length; sxx = sxy = syy = 0; for (const i of uniq) { const a = P[2 * i] - ax, b = P[2 * i + 1] - ay; sxx += a * a; sxy += a * b; syy += b * b; }
+      const th2 = 0.5 * Math.atan2(2 * sxy, sxx - syy); ux = Math.cos(th2); uy = Math.sin(th2);
+      const ts = uniq.map(i => ({ i, t: ux * (P[2 * i] - ax) + uy * (P[2 * i + 1] - ay) })).sort((p, q) => p.t - q.t);
+      // разбить на куски по разрывам > 0,25 м
+      let st = 0, made = false;
+      for (let k = 1; k <= ts.length; k++) { if (k < ts.length && ts[k].t - ts[k - 1].t < 0.25) continue; const run = ts.slice(st, k); st = k; const L = run[run.length - 1].t - run[0].t; if (L < 0.35 || run.length / L < 25) continue;
+        segs.push({ a: [ax + ux * run[0].t, ay + uy * run[0].t], b: [ax + ux * run[run.length - 1].t, ay + uy * run[run.length - 1].t], n: run.length }); for (const q of run) alive[q.i] = 0; made = true; }
+      if (made) fails = 0; else { fails++; alive[i0] = 0; }
+    }
+    // объединить соосные куски; разрыв 0,5–2,6 м — проём
+    const W = segs.map(s => ({ a: s.a, b: s.b, n: s.n, ops: [] }));
+    let merged = true; while (merged) { merged = false;
+      for (let i = 0; i < W.length && !merged; i++) for (let j = i + 1; j < W.length && !merged; j++) { const A = W[i], B = W[j], u = wDir(A), v = wDir(B); if (Math.abs(u[0] * v[1] - u[1] * v[0]) > 0.026) continue; const nrm = [-u[1], u[0]]; if (Math.abs(dot(sub(B.a, A.a), nrm)) > 0.03 || Math.abs(dot(sub(B.b, A.a), nrm)) > 0.03) continue;
+        const ta = [0, wLen(A)], tb = [dot(sub(B.a, A.a), u), dot(sub(B.b, A.a), u)].sort((p, q) => p - q); const lo = Math.max(ta[0], tb[0]), hi = Math.min(ta[1], tb[1]), gap = lo - hi;
+        if (gap > 2.6) continue; const t0 = Math.min(ta[0], tb[0]), t1 = Math.max(ta[1], tb[1]), wsum = A.n + B.n;
+        const na = addv(A.a, mul(u, t0)), nb = addv(A.a, mul(u, t1)); const ops = A.ops.map(o => [o[0] - t0, o[1] - t0]).concat(B.ops.map(o => { const s0 = dot(sub(addv(B.a, mul(v, o[0])), A.a), u), s1 = dot(sub(addv(B.a, mul(v, o[1])), A.a), u); return [Math.min(s0, s1) - t0, Math.max(s0, s1) - t0]; }));
+        if (gap > 0.5) ops.push([hi - t0, lo - t0]);
+        W[i] = { a: na, b: nb, n: wsum, ops }; W.splice(j, 1); merged = true; } }
+    // замкнуть углы: конец около чужой прямой (до 0,3 м) — продлить/обрезать до пересечения
+    for (const A of W) for (const end of ['a', 'b']) { let best = null; for (const B of W) { if (B === A) continue; const u = wDir(A), v = wDir(B); if (Math.abs(u[0] * v[1] - u[1] * v[0]) < 0.5) continue; const X = lineX(A.a, A.b, B.a, B.b); if (!X) continue; const dE = len(sub(X, A[end])); const onB = distSeg(X, B.a, B.b); if (dE < 0.3 && onB.d < 0.3 && (!best || dE < best.d)) best = { d: dE, X }; } if (best) { const before = wLen(A); A[end] = best.X; if (end === 'a') { const sh = wLen(A) - before; A.ops = A.ops.map(o => [o[0] + sh, o[1] + sh]); } } }
+    const pl = PL(); pushUndo(); pl.walls = []; pl.ops = []; pl.nextW = 1; pl.nextO = 1;
+    for (const w of W) { if (wLen(w) < 0.3) continue; const id = pl.nextW++; pl.walls.push({ id, a: w.a, b: w.b }); for (const o of w.ops) { const L = o[1] - o[0]; pl.ops.push({ id: pl.nextO++, w: id, t0: o[0], t1: o[1], kind: L >= 0.6 && L <= 1.1 ? 'door' : 'gap' }); } }
+    busy(''); S.planSel = null; setView('plan'); saveSoon(); stat(`Найдено стен: ${pl.walls.length}, проёмов: ${pl.ops.length}. Касание стены — выбрать: тянуть — двигать, концы — длина, число длины — в окошке. Лишнее — «🗑».`);
+  } catch (e) { busy(''); console.error(e); uiAlert('Не получилось найти стены: ' + e.message); } }, 30);
+}
+
+// --- правка ---
+const JOIN = 0.015;
+function joinedAt(w, end) { const P = w[end], out = []; for (const o of PL().walls) { if (o === w) continue; for (const e of ['a', 'b']) if (len(sub(o[e], P)) < JOIN) out.push({ w: o, end: e }); } return out; }
+function moveWallTo(w, na, nb, carry = true) { // поставить стену на новую прямую; примыкающие стены доводятся до неё (углы остаются замкнутыми)
+  const J = carry ? { a: joinedAt(w, 'a'), b: joinedAt(w, 'b') } : { a: [], b: [] };
+  const oldA = w.a, oldB = w.b; w.a = na; w.b = nb;
+  for (const end of ['a', 'b']) for (const j of J[end]) { const o = j.w, other = j.end === 'a' ? 'b' : 'a'; const X = lineX(o.a, o.b, w.a, w.b); if (X && len(sub(X, o[other])) > 0.05) { o[j.end] = X; w[end] = X; } else { o[j.end] = w[end]; } }
+  void oldA; void oldB; fixOps(w);
+}
+function fixOps(w) { const L = wLen(w); for (const o of PL().ops) if (o.w === w.id) { o.t0 = Math.max(0, Math.min(L - 0.05, o.t0)); o.t1 = Math.max(o.t0 + 0.05, Math.min(L, o.t1)); } }
+function setLength(w, L, anchor) { // anchor: 'a' — начало на месте, 'b' — конец на месте, 'c' — середина
+  const u = wDir(w), c = mul(addv(w.a, w.b), 0.5); let na = w.a, nb = w.b;
+  if (anchor === 'a') nb = addv(w.a, mul(u, L)); else if (anchor === 'b') na = sub(w.b, mul(u, L)); else { na = sub(c, mul(u, L / 2)); nb = addv(c, mul(u, L / 2)); }
+  // примыкающие к сдвинутому концу стены переезжают параллельно (комната становится шире/уже)
+  for (const [end, np] of [['a', na], ['b', nb]]) { const d = sub(np, w[end]); if (len(d) < 1e-6) continue; for (const j of joinedAt(w, end)) { const o = j.w, oth = j.end === 'a' ? 'b' : 'a'; const oa = addv(o.a, d), ob = addv(o.b, d); const J2 = joinedAt(o, oth).filter(q => q.w !== w); o.a = oa; o.b = ob; for (const q of J2) { const X = lineX(q.w.a, q.w.b, o.a, o.b); if (X) { q.w[q.end] = X; o[oth] = X; fixOps(q.w); } } fixOps(o); } }
+  if (anchor === 'a') w.b = nb; else if (anchor === 'b') w.a = na; else { w.a = na; w.b = nb; }
+  fixOps(w);
+}
+function refitWall(w) { // подогнать стену по точкам сканов
+  const P = worldWallPts(300000), u = wDir(w), nrm = [-u[1], u[0]], L = wLen(w); let sel = [];
+  for (const tol of [0.08, 0.04, 0.02]) { sel = []; let mx = 0, my = 0; for (let i = 0; i < P.length; i += 2) { const q = [P[i], P[i + 1]], t = dot(sub(q, w.a), u), d = dot(sub(q, w.a), nrm); if (t < 0.05 || t > L - 0.05 || Math.abs(d) > tol) continue; sel.push(q); mx += q[0]; my += q[1]; } if (sel.length < 30) return false;
+    mx /= sel.length; my /= sel.length; let sxx = 0, sxy = 0, syy = 0; for (const q of sel) { const a = q[0] - mx, b = q[1] - my; sxx += a * a; sxy += a * b; syy += b * b; } const th = 0.5 * Math.atan2(2 * sxy, sxx - syy); let v = [Math.cos(th), Math.sin(th)]; if (dot(v, u) < 0) v = mul(v, -1);
+    const pr = p => addv([mx, my], mul(v, dot(sub(p, [mx, my]), v))); moveWallTo(w, pr(w.a), pr(w.b)); }
+  return sel.length;
+}
+function squareAll() { // выровнять стены к двум главным осям (если отклонение меньше 4°)
+  const W = PL().walls; let sx = 0, sy = 0; for (const w of W) { const a = Math.atan2(w.b[1] - w.a[1], w.b[0] - w.a[0]) * 4, L = wLen(w); sx += Math.cos(a) * L; sy += Math.sin(a) * L; } const ax = Math.atan2(sy, sx) / 4; let n = 0;
+  pushUndo(); for (const w of W) { const a = Math.atan2(w.b[1] - w.a[1], w.b[0] - w.a[0]); const k = Math.round((a - ax) / (Math.PI / 2)), tgt = ax + k * Math.PI / 2; if (Math.abs(normA(a - tgt)) > 4 * Math.PI / 180 || Math.abs(normA(a - tgt)) < 1e-7) continue; const c = mul(addv(w.a, w.b), 0.5), L = wLen(w), u = [Math.cos(tgt), Math.sin(tgt)]; moveWallTo(w, sub(c, mul(u, L / 2)), addv(c, mul(u, L / 2))); n++; }
+  closeCorners(true); drawPlan(); saveSoon(); stat(`Выровнено к осям: ${n} стен (отклонение было меньше 4°).`);
+}
+function closeCorners(silent) { const W = PL().walls; let n = 0; if (!silent) pushUndo();
+  for (const A of W) for (const end of ['a', 'b']) { if (joinedAt(A, end).length) continue; let best = null; for (const B of W) { if (B === A) continue; const u = wDir(A), v = wDir(B); if (Math.abs(u[0] * v[1] - u[1] * v[0]) < 0.5) continue; const X = lineX(A.a, A.b, B.a, B.b); if (!X) continue; const dE = len(sub(X, A[end])), onB = distSeg(X, B.a, B.b); if (dE < 0.35 && onB.d < 0.35 && (!best || dE < best.d)) best = { d: dE, X, B }; }
+    if (best) { const sh = end === 'a' ? len(sub(best.X, A.a)) * Math.sign(dot(sub(A.a, best.X), wDir(A))) : 0; A[end] = best.X; if (end === 'a') for (const o of PL().ops) if (o.w === A.id) { o.t0 += sh; o.t1 += sh; } fixOps(A);
+      const B = best.B; for (const e of ['a', 'b']) if (len(sub(B[e], best.X)) < 0.35 && !joinedAt(B, e).some(q => q.w === A)) { B[e] = best.X; fixOps(B); } n++; } }
+  if (!silent) { drawPlan(); saveSoon(); stat(`Замкнуто углов: ${n}.`); } }
+
+// --- отрисовка плана ---
+function drawPlan() {
+  const cv = $('#plan'); if (!cv || S.view !== 'plan') return; const W = cv.width, H = cv.height, ctx = cv.getContext('2d'); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+  const V = S.asmV, d = dpr(), toS = p => w2s(V, W, H, p);
+  if (S.planBg !== false) for (const sc of S.scans) if (sc.vis) drawScan(ctx, sc, V, W, H, 0.45);
+  const sel = S.planSel;
+  for (const w of PL().walls) { const A = toS(w.a), B = toS(w.b), isSel = sel && sel.w === w.id; const ops = PL().ops.filter(o => o.w === w.id).sort((p, q) => p.t0 - q.t0), u = wDir(w);
+    ctx.strokeStyle = isSel ? '#2563eb' : '#111'; ctx.lineWidth = (isSel ? 4 : 3) * d; ctx.lineCap = 'round';
+    let t = 0; const L = wLen(w); const seg = (t0, t1) => { if (t1 - t0 <= 0) return; ctx.beginPath(); ctx.moveTo(...toS(addv(w.a, mul(u, t0)))); ctx.lineTo(...toS(addv(w.a, mul(u, t1)))); ctx.stroke(); };
+    for (const o of ops) { seg(t, o.t0); t = Math.max(t, o.t1); } seg(t, L);
+    for (const o of ops) drawOp(ctx, w, o, toS, sel && sel.o === o.id);
+    // длина
+    if (len(sub(B, A)) > 40 * d) { const M = mul(addv(A, B), 0.5); let ang = Math.atan2(B[1] - A[1], B[0] - A[0]); if (ang > Math.PI / 2) ang -= Math.PI; if (ang < -Math.PI / 2) ang += Math.PI; ctx.save(); ctx.translate(M[0], M[1]); ctx.rotate(ang); ctx.font = `bold ${12 * d}px system-ui`; ctx.textAlign = 'center'; const txt = nf(L, 3), tw = ctx.measureText(txt).width; ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fillRect(-tw / 2 - 3 * d, -18 * d, tw + 6 * d, 14 * d); ctx.fillStyle = isSel ? '#2563eb' : '#111'; ctx.fillText(txt, 0, -7 * d); ctx.restore(); }
+    if (isSel) for (const P of [A, B]) { ctx.fillStyle = '#fff'; ctx.strokeStyle = '#2563eb'; ctx.lineWidth = 2.5 * d; ctx.beginPath(); ctx.arc(P[0], P[1], 9 * d, 0, 7); ctx.fill(); ctx.stroke(); } }
+  // свободные концы — оранжевые точки (угол не замкнут)
+  for (const w of PL().walls) for (const e of ['a', 'b']) if (!joinedAt(w, e).length) { const P = toS(w[e]); ctx.fillStyle = '#ea580c'; ctx.beginPath(); ctx.arc(P[0], P[1], 3 * d, 0, 7); ctx.fill(); }
+  if (S.pdraw) { ctx.strokeStyle = '#2563eb'; ctx.setLineDash([6 * d, 4 * d]); ctx.lineWidth = 2 * d; ctx.beginPath(); ctx.moveTo(...toS(S.pdraw.a)); ctx.lineTo(...toS(S.pdraw.b)); ctx.stroke(); ctx.setLineDash([]); }
+  scaleBar(ctx, V, W, H); renderPlanCard();
+}
+function drawOp(ctx, w, o, toS, isSel) { const u = wDir(w), n = [-u[1], u[0]], d = dpr(), A = addv(w.a, mul(u, o.t0)), B = addv(w.a, mul(u, o.t1)), Lw = o.t1 - o.t0;
+  ctx.save(); ctx.strokeStyle = isSel ? '#2563eb' : '#0f8a4b'; ctx.lineWidth = (isSel ? 3 : 2) * d;
+  const SA = toS(A), SB = toS(B); for (const P of [SA, SB]) { ctx.beginPath(); ctx.arc(P[0], P[1], (isSel ? 6 : 3) * d, 0, 7); ctx.stroke(); }
+  if (o.kind === 'door') { const tip = addv(A, mul(n, Lw)); ctx.beginPath(); ctx.moveTo(...SA); ctx.lineTo(...toS(tip)); ctx.stroke(); ctx.setLineDash([4 * d, 3 * d]); ctx.beginPath(); for (let k = 0; k <= 16; k++) { const a = k / 16 * Math.PI / 2, p = addv(A, addv(mul(u, Math.cos(a) * Lw), mul(n, Math.sin(a) * Lw))); const S2 = toS(p); k ? ctx.lineTo(...S2) : ctx.moveTo(...S2); } ctx.stroke(); ctx.setLineDash([]); }
+  else if (o.kind === 'window') { for (const k of [-0.04, 0.04]) { ctx.beginPath(); ctx.moveTo(...toS(addv(A, mul(n, k)))); ctx.lineTo(...toS(addv(B, mul(n, k)))); ctx.stroke(); } }
+  else { ctx.setLineDash([3 * d, 4 * d]); ctx.beginPath(); ctx.moveTo(...SA); ctx.lineTo(...SB); ctx.stroke(); ctx.setLineDash([]); }
+  const M = toS(mul(addv(A, B), 0.5)); ctx.font = `${11 * d}px system-ui`; ctx.fillStyle = isSel ? '#2563eb' : '#0f8a4b'; ctx.textAlign = 'center'; ctx.fillText(nf(Lw, 3), M[0], M[1] + 16 * d); ctx.restore(); }
+
+// --- карточка выбранного: длина числом, проёмы, действия ---
+function renderPlanCard() {
+  let el = $('#pcard'); const sel = S.planSel; if (!el) { el = document.createElement('div'); el.id = 'pcard'; $('#main').appendChild(el); }
+  if (!sel) { el.innerHTML = `<div class="pc-h">План: стен ${PL().walls.length}, проёмов ${PL().ops.length}</div><div class="pc-r"><button id="pcBuild" class="pri">${PL().walls.length ? '⟳ Найти стены заново' : '🔎 Найти стены по сканам'}</button></div><div class="pc-r"><button id="pcClose">⌐ Замкнуть углы</button><button id="pcSq">⊾ К осям</button><button id="pcBg">${S.planBg === false ? '◌ Показать сканы' : '◉ Скрыть сканы'}</button></div><div class="pc-r"><button id="pcDxf">⬇ DXF</button></div><div class="pc-s">Касание стены — выбрать. ／ Линия — нарисовать стену. Оранжевые точки — незамкнутые углы.</div>`;
+    $('#pcBuild').onclick = async () => { if (PL().walls.length && !(await uiDialog({ title: 'Найти стены заново?', text: 'Текущие стены и правки заменятся найденными. Вернуть — «↶».', ok: 'Найти', cancel: 'Отмена' }))) return; buildWalls(); };
+    $('#pcClose').onclick = () => closeCorners(false); $('#pcSq').onclick = squareAll; $('#pcBg').onclick = () => { S.planBg = S.planBg === false; drawPlan(); }; $('#pcDxf').onclick = exportDXF; return; }
+  const w = wById(sel.w); if (!w) { S.planSel = null; return renderPlanCard(); }
+  if (sel.o) { const o = PL().ops.find(q => q.id === sel.o); if (!o) { S.planSel = { w: w.id }; return renderPlanCard(); }
+    el.innerHTML = `<div class="pc-h">Проём на стене ${nf(wLen(w), 3)} м</div>
+      <div class="pc-r">${[['door', '🚪 Дверь'], ['window', '🪟 Окно'], ['gap', '▭ Проём']].map(([k, t]) => `<button data-ok="${k}" class="${o.kind === k ? 'on' : ''}">${t}</button>`).join('')}</div>
+      <div class="pc-r"><label>Ширина</label><input id="opW" inputmode="decimal" value="${nf(o.t1 - o.t0, 3)}"><label>от начала</label><input id="opT" inputmode="decimal" value="${nf(o.t0, 3)}"></div>
+      <div class="pc-r">${o.kind === 'door' ? '<button id="opFlip">↔ Открывание</button>' : ''}<button id="opDel" class="dang">🗑 Удалить проём</button><button id="opBack">← К стене</button></div>`;
+    $$('[data-ok]').forEach(b => b.onclick = () => { pushUndo(); o.kind = b.dataset.ok; drawPlan(); saveSoon(); });
+    const num = v => { const x = parseFloat(String(v).replace(',', '.')); return isFinite(x) ? (x > 20 ? x / 1000 : x) : null; };
+    $('#opW').onchange = e => { const v = num(e.target.value); if (!v) return; pushUndo(); o.t1 = Math.min(wLen(w), o.t0 + v); drawPlan(); saveSoon(); };
+    $('#opT').onchange = e => { const v = num(e.target.value); if (v == null) return; pushUndo(); const Wd = o.t1 - o.t0; o.t0 = Math.max(0, Math.min(wLen(w) - Wd, v)); o.t1 = o.t0 + Wd; drawPlan(); saveSoon(); };
+    const fl = $('#opFlip'); if (fl) fl.onclick = () => { pushUndo(); const L = wLen(w); [w.a, w.b] = [w.b, w.a]; for (const q of PL().ops) if (q.w === w.id) { const a = L - q.t1, b = L - q.t0; q.t0 = a; q.t1 = b; } drawPlan(); saveSoon(); };
+    $('#opDel').onclick = () => { pushUndo(); PL().ops = PL().ops.filter(q => q !== o); S.planSel = { w: w.id }; drawPlan(); saveSoon(); }; $('#opBack').onclick = () => { S.planSel = { w: w.id }; drawPlan(); };
+    return; }
+  const ang = Math.atan2(w.b[1] - w.a[1], w.b[0] - w.a[0]) * 180 / Math.PI;
+  el.innerHTML = `<div class="pc-h">Стена · ${nf(wLen(w), 3)} м · ${nf(((ang % 180) + 180) % 180, 2)}°</div>
+    <div class="pc-r"><label>Длина, м</label><input id="wL" inputmode="decimal" value="${nf(wLen(w), 3)}"></div>
+    <div class="pc-r pc-anc">${[['a', 'начало на месте'], ['c', 'от середины'], ['b', 'конец на месте']].map(([k, t]) => `<button data-anc="${k}" class="${(S.lenAnc || 'a') === k ? 'on' : ''}">${t}</button>`).join('')}</div>
+    <div class="pc-r"><button id="wFit">🎯 По точкам</button><button id="wSq">⊾ К оси</button><button id="wOp" class="pri">＋ Проём</button></div>
+    <div class="pc-r"><button id="wSplit">✂ Разделить</button><button id="wDel" class="dang">🗑 Удалить</button><button id="wDone">Готово</button></div>
+    <div class="pc-s">Тянуть стену — сдвиг параллельно, углы остаются замкнутыми. Тянуть кружок на конце — длина (липнет к соседним стенам). Начало стены — со стороны первого кружка.</div>`;
+  const num = v => { const x = parseFloat(String(v).replace(',', '.')); return isFinite(x) ? (x > 50 ? x / 1000 : x) : null; };
+  $('#wL').onchange = e => { const v = num(e.target.value); if (!v || v < 0.05) return; pushUndo(); setLength(w, v, S.lenAnc || 'a'); drawPlan(); saveSoon(); stat(`Длина ${nf(v, 3)} м.`); };
+  $('#wL').onkeydown = e => { if (e.key === 'Enter') e.target.blur(); };
+  $$('[data-anc]').forEach(b => b.onclick = () => { S.lenAnc = b.dataset.anc; renderPlanCard(); });
+  $('#wFit').onclick = () => { pushUndo(); const n = refitWall(w); drawPlan(); saveSoon(); stat(n ? `Стена подогнана по ${n} точкам сканов.` : 'Рядом мало точек сканов — стена не сдвинута.'); };
+  $('#wSq').onclick = () => { const a = Math.atan2(w.b[1] - w.a[1], w.b[0] - w.a[0]); let ref = 0, best = 1e9; for (const o of PL().walls) { if (o === w) continue; const b = Math.atan2(o.b[1] - o.a[1], o.b[0] - o.a[0]); const k = Math.round((a - b) / (Math.PI / 2)), dd = Math.abs(normA(a - b - k * Math.PI / 2)); if (dd < best) { best = dd; ref = b + k * Math.PI / 2; } } pushUndo(); const c = mul(addv(w.a, w.b), 0.5), L = wLen(w), u = [Math.cos(ref), Math.sin(ref)]; moveWallTo(w, sub(c, mul(u, L / 2)), addv(c, mul(u, L / 2))); drawPlan(); saveSoon(); };
+  $('#wOp').onclick = () => { pushUndo(); const L = wLen(w), W = Math.min(0.9, L * 0.6), o = { id: PL().nextO++, w: w.id, t0: (L - W) / 2, t1: (L + W) / 2, kind: 'door' }; PL().ops.push(o); S.planSel = { w: w.id, o: o.id }; drawPlan(); saveSoon(); stat('Проём посередине стены: тяните его или его края, ширину и привязку можно ввести числом.'); };
+  $('#wSplit').onclick = () => { pushUndo(); const L = wLen(w), u = wDir(w), M = addv(w.a, mul(u, L / 2)); const nw = { id: PL().nextW++, a: M, b: w.b }; w.b = M; for (const o of PL().ops) if (o.w === w.id && o.t0 >= L / 2) { o.w = nw.id; o.t0 -= L / 2; o.t1 -= L / 2; } PL().walls.push(nw); fixOps(w); drawPlan(); saveSoon(); stat('Стена разделена посередине — концы можно тянуть.'); };
+  $('#wDel').onclick = () => { pushUndo(); PL().walls = PL().walls.filter(q => q !== w); PL().ops = PL().ops.filter(o => o.w !== w.id); S.planSel = null; drawPlan(); saveSoon(); }; $('#wDone').onclick = () => { S.planSel = null; drawPlan(); };
+}
+
+// --- касания на плане ---
+function bindPlan(cv) {
+  const P = new Map(); let g = null; const d = () => dpr();
+  const toW = e => { const r = cv.getBoundingClientRect(); return s2w(S.asmV, cv.width, cv.height, e.clientX - r.left, e.clientY - r.top); };
+  const scr = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * d(), (e.clientY - r.top) * d()]; };
+  const toS = p => w2s(S.asmV, cv.width, cv.height, p);
+  const hit = e => { const s = scr(e); let best = null, bd = 14 * d();
+    const sel = S.planSel && wById(S.planSel.w); if (sel) for (const end of ['a', 'b']) { const q = toS(sel[end]); if (Math.hypot(q[0] - s[0], q[1] - s[1]) < 20 * d()) return { kind: 'end', w: sel, end }; }
+    for (const o of PL().ops) { const w = wById(o.w); if (!w) continue; const u = wDir(w), A = toS(addv(w.a, mul(u, o.t0))), B = toS(addv(w.a, mul(u, o.t1))); for (const [k, Q] of [['t0', A], ['t1', B]]) if (S.planSel && S.planSel.o === o.id && Math.hypot(Q[0] - s[0], Q[1] - s[1]) < 16 * d()) return { kind: 'opEnd', o, w, k }; const r = distSeg(s, A, B); if (r.d < bd && r.t > 0 && r.t < 1) { bd = r.d; best = { kind: 'op', o, w }; } }
+    for (const w of PL().walls) { const r = distSeg(s, toS(w.a), toS(w.b)); if (r.d < bd) { bd = r.d; best = { kind: 'wall', w }; } }
+    return best; };
+  const snapPt = (p, skip) => { let best = null, bd = 18 / (S.asmV.s); for (const w of PL().walls) { if (w === skip) continue; for (const e of ['a', 'b']) { const dd = len(sub(w[e], p)); if (dd < bd) { bd = dd; best = w[e]; } } } return best; };
+  cv.oncontextmenu = e => e.preventDefault();
+  cv.onwheel = e => { e.preventDefault(); const v = S.asmV, w = toW(e), k = Math.exp(-e.deltaY * 0.0015); v.s *= k; const w2 = toW(e); v.cx += w[0] - w2[0]; v.cy += w[1] - w2[1]; drawPlan(); };
+  cv.onpointerdown = e => { e.preventDefault(); cv.setPointerCapture(e.pointerId); P.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (P.size === 2) { const [a, b] = [...P.values()], mid = { clientX: (a.x + b.x) / 2, clientY: (a.y + b.y) / 2 }; S.pdraw = null; g = { kind: 'pinch', d0: Math.hypot(b.x - a.x, b.y - a.y), v0: { ...S.asmV }, wm0: toW(mid) }; return; }
+    if (P.size > 2) return; const w = toW(e);
+    if (S.tool === 'line') { const s0 = snapPt(w) || w; g = { kind: 'draw', a: s0 }; S.pdraw = { a: s0, b: s0 }; return; }
+    const h = hit(e);
+    if (S.tool === 'erase' && h) { pushUndo(); if (h.kind === 'op') PL().ops = PL().ops.filter(o => o !== h.o); else if (h.w) { PL().walls = PL().walls.filter(q => q !== h.w); PL().ops = PL().ops.filter(o => o.w !== h.w.id); } S.planSel = null; drawPlan(); saveSoon(); g = null; return; }
+    if (h && h.kind === 'end') { pushUndo(); g = { kind: 'end', w: h.w, end: h.end, u: wDir(h.w), p0: h.w[h.end].slice(), free: e.button === 2 || e.altKey }; return; }
+    if (h && h.kind === 'opEnd') { pushUndo(); g = { kind: 'opEnd', o: h.o, w: h.w, k: h.k }; return; }
+    if (h && h.kind === 'op') { S.planSel = { w: h.w.id, o: h.o.id }; pushUndo(); g = { kind: 'opMove', o: h.o, w: h.w, w0: w, t0: h.o.t0, t1: h.o.t1 }; drawPlan(); return; }
+    if (h && h.kind === 'wall') { const was = S.planSel && S.planSel.w === h.w.id && !S.planSel.o; S.planSel = { w: h.w.id }; pushUndo(); g = { kind: 'wall', w: h.w, w0: w, a0: h.w.a.slice(), b0: h.w.b.slice(), moved: false, was }; drawPlan(); return; }
+    g = { kind: 'pan', x: e.clientX, y: e.clientY, v0: { ...S.asmV }, tap: true }; };
+  cv.onpointermove = e => { if (!P.has(e.pointerId)) return; P.set(e.pointerId, { x: e.clientX, y: e.clientY }); if (!g) return; const v = S.asmV;
+    if (g.kind === 'pinch' && P.size >= 2) { const [a, b] = [...P.values()], mid = { clientX: (a.x + b.x) / 2, clientY: (a.y + b.y) / 2 }; v.s = g.v0.s * Math.hypot(b.x - a.x, b.y - a.y) / g.d0; v.cx = g.v0.cx; v.cy = g.v0.cy; const wm = toW(mid); v.cx += g.wm0[0] - wm[0]; v.cy += g.wm0[1] - wm[1]; drawPlan(); return; }
+    if (g.kind === 'pan') { v.cx = g.v0.cx - (e.clientX - g.x) / v.s; v.cy = g.v0.cy + (e.clientY - g.y) / v.s; if (Math.hypot(e.clientX - g.x, e.clientY - g.y) > 6) g.tap = false; drawPlan(); return; }
+    const w = toW(e);
+    if (g.kind === 'draw') { let b = snapPt(w) || w; const dd = sub(b, g.a), a = Math.atan2(dd[1], dd[0]); const st = Math.round(a / (Math.PI / 2)) * Math.PI / 2; if (!snapPt(w) && Math.abs(normA(a - st)) < 3 * Math.PI / 180) { const L = len(dd); b = addv(g.a, [Math.cos(st) * L, Math.sin(st) * L]); } S.pdraw = { a: g.a, b }; drawPlan(); return; }
+    if (g.kind === 'wall') { const u = wDir(g.w), n = [-u[1], u[0]], k = dot(sub(w, g.w0), n); if (Math.abs(k) * v.s > 3) g.moved = true; if (!g.moved) return; moveWallTo(g.w, addv(g.a0, mul(n, k)), addv(g.b0, mul(n, k))); drawPlan(); return; }
+    if (g.kind === 'end') { let p; const sp = snapPt(w, g.w); if (g.free) p = sp || w; else { const t = dot(sub(w, g.p0), g.u); p = addv(g.p0, mul(g.u, t)); // липнет к прямым соседних стен
+        let best = null, bd = 14 / v.s; for (const o of PL().walls) { if (o === g.w) continue; const X = lineX(g.w.a, g.w.b, o.a, o.b); if (!X) continue; const dd = len(sub(X, p)); if (dd < bd && distSeg(X, o.a, o.b).d < 0.3) { bd = dd; best = X; } } if (best) p = best; }
+      const other = g.end === 'a' ? 'b' : 'a'; if (len(sub(p, g.w[other])) < 0.05) return; const sh = g.end === 'a' ? dot(sub(g.w.a, p), wDir(g.w)) : 0; g.w[g.end] = p; if (g.end === 'a') for (const o of PL().ops) if (o.w === g.w.id) { o.t0 += sh; o.t1 += sh; } fixOps(g.w); drawPlan(); return; }
+    if (g.kind === 'opMove') { const u = wDir(g.w), dt = dot(sub(w, g.w0), u), W = g.t1 - g.t0, L = wLen(g.w); g.o.t0 = Math.max(0, Math.min(L - W, g.t0 + dt)); g.o.t1 = g.o.t0 + W; drawPlan(); return; }
+    if (g.kind === 'opEnd') { const u = wDir(g.w), t = Math.max(0, Math.min(wLen(g.w), dot(sub(w, g.w.a), u))); if (g.k === 't0') g.o.t0 = Math.min(t, g.o.t1 - 0.05); else g.o.t1 = Math.max(t, g.o.t0 + 0.05); drawPlan(); return; } };
+  const end = e => { P.delete(e.pointerId); if (!g) return; if (g.kind === 'pinch' && P.size) return; const was = g; g = null;
+    if (was.kind === 'draw') { const D = S.pdraw; S.pdraw = null; if (D && len(sub(D.b, D.a)) > 0.1) { pushUndo(); const w = { id: PL().nextW++, a: D.a, b: D.b }; PL().walls.push(w); S.planSel = { w: w.id }; saveSoon(); } drawPlan(); return; }
+    if (was.kind === 'pan' && was.tap) { S.planSel = null; drawPlan(); return; }
+    if (was.kind === 'wall' && !was.moved) { S.undo.pop(); drawPlan(); return; }
+    saveSoon(); drawPlan(); };
+  cv.onpointerup = end; cv.onpointercancel = end;
+}
+
+// --- DXF для камералки ---
+const CP1251 = (() => { const m = {}; for (let i = 0; i < 64; i++) m[0x410 + i] = 0xC0 + i; m[0x401] = 0xA8; m[0x451] = 0xB8; m[0x2116] = 0xB9; return m; })();
+function exportDXF() {
+  const L = []; const g = (c, v) => L.push(String(c), String(v)); const k = 1000; // мм
+  g(0, 'SECTION'); g(2, 'HEADER'); g(9, '$ACADVER'); g(1, 'AC1009'); g(9, '$DWGCODEPAGE'); g(3, 'ANSI_1251'); g(9, '$INSUNITS'); g(70, 4); g(0, 'ENDSEC');
+  g(0, 'SECTION'); g(2, 'TABLES'); g(0, 'TABLE'); g(2, 'LAYER'); g(70, 4); for (const [n, c] of [['STENY', 7], ['PROEMY', 3], ['RAZMERY', 1], ['SKANY', 8]]) { g(0, 'LAYER'); g(2, n); g(70, 0); g(62, c); g(6, 'CONTINUOUS'); } g(0, 'ENDTAB'); g(0, 'ENDSEC');
+  g(0, 'SECTION'); g(2, 'ENTITIES');
+  const line = (a, b, lay) => { g(0, 'LINE'); g(8, lay); g(10, (a[0] * k).toFixed(1)); g(20, (a[1] * k).toFixed(1)); g(30, 0); g(11, (b[0] * k).toFixed(1)); g(21, (b[1] * k).toFixed(1)); g(31, 0); };
+  const text = (p, h, s, ang, lay) => { g(0, 'TEXT'); g(8, lay); g(10, (p[0] * k).toFixed(1)); g(20, (p[1] * k).toFixed(1)); g(30, 0); g(40, (h * k).toFixed(1)); g(1, s); g(50, ang.toFixed(3)); g(72, 1); g(11, (p[0] * k).toFixed(1)); g(21, (p[1] * k).toFixed(1)); g(31, 0); };
+  for (const w of PL().walls) { const u = wDir(w), n = [-u[1], u[0]], Lw = wLen(w), ops = PL().ops.filter(o => o.w === w.id).sort((p, q) => p.t0 - q.t0); let t = 0;
+    for (const o of ops) { if (o.t0 > t) line(addv(w.a, mul(u, t)), addv(w.a, mul(u, o.t0)), 'STENY'); t = Math.max(t, o.t1); const A = addv(w.a, mul(u, o.t0)), B = addv(w.a, mul(u, o.t1));
+      if (o.kind === 'door') { line(A, addv(A, mul(n, o.t1 - o.t0)), 'PROEMY'); g(0, 'ARC'); g(8, 'PROEMY'); g(10, (A[0] * k).toFixed(1)); g(20, (A[1] * k).toFixed(1)); g(30, 0); g(40, ((o.t1 - o.t0) * k).toFixed(1)); const a0 = Math.atan2(u[1], u[0]) * 180 / Math.PI; g(50, a0.toFixed(3)); g(51, (a0 + 90).toFixed(3)); }
+      else if (o.kind === 'window') { line(addv(A, mul(n, -0.04)), addv(B, mul(n, -0.04)), 'PROEMY'); line(addv(A, mul(n, 0.04)), addv(B, mul(n, 0.04)), 'PROEMY'); }
+      else line(A, B, 'PROEMY');
+      text(addv(mul(addv(A, B), 0.5), mul(n, -0.12)), 0.08, nf(o.t1 - o.t0, 3), Math.atan2(u[1], u[0]) * 180 / Math.PI, 'RAZMERY'); }
+    if (Lw > t) line(addv(w.a, mul(u, t)), w.b, 'STENY');
+    let ang = Math.atan2(u[1], u[0]) * 180 / Math.PI; if (ang > 90) ang -= 180; if (ang <= -90) ang += 180; text(addv(mul(addv(w.a, w.b), 0.5), mul(n, 0.1)), 0.1, nf(Lw, 3), ang, 'RAZMERY'); }
+  for (const s of S.scans) if (s.vis) text([s.pose.x, s.pose.y], 0.15, s.name, 0, 'SKANY');
+  g(0, 'ENDSEC'); g(0, 'EOF');
+  const str = L.join('\r\n') + '\r\n', out = []; for (const ch of str) { const c = ch.codePointAt(0); out.push(c < 128 ? c : (CP1251[c] || 63)); }
+  const blob = new Blob([new Uint8Array(out)], { type: 'application/dxf' }), a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'План_по_сканам_' + new Date().toISOString().slice(0, 10) + '.dxf'; document.body.appendChild(a); a.click(); a.remove();
+  stat('DXF сохранён: слои STENY, PROEMY, RAZMERY, SKANY; единицы — мм.');
+}
 </script>
 </body></html>
