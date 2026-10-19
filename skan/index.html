@@ -305,10 +305,6 @@ const E57 = (() => {
     return { floor, ceil };
   }
 
-// ---- reg3d.js ----
-/* Программа для ЭВМ «Скан → План». © d1sco, 2026. Все права защищены. */
-// ===== 3D feature registration (FPFH + 4-DoF RANSAC + point-to-plane ICP + visibility evidence + pose graph) =====
-// Scans from a levelled tripod scanner differ by yaw + translation (x, y, z): 4 degrees of freedom.
 const REG3D = (() => {
   const V = 0.05, RN = 0.3, KN = 32, NK = 9000, NK_FAST = 3000;
   let seed = 12345; const rnd = () => (seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296;
@@ -634,7 +630,7 @@ const REG3D = (() => {
         const p = poses.get(k); return { k, pose: { ...p, a: wrap(p.a) }, q };
       }));
     }
-    return { groups: out, edges: E.map(e => ({ i: e.i, j: e.j, ratio: e.q.ratio, ag: e.q.ag, rms: e.q.rms, unc: e.q.unc })) };
+    return { groups: out, edges: E.map(e => ({ i: e.i, j: e.j, a: e.a, tx: e.tx, ty: e.ty, w: e.w, ratio: e.q.ratio, ag: e.q.ag, rms: e.q.rms, unc: e.q.unc })) };
   }
   function posesOf(n, E, c, optimizeIt) {
     const out = new Map();
