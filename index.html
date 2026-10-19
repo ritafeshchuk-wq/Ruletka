@@ -285,7 +285,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 6.4 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 6.5 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -4567,6 +4567,8 @@ async function checkUpdate() {
       b.querySelector('button').onclick = async () => { if (!(await leaveProject())) return; location.replace(location.pathname + '?v=' + m[1] + '-' + Date.now()); }; } } catch (e) { }
 }
 setTimeout(checkUpdate, 4000); setInterval(checkUpdate, 30 * 60000);
+// офлайн: страница сохраняется в браузере и открывается без сети (если браузер это умеет)
+try { if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { }
 (async () => {
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) { }
   AS.db = await asDB();
