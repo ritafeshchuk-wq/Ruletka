@@ -135,6 +135,7 @@ body.touch #steps li{padding:10px 6px 8px}
 #tmenu button{border:0;text-align:left;padding:10px 12px;border-radius:8px;font-size:14px;background:transparent}
 #tmenu button:hover{background:var(--soft)}
 .holdveil{position:fixed;inset:0;z-index:900;background:rgba(255,255,255,.01);cursor:progress}
+#selbox .sb-rot{align-items:center;flex-wrap:wrap}#selbox .sb-rot span{font-size:13px;color:var(--muted,#667)}#selbox .sb-rot button{padding:6px 9px}
 #tmenu .tm-num{padding:6px 8px 8px;border-bottom:1px solid var(--line);margin-bottom:4px;display:flex;flex-direction:column;gap:8px}
 #tmenu .tm-num-r{display:flex;align-items:center;gap:8px}#tmenu .tm-num-r span{font-size:13px;font-weight:600;white-space:nowrap}
 #tmenu .tm-num-r input{flex:1;min-width:0;font-size:17px;padding:7px 9px;border:1px solid var(--line);border-radius:8px}#tmenu .tm-num-r button{padding:8px 14px;font-size:16px;border-radius:8px;text-align:center;background:#1f6feb;color:#fff;font-weight:700}
@@ -217,9 +218,9 @@ html,body{overscroll-behavior:none}
 header .modes,#bOpen,.homein .lead{display:none!important}
 #projName{min-width:0;flex:0 1 auto}
 .projname{color:#fff;font-weight:600;font-size:14px;align-self:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;padding:0 6px}
-#selbox{position:absolute;left:50%;transform:translateX(-50%);bottom:150px;max-height:calc(100% - 170px);overflow:auto;width:min(560px,calc(100% - 24px));background:#fff;border:2px solid #1f6feb;border-radius:14px;box-shadow:0 8px 28px rgba(15,23,36,.25);padding:12px 14px;display:flex;flex-direction:column;gap:8px;z-index:7;font-size:14px}
+#selbox{position:absolute;right:12px;top:92px;max-height:calc(100% - 250px);overflow:auto;width:min(330px,calc(100% - 140px));background:#fff;border:2px solid #1f6feb;border-radius:14px;box-shadow:0 8px 28px rgba(15,23,36,.25);padding:12px 14px;display:flex;flex-direction:column;gap:8px;z-index:7;font-size:14px}
 #selbox.ok{border-color:#1E8A55}#selbox.warn{border-color:#E3A21A}#selbox.bad{border-color:#C4372F}
-#selbox .sb-h{font-weight:700}#selbox .row{display:flex;flex-wrap:wrap;gap:6px}#selbox button{min-height:40px}
+#selbox .sb-h{font-weight:700;display:flex;align-items:center;gap:8px}#selbox .sb-h span{flex:1}#selbox .row{display:flex;flex-wrap:wrap;gap:5px}#selbox button{min-height:36px;font-size:13px;padding:5px 9px}#selbox #sbMin{min-height:30px;padding:2px 10px;font-size:15px}#selbox.min>*:not(.sb-h){display:none}#selbox.min{padding:8px 12px}
 #trail{position:absolute;left:8px;top:8px;bottom:8px;display:flex;flex-direction:column;gap:4px;overflow-y:auto;z-index:6;padding:4px;background:rgba(27,36,48,.88);border-radius:14px;scrollbar-width:none;width:66px}
 #trail::-webkit-scrollbar{display:none}
 #trail button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:3px 2px;min-height:33px;max-height:56px;border:0;border-radius:10px;background:transparent;color:#E7ECF2;font-size:10.5px;line-height:1.1;flex:1 1 0}
@@ -273,7 +274,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 4.9 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 5.0 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -2874,7 +2875,7 @@ const scanById = id => S.scans.find(s => s.id === id);
 function uiDialog({ title, text = '', input = null, ok = 'OK', cancel = null }) {
   return new Promise(res => {
     const ov = document.createElement('div'); ov.className = 'uidlg';
-    ov.innerHTML = `<div class="uidlg-box" role="dialog"><div class="uidlg-t"></div>${text ? '<div class="uidlg-x"></div>' : ''}${input !== null ? '<input type="text" class="uidlg-in" inputmode="decimal" autocomplete="off">' : ''}<div class="row"><button class="pri uidlg-ok"></button>${cancel ? '<button class="uidlg-c"></button>' : ''}</div></div>`;
+    ov.innerHTML = `<div class="uidlg-box" role="dialog"><div class="uidlg-t"></div>${text ? '<div class="uidlg-x"></div>' : ''}${input !== null ? (/значени|м или мм|градус|числ|уклон|%|диаметр|сторон|толщин/i.test(title) ? '<input type="text" class="uidlg-in" inputmode="decimal" autocomplete="off">' : '<input type="text" class="uidlg-in" autocomplete="off" autocapitalize="sentences">') : ''}<div class="row"><button class="pri uidlg-ok"></button>${cancel ? '<button class="uidlg-c"></button>' : ''}</div></div>`;
     ov.querySelector('.uidlg-t').textContent = title; if (text) ov.querySelector('.uidlg-x').textContent = text;
     ov.querySelector('.uidlg-ok').textContent = ok; if (cancel) ov.querySelector('.uidlg-c').textContent = cancel;
     const inp = ov.querySelector('.uidlg-in'); if (inp) inp.value = input;
@@ -4561,7 +4562,7 @@ function setPtName(p, v) { v = String(v == null ? '' : v).trim(); tPush(); if (v
   stat(v ? `Точка — № ${v}` + (dup ? ` · внимание: такой номер уже есть у другой точки на этом листе` : '') : 'Свой номер снят — точка снова ' + pname(p.id)); }
 function numBlock(el, p) {
   const box = document.createElement('div'); box.className = 'tm-num'; const nx = nextPtName();
-  box.innerHTML = `<div class="tm-num-r"><span>№ точки</span><input type="text" autocomplete="off" autocapitalize="characters" value="${escH(p.name || '')}" placeholder="${escH('Т' + p.id)}"><button data-n="ok" class="pri">✓</button></div>`
+  box.innerHTML = `<div class="tm-num-r"><span>№ точки</span><input type="text" autocomplete="off" autocapitalize="sentences" autocorrect="off" spellcheck="false" value="${escH(p.name || '')}" placeholder="${escH('Т' + p.id)}"><button data-n="ok" class="pri">✓</button></div>`
     + `<div class="tm-st-b"><button data-n="next">Дать № ${escH(nx)}</button><button data-n="seq">Нумеровать подряд с ${escH(p.name ? incName(p.name) === nx ? p.name : nx : nx)}…</button>${p.name ? '<button data-n="clr">Убрать номер</button>' : ''}</div>`;
   const hd = el.querySelector('.tm-h'); hd ? hd.after(box) : el.prepend(box);
   const inp = box.querySelector('input'), stop = e => e.stopPropagation();
@@ -4640,6 +4641,7 @@ function tapeMenu(w, cx, cy) {
         if (am) items.push(['∠ Убрать заданный угол', () => { tPush(); M.meas = M.meas.filter(m => m !== am); adjust(); renderTape(); draw(); }]);
         items.push([h.pt.free ? '∟ Угол около 90° считать прямым' : '∠ Угол не прямой — не выравнивать', () => { tPush(); h.pt.free = !h.pt.free; adjust(); renderTape(); draw(); }]);
       } }
+    items.push([h.pt.fixed ? '📌 Открепить точку' : '📌 Закрепить точку (не будет сдвигаться при правке)', () => { tPush(); adjust(); if (h.pt.fixed) delete h.pt.fixed; else { if (h.pt.x != null) { h.pt.x0 = h.pt.x; h.pt.y0 = h.pt.y; } h.pt.fixed = true; } adjust(); draw(); renderTape(); }]);
     items.push(['✥ Передвинуть', () => { stat('Просто ведите точку ' + pname(id) + ' пальцем'); }]);
     items.push([nm ? `🗑 Удалить точку и её замеры (${nm})` : '🗑 Удалить точку', () => { T.sel = { pt: h.pt }; tapeDelete(); stat('Точка удалена. ↶ Отменить — вернуть'); }, 'danger']);
   } else if (h.edge) {
@@ -5066,6 +5068,28 @@ function findBlunder(list) { // какой замер «тянет» сильн�
   }
   adjust(); return best;
 }
+// участок по обходу между двумя точками (в порядке выделения); other — другой стороной замкнутого обхода
+function chainPath(a, b, other) {
+  for (const c of M.chains || []) { const closed = c.length > 2 && c[0] === c[c.length - 1], arr = closed ? c.slice(0, -1) : c, n = arr.length, ia = arr.indexOf(a), ib = arr.indexOf(b); if (ia < 0 || ib < 0) continue;
+    const out = [arr[ia]]; let i = ia; const step = closed ? (other ? -1 : 1) : (ib >= ia ? 1 : -1);
+    while (arr[i] !== b && out.length <= n) { i = (i + step + n) % n; out.push(arr[i]); } return { ids: out, closed }; }
+  // нет общего обхода — кратчайший путь по стенам
+  const adj = new Map(); for (const e of M.edges) { if (e.obj) continue; (adj.get(e.a) || adj.set(e.a, []).get(e.a)).push(e.b); (adj.get(e.b) || adj.set(e.b, []).get(e.b)).push(e.a); }
+  const prev = new Map([[a, null]]), q = [a]; while (q.length) { const x = q.shift(); if (x === b) break; for (const y of adj.get(x) || []) if (!prev.has(y)) { prev.set(y, x); q.push(y); } }
+  if (!prev.has(b)) return null; const out = []; for (let x = b; x != null; x = prev.get(x)) out.unshift(x); return { ids: out, closed: false };
+}
+function pinOthers() { // править только выделенное: всё остальное на листе стоит на месте
+  tPush(); adjust(); let n = 0; for (const p of M.pts) { if (T.selSet.has(p.id) || p.soft) continue; if (p.x != null) { p.x0 = p.x; p.y0 = p.y; } if (!p.fixed) { p.fixed = true; n++; } }
+  adjust(); draw(); renderTape(); stat(`Закреплено точек вне выделения: ${n}. Теперь правьте замеры участка — двигаться будет только он. Снять — «Открепить всё».`); }
+function unpinAll() { tPush(); let n = 0; for (const p of M.pts) if (p.fixed) { delete p.fixed; n++; } adjust(); draw(); renderTape(); stat(`Откреплено точек: ${n}.`); }
+function rotateSel(deg) {
+  const b = selBBox(); if (!b) return; tPush(); const c = [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2], a = deg * Math.PI / 180, cs = Math.cos(a), sn = Math.sin(a), pad = 26 / S.view.s;
+  const R = (x, y) => [c[0] + (x - c[0]) * cs - (y - c[1]) * sn, c[1] + (x - c[0]) * sn + (y - c[1]) * cs], inB = q => q && q[0] >= b[0] - pad && q[0] <= b[2] + pad && q[1] >= b[1] - pad && q[1] <= b[3] + pad;
+  for (const p of M.pts) if (T.selSet.has(p.id)) { const q = PX(p); [p.x0, p.y0] = R(q[0], q[1]); if (p.x != null) { p.x = p.x0; p.y = p.y0; } }
+  for (const m of M.marks || []) if (inB(m.p)) { m.p = R(...m.p); if (m.dir != null) m.dir += a; }
+  for (const n of M.notes || []) if (inB(n.at)) { n.at = R(...n.at); if (n.tip) n.tip = R(...n.tip); }
+  if (M.axis != null && T.selSet.size === M.pts.length) M.axis += a;
+  adjust(); draw(); showSelBox(); stat(`Повёрнуто ${deg > 0 ? '⟲ против' : '⟳ по'} часовой на ${String(Math.abs(deg)).replace('.', ',')}°`); }
 function showSelBox() {
   let el = document.getElementById('selbox'); if (!T.selSet) { if (el) el.remove(); return; }
   adjust(); const list = selMeas(), rs = list.filter(m => m.res != null).map(m => Math.abs(m.res)); const ai = angIssues(); const mx = Math.max(0, ...rs, ...ai.map(x => x.lin)), mean = rs.length ? rs.reduce((a, b) => a + b, 0) / rs.length : 0;
@@ -5079,16 +5103,23 @@ function showSelBox() {
   let blunder = null; if (cls === 'bad') { blunder = findBlunder(list); adjust(); }
   const angTxt = ai.filter(x => x.lin > tol).slice(0, 3).map(x => `${pname(x.b)}: ${fdeg(x.deg)}`).join(', ');
   if (!el) { el = document.createElement('div'); el.id = 'selbox'; $('#main').appendChild(el); }
-  el.className = cls;
-  el.innerHTML = `<div class="sb-h">Выделено: точек ${T.selSet.size}, замеров ${list.length}${rooms ? ', помещений ' + rooms : ''}</div><div class="sb-v">${verdict}</div>${angTxt ? `<div class="sb-v">Углы, которые должны быть прямыми, по замерам выходят: ${angTxt}.</div>` : ''}
+  el.className = cls + (T.selMin ? ' min' : '');
+  el.innerHTML = `<div class="sb-h"><span>Выделено: точек ${T.selSet.size}, замеров ${list.length}${rooms ? ', помещений ' + rooms : ''}</span><button id="sbMin" title="Свернуть / развернуть">${T.selMin ? '▸' : '▾'}</button></div><div class="sb-v">${verdict}</div>${angTxt ? `<div class="sb-v">Углы, которые должны быть прямыми, по замерам выходят: ${angTxt}.</div>` : ''}
     ${blunder ? `<div class="sb-v">Вероятно, ошибка в замере <b>${pname(blunder.m.a)}–${pname(blunder.m.b)}</b>: записано ${fm(blunder.m.v)} м, а по остальным замерам выходит ≈ ${fm(blunder.exp)} м${blunder.mx <= tol ? ' (без него всё сходится)' : ''}.</div>
       <div class="row"><button id="sbShow">Показать</button><button id="sbRe">↻ Перемерить</button><button id="sbOff">Не учитывать этот замер</button></div>` : ''}
     <div class="row">${list.length ? `<button class="pri" id="sbAdj" ${cls === 'bad' ? '' : ''}>✓ Уравнять${cls === 'bad' ? ' всё равно' : ''}</button>` : ''}<button id="sbKeep">Оставить как есть</button><button id="sbAll">Выделить всё</button></div>
+    ${T.selSet.size === 2 ? `<div class="row"><button id="sbPath">↔ Весь участок ${pname([...T.selSet][0])} → ${pname([...T.selSet][1])}</button>${chainPath([...T.selSet][0], [...T.selSet][1]) && chainPath([...T.selSet][0], [...T.selSet][1]).closed ? '<button id="sbPath2">↔ другой стороной</button>' : ''}</div>` : ''}
+    <div class="row"><button id="sbPin">📌 Править только выделенное</button>${M.pts.some(p => p.fixed) ? '<button id="sbUnpin">Открепить всё</button>' : ''}</div>
+    <div class="row sb-rot"><span>Повернуть:</span><button data-r="5">⟲ 5°</button><button data-r="0.5">⟲ 0,5°</button><button data-r="-0.5">⟳ 0,5°</button><button data-r="-5">⟳ 5°</button><button data-r="-90">⟳ 90°</button></div>
     <div class="row"><button id="sbDel" class="danger">🗑 Удалить</button><button id="sbCopy">⧉ Копировать</button><button id="sbCut">✂ Вырезать</button></div>`;
   const q = id => el.querySelector(id);
-  q('#sbKeep').onclick = () => selectPts([]);
+  q('#sbKeep').onclick = () => selectPts([]); q('#sbMin').onclick = () => { T.selMin = !T.selMin; showSelBox(); };
   q('#sbAll').onclick = () => { selectPts(M.pts.map(p => p.id)); T.selRect = [-1e9, -1e9, 1e9, 1e9]; };
   q('#sbDel').onclick = () => selDelete(); q('#sbCopy').onclick = () => selCopy(false); q('#sbCut').onclick = () => selCopy(true);
+  const pth = other => { const [a, b] = [...T.selSet], r = chainPath(a, b, other); if (!r) { stat('Между этими точками нет обхода или стен.'); return; } selectPts(r.ids); stat(`Выделен участок ${pname(a)} → ${pname(b)}: точек ${r.ids.length}. «📌 Править только выделенное» — остальное не сдвинется.`); };
+  if (q('#sbPath')) q('#sbPath').onclick = () => pth(false); if (q('#sbPath2')) q('#sbPath2').onclick = () => pth(true);
+  q('#sbPin').onclick = pinOthers; if (q('#sbUnpin')) q('#sbUnpin').onclick = unpinAll;
+  el.querySelectorAll('[data-r]').forEach(bn => bn.onclick = () => rotateSel(+bn.dataset.r));
   if (q('#sbAdj')) q('#sbAdj').onclick = () => { tPush(); adjust(); for (const p of M.pts) if (T.selSet.has(p.id) && p.x != null) { p.x0 = p.x; p.y0 = p.y; } adjust(); stat(`Уравнено: ${T.selSet.size} точек, чертёж совпал с замерами.`); selectPts([]); renderTape(); };
   if (blunder) {
     q('#sbShow').onclick = () => { const A = PX(ptById(blunder.m.a)), B = PX(ptById(blunder.m.b)); fitBounds([Math.min(A[0], B[0]) - 1.5, Math.min(A[1], B[1]) - 1.5, Math.max(A[0], B[0]) + 1.5, Math.max(A[1], B[1]) + 1.5]); T.sel = hasEdge(blunder.m.a, blunder.m.b) ? { edge: hasEdge(blunder.m.a, blunder.m.b) } : { meas: blunder.m }; draw(); };
@@ -5820,7 +5851,8 @@ function drawTape() {
     const sel = T.sel && T.sel.pt === p, inCh = T.chain && T.chain[0] === p.id, isA = T.mA === p.id || T.opA === p.id || (T.roomIds && T.roomIds.includes(p.id)) || (T.objIds && T.objIds.includes(p.id));
     ctx.fillStyle = sel ? '#1f6feb' : inCh ? '#e07000' : isA ? '#7b4bd6' : '#fff'; ctx.strokeStyle = '#111'; ctx.lineWidth = 1.5 * dpr;
     if (p.soft && !sel) { ctx.lineWidth = 1 * dpr; ctx.beginPath(); ctx.arc(x, y, 3 * dpr, 0, 7); ctx.fill(); ctx.stroke(); continue; }
-    ctx.beginPath(); ctx.arc(x, y, 5 * dpr, 0, 7); ctx.fill(); ctx.stroke();
+    if (p.fixed && !M.cond) { ctx.fillStyle = sel ? '#1f6feb' : '#3b4252'; ctx.fillRect(x - 4.5 * dpr, y - 4.5 * dpr, 9 * dpr, 9 * dpr); ctx.strokeRect(x - 4.5 * dpr, y - 4.5 * dpr, 9 * dpr, 9 * dpr); }
+    else { ctx.beginPath(); ctx.arc(x, y, 5 * dpr, 0, 7); ctx.fill(); ctx.stroke(); }
     const own = !!p.name; ctx.font = own ? `bold ${11.5 * dpr}px Golos Text, Segoe UI` : `${10 * dpr}px Golos Text, Segoe UI`; const nm = pname(p.id), tw = ctx.measureText(nm).width, th = (own ? 11.5 : 10) * dpr;
     // номер точки — в первый свободный угол; если все заняты соседями — не пишем (выбранная точка — всегда)
     let put = null; for (const [ox, oy] of [[7, -6], [-7, -6], [7, 14], [-7, 14]]) { const x0 = ox > 0 ? x + ox * dpr : x + ox * dpr - tw, y0 = y + oy * dpr - th; if (!PNR.some(r => x0 < r[2] && x0 + tw > r[0] && y0 < r[3] && y0 + th > r[1])) { put = [x0, y0]; break; } }
