@@ -274,7 +274,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 5.1.1 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 5.2 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -3865,7 +3865,8 @@ function renderTouchBar() {
     tape && T.chain ? btn('endc', '■ Закончить обход') : (tape && (T.mA || T.tA || T.roomIds || T.objIds || T.noteTip)) ? btn('esc', 'Стоп') : '',
     pend && T.pending.got != null ? btn('ok', '✓ Принять', 'pri') : '',
     tape && (T.selSet || T.sel) ? btn('trash', '🗑 Удалить', 'danger') : '',
-    tape && CLIP && CLIP.pts && CLIP.pts.length ? btn('paste', '📋 Вставить') : ''
+    tape && CLIP && CLIP.pts && CLIP.pts.length ? btn('paste', '📋 Вставить') : '',
+    tape && T.tool === 'gps' ? btn('gnew', '✂ Новый участок', T.gpsPrev ? 'pri' : '', !T.gpsPrev) + btn('gpco', '📂 PCO') : ''
   ].join('');
 }
 function tbKey(key, extra = {}) { window.dispatchEvent(new KeyboardEvent('keydown', Object.assign({ key, bubbles: true }, extra))); }
@@ -3886,6 +3887,8 @@ function tbAct(e) {
   else if (k === 'endc') endChain();
   else if (k === 'trash') { if (T.selSet) selDelete(); else if (T.sel) { tapeDelete(); closeTapeMenu(); } }
   else if (k === 'paste') clipPaste();
+  else if (k === 'gnew') { T.gpsPrev = null; renderTape(); draw(); stat('Новый участок: следующий пикет не соединится с предыдущими.'); }
+  else if (k === 'gpco') { const f = $('#gFile'); if (f) f.click(); else { let i = document.createElement('input'); i.type = 'file'; i.onchange = () => i.files[0] && gpsLoadFile(i.files[0]); i.click(); } }
   else if (k === 's90') { M.snap90 = M.snap90 === false; stat(M.snap90 === false ? 'Привязка 90° выключена: точки ставятся как есть.' : 'Привязка 90°: новая стена ложится вдоль или поперёк предыдущей (если отклонение меньше 15°).'); }
   else if (k === 'ok') tbKey('Enter');
   renderTouchBar(); return true;
@@ -5231,18 +5234,21 @@ async function gpsLoadFile(file) {
   const map = new Map(), dig = new Map(); for (const r of pts) { map.set(gpsKey(r.n), r); const d = gpsDig(r.n); if (d) dig.set(d, dig.has(d) ? null : r); }
   T.gpsDb = { name: file.name, pts, map, dig }; await gpsApply(false); renderTape(); }
 function gpsFind(name) { const D = T.gpsDb; if (!D || name == null) return null; const k = gpsKey(name); if (D.map.has(k)) return D.map.get(k); const d = gpsDig(name); return d && D.dig.get(d) || null; }
+function gpsDropTape(p) { // старые длины и диагонали между пикетами GPS больше не нужны — длины будут из съёмки
+  const n0 = M.meas.length; M.meas = M.meas.filter(m => !(!m.gps && (m.type === 'dist' || m.type === 'line' || m.type === 'angle') && [m.a, m.b, m.p].includes(p.id) && [m.a, m.b, m.p].filter(v => v != null && v !== p.id).every(id => { const q = ptById(id); return q && q.gpsPt; })));
+  if (T.pending && [T.pending.a, T.pending.b].includes(p.id)) T.pending = null; return n0 - M.meas.length; }
 function gpsUnbind(p) { delete p.gps; delete p.fixed; M.meas = M.meas.filter(m => !(m.gps && (m.a === p.id || m.b === p.id))); }
 function gpsMeas() { // длины по координатам — для каждой линии между двумя пикетами с координатами
   const ok = new Set(M.meas.filter(m => m.gps).map(m => m.a < m.b ? m.a + ',' + m.b : m.b + ',' + m.a)); let n = 0;
   M.meas = M.meas.filter(m => !m.gps || (hasEdge(m.a, m.b) && ptById(m.a) && ptById(m.b) && ptById(m.a).gps && ptById(m.b).gps));
   for (const e of M.edges) { if (e.obj) continue; const A = ptById(e.a), B = ptById(e.b); if (!A || !B || !A.gps || !B.gps) continue;
     const v = Math.hypot(A.gps.X - B.gps.X, A.gps.Y - B.gps.Y); const old = M.meas.find(m => m.type === 'dist' && ((m.a === e.a && m.b === e.b) || (m.a === e.b && m.b === e.a)));
-    if (old) { if (old.gps) old.v = v; continue; } M.meas.push({ id: M.nextMeas++, type: 'dist', a: e.a, b: e.b, v, on: true, gps: true }); n++; }
+    if (old && old.gps) { old.v = v; continue; } if (old) M.meas = M.meas.filter(m => m !== old); M.meas.push({ id: M.nextMeas++, type: 'dist', a: e.a, b: e.b, v, on: true, gps: true }); n++; }
   void ok; return n; }
 async function gpsApply(auto) {
   const D = T.gpsDb; if (!D) return;
-  adjust(); let pairs = M.pts.filter(p => p.name && !p.soft).map(p => ({ p, r: gpsFind(p.name) })).filter(x => x.r);
-  const lost = M.pts.filter(p => p.gpsPt && !gpsFind(p.name)).map(p => pname(p.id));
+  adjust(); const gnm = p => p.name || (p.gpsPt ? pname(p.id) : null); let pairs = M.pts.filter(p => gnm(p) && !p.soft).map(p => ({ p, r: gpsFind(gnm(p)) })).filter(x => x.r);
+  const lost = M.pts.filter(p => p.gpsPt && !gpsFind(gnm(p))).map(p => pname(p.id));
   if (!pairs.length) { if (!auto) uiAlert(`Ни один номер точки на этом листе не совпал с номерами в «${D.name}» (${D.pts.length} точек). Подпишите пикеты теми же номерами, что в приёмнике.`); return; }
   tPush();
   const fit = () => { const S = pairs.map(x => [x.r.Y, x.r.X]), Dd = pairs.map(x => PX(x.p)), n = S.length; // мир: x — восток (Y), y — север (X)
@@ -5256,7 +5262,7 @@ async function gpsApply(auto) {
     if (await uiDialog({ title: 'Подложка в другом масштабе, чем съёмка', text: `Расстояния между пикетами на подложке ${F.k > 1 ? 'больше' : 'меньше'}, чем по GPS, в ${nf(F.k > 1 ? F.k : 1 / F.k, 3)} раза. Подогнать масштаб подложки под GPS? Тогда точки встанут на свои места на плане.`, ok: 'Подогнать', cancel: 'Нет, только точки' })) { T.undo.pop(); fitScale(1 / F.k); tPush(); adjust(); F = fit(); } }
   let dmax = 0;
   for (const { p, r } of pairs) { const q = F.tr([r.Y, r.X]), cur = PX(p); dmax = Math.max(dmax, Math.hypot(q[0] - cur[0], q[1] - cur[1]));
-    p.x0 = q[0]; p.y0 = q[1]; p.fixed = true; p.gpsPt = true; p.gps = { X: r.X, Y: r.Y, H: isFinite(r.H) ? r.H : null }; }
+    p.x0 = q[0]; p.y0 = q[1]; p.fixed = true; p.gpsPt = true; gpsDropTape(p); p.gps = { X: r.X, Y: r.Y, H: isFinite(r.H) ? r.H : null }; }
   const nm = gpsMeas(); adjust(); draw(); renderTape();
   const msg = `GPS «${D.name}»: на места встали ${pairs.length} точ.${pairs.length === 1 ? ' (одна общая точка — поворот не определён, нужно минимум две)' : ''}; длин по координатам: ${M.meas.filter(m => m.gps).length}${nm ? ' (новых ' + nm + ')' : ''}. Самый большой сдвиг от того, где вы ставили, — ${nf(dmax, 2)} м.` + (lost.length ? ` Нет в файле: ${lost.slice(0, 12).join(', ')}${lost.length > 12 ? '…' : ''}.` : '');
   stat(msg); if (!auto) uiAlert(msg);
@@ -5267,13 +5273,14 @@ async function gpsAskName(p, def) {
   const dup = M.pts.find(q => q !== p && q.name === nm); if (dup) stat(`Внимание: номер ${nm} уже есть у другой точки на этом листе.`);
   p.name = nm; T.lastPtName = nm; return true; }
 async function gpsMark(p) { // существующая точка → пикет
-  const was = { name: p.name, gpsPt: p.gpsPt }; tPush(); p.gpsPt = true; draw();
-  if (!(await gpsAskName(p, p.name || nextPtName()))) { if (was.gpsPt) p.gpsPt = was.gpsPt; else delete p.gpsPt; T.undo.pop(); draw(); return false; }
-  if (T.gpsDb && gpsFind(p.name)) await gpsApply(true); else { adjust(); draw(); renderTape(); stat(`Точка ${pname(p.id)} — пикет GPS.`); } return true; }
+  const was = { name: p.name, gpsPt: p.gpsPt, meas: M.meas.slice() }; tPush(); p.gpsPt = true; const dropped = gpsDropTape(p); draw();
+  if (!(await gpsAskName(p, p.name || nextPtName()))) { if (was.gpsPt) p.gpsPt = was.gpsPt; else delete p.gpsPt; M.meas = was.meas; T.undo.pop(); draw(); return false; }
+  if (T.gpsDb && gpsFind(p.name || pname(p.id))) await gpsApply(true); else { adjust(); draw(); renderTape(); stat(`Точка ${pname(p.id)} — пикет GPS.${dropped ? ' Убраны условные длины к другим пикетам: ' + dropped + '.' : ''}`); } return true; }
 async function gpsTap(w, e) {
   const prev = T.gpsPrev && ptById(T.gpsPrev) ? T.gpsPrev : null; let p = e.altKey ? null : nearestPoint(w, 9);
   if (p && p.id === prev) { T.gpsPrev = null; draw(); renderTape(); stat('Линия разорвана. Следующая точка начнёт новую линию.'); return; }
-  if (p) { if ((!p.gpsPt || !p.name) && !(await gpsMark(p))) return;
+  if (p && !p.gpsPt) { T.gpsPrev = null; await gpsMark(p); renderTape(); draw(); return; }
+  if (p) { if (!p.name && !(await gpsMark(p))) return;
     tPush(); if (gpsLine() && prev && !hasEdge(prev, p.id)) M.edges.push({ a: prev, b: p.id });
     T.gpsPrev = p.id; gpsMeas(); adjust(); draw(); renderTape(); stat(`Пикет ${pname(p.id)}. Дальше — следующий пикет; ещё раз коснуться ${pname(p.id)} — разорвать линию.`); return; }
   tPush(); p = addPoint(w); p.gpsPt = true; draw();
@@ -5288,8 +5295,8 @@ function gpsPanel() {
   <div class="row"><button id="gLoad" class="pri" style="flex:1">📂 Загрузить PCO</button><input type="file" id="gFile" hidden></div>
   ${D ? `<div class="row"><span class="hint" style="flex:1;margin:0">${escH(D.name)} · ${D.pts.length} точек</span><button id="gApply">↻ Подставить</button></div>` : ''}
   <div class="chk"><input type="checkbox" id="gLine" ${gpsLine() ? 'checked' : ''}><label for="gLine">Соединять пикеты линией</label></div>
-  ${T.gpsPrev && ptById(T.gpsPrev) ? `<div class="row"><span style="flex:1">Линия от <b>${escH(pname(T.gpsPrev))}</b></span><button id="gBreak">✂ Разорвать</button></div>` : ''}
-  <p class="hint">Коснитесь места пикета — введите номер как в приёмнике. Длины рулеткой не нужны: после «Загрузить PCO» точки с теми же номерами встанут по координатам, длины между ними посчитаются сами.</p></div>`; }
+  ${T.gpsPrev && ptById(T.gpsPrev) ? `<div class="row"><span style="flex:1">Линия от <b>${escH(pname(T.gpsPrev))}</b></span><button id="gBreak">✂ Новый участок</button></div>` : ''}
+  <p class="hint">Коснитесь места пикета — введите номер как в приёмнике. «✂ Новый участок» (внизу) — следующий пикет не соединится с предыдущим. Касание старой точки — переназначить её на GPS (без линий; условные длины к другим пикетам убираются). Длины рулеткой не нужны: после «Загрузить PCO» точки с теми же номерами встанут по координатам, длины между ними посчитаются сами.</p></div>`; }
 function gpsPanelBind() {
   const l = $('#gLoad'), f = $('#gFile'); if (l) l.onclick = () => f.click(); if (f) f.onchange = e => { const x = e.target.files[0]; e.target.value = ''; if (x) gpsLoadFile(x); };
   const a = $('#gApply'); if (a) a.onclick = () => gpsApply(false);
@@ -5875,7 +5882,7 @@ function drawTape() {
       ctx.save(); ctx.translate((sa[0] + sb[0]) / 2, (sa[1] + sb[1]) / 2); let r = Math.atan2(sb[1] - sa[1], sb[0] - sa[0]); if (r > Math.PI / 2) r -= Math.PI; if (r < -Math.PI / 2) r += Math.PI; ctx.rotate(r);
       ctx.textAlign = 'center'; ctx.font = `bold ${12 * dpr * stK(m)}px Golos Text, Segoe UI`;
       if (m) { const bad = !M.cond && Math.abs(m.res || 0) > 0.005; ctx.fillStyle = bad ? '#c4372f' : stC(m, '#111'); ctx.fillText(fm(m.v) + (bad ? ` (${m.res > 0 ? '+' : ''}${Math.round(m.res * 1000)} мм)` : ''), 0, -7 * dpr * Math.max(1, stK(m))); }
-      else { ctx.fillStyle = '#9aa3b2'; ctx.font = `${11 * dpr}px Golos Text, Segoe UI`; ctx.fillText('≈' + fm(L), 0, -7 * dpr); }
+      else if (!(A.gpsPt && B.gpsPt)) { ctx.fillStyle = '#9aa3b2'; ctx.font = `${11 * dpr}px Golos Text, Segoe UI`; ctx.fillText('≈' + fm(L), 0, -7 * dpr); }
       ctx.restore();
     }
   }
@@ -5943,7 +5950,7 @@ function drawTape() {
     const sel = T.sel && T.sel.pt === p, inCh = T.chain && T.chain[0] === p.id, isA = T.mA === p.id || T.opA === p.id || (T.roomIds && T.roomIds.includes(p.id)) || (T.objIds && T.objIds.includes(p.id));
     ctx.fillStyle = sel ? '#1f6feb' : inCh ? '#e07000' : isA ? '#7b4bd6' : '#fff'; ctx.strokeStyle = '#111'; ctx.lineWidth = 1.5 * dpr;
     if (p.soft && !sel) { ctx.lineWidth = 1 * dpr; ctx.beginPath(); ctx.arc(x, y, 3 * dpr, 0, 7); ctx.fill(); ctx.stroke(); continue; }
-    if (p.gpsPt) { const r = 6.5 * dpr; ctx.fillStyle = sel ? '#1f6feb' : p.gps ? '#1a7f37' : (inCh || T.gpsPrev === p.id) ? '#e07000' : '#fff'; ctx.strokeStyle = '#1a7f37'; ctx.lineWidth = 1.8 * dpr; ctx.beginPath(); ctx.moveTo(x, y - r); ctx.lineTo(x + r * 0.87, y + r * 0.5); ctx.lineTo(x - r * 0.87, y + r * 0.5); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.strokeStyle = '#111'; }
+    if (p.gpsPt) { ctx.fillStyle = sel ? '#1f6feb' : T.gpsPrev === p.id ? '#e07000' : p.gps ? '#1a9e45' : '#b8f0c8'; ctx.strokeStyle = '#0d5c27'; ctx.lineWidth = 2 * dpr; ctx.beginPath(); ctx.arc(x, y, 5.5 * dpr, 0, 7); ctx.fill(); ctx.stroke(); ctx.strokeStyle = '#111'; }
     else if (p.fixed && !M.cond) { ctx.fillStyle = sel ? '#1f6feb' : '#3b4252'; ctx.fillRect(x - 4.5 * dpr, y - 4.5 * dpr, 9 * dpr, 9 * dpr); ctx.strokeRect(x - 4.5 * dpr, y - 4.5 * dpr, 9 * dpr, 9 * dpr); }
     else { ctx.beginPath(); ctx.arc(x, y, 5 * dpr, 0, 7); ctx.fill(); ctx.stroke(); }
     const own = !!p.name; ctx.font = own ? `bold ${11.5 * dpr}px Golos Text, Segoe UI` : `${10 * dpr}px Golos Text, Segoe UI`; const nm = pname(p.id), tw = ctx.measureText(nm).width, th = (own ? 11.5 : 10) * dpr;
@@ -6212,7 +6219,7 @@ async function exportOverlayPdf(opt = {}) {
     for (const e of M.edges) { const A = ptById(e.a), B = ptById(e.b); if (!A || !B || e.obj) continue; const a = P2(A), b = P2(B), m = distMeas(e.a, e.b);
       page.drawLine({ start: { x: a[0], y: a[1] }, end: { x: b[0], y: b[1] }, thickness: e.open ? lw * 2.2 : lw * 1.3, color: e.open ? GRN : m ? RED : GRY, dashArray: m || e.open ? undefined : [lw * 6, lw * 4] });
       if (m) DL.push({ pr: 1, L: Math.hypot(b[0] - a[0], b[1] - a[1]), a, b, s: fm(m.v), size: fs * stK(m), col: sc(m, RED) });
-      else if (!e.open) { const Lw = Math.hypot(...[0, 1].map(i => PX(B)[i] - PX(A)[i])); DL.push({ pr: 6, L: 0, a, b, s: '≈' + fm(Lw), size: fs * 0.8, col: GRY, opt: true }); } }
+      else if (!e.open && !(A.gpsPt && B.gpsPt)) { const Lw = Math.hypot(...[0, 1].map(i => PX(B)[i] - PX(A)[i])); DL.push({ pr: 6, L: 0, a, b, s: '≈' + fm(Lw), size: fs * 0.8, col: GRY, opt: true }); } }
     for (const e of M.edges) for (const [p1, p2, k] of openGeom(e, PX)) { const a = toPt(...p1), b = toPt(...p2); page.drawLine({ start: { x: a[0], y: a[1] }, end: { x: b[0], y: b[1] }, thickness: lw * (k === 'arc' ? 0.6 : 1.1), color: GRN }); }
     // диагонали и прочие замеры
     for (const m of M.meas) { if (m.type !== 'dist' || hasEdge(m.a, m.b) || m.on === false) continue; const A = ptById(m.a), B = ptById(m.b); if (!A || !B) continue; const a = P2(A), b = P2(B);
