@@ -135,6 +135,9 @@ body.touch #steps li{padding:10px 6px 8px}
 #tmenu button{border:0;text-align:left;padding:10px 12px;border-radius:8px;font-size:14px;background:transparent}
 #tmenu button:hover{background:var(--soft)}
 .holdveil{position:fixed;inset:0;z-index:900;background:rgba(255,255,255,.01);cursor:progress}
+#tmenu .tm-num{padding:6px 8px 8px;border-bottom:1px solid var(--line);margin-bottom:4px;display:flex;flex-direction:column;gap:8px}
+#tmenu .tm-num-r{display:flex;align-items:center;gap:8px}#tmenu .tm-num-r span{font-size:13px;font-weight:600;white-space:nowrap}
+#tmenu .tm-num-r input{flex:1;min-width:0;font-size:17px;padding:7px 9px;border:1px solid var(--line);border-radius:8px}#tmenu .tm-num-r button{padding:8px 14px;font-size:16px;border-radius:8px;text-align:center;background:#1f6feb;color:#fff;font-weight:700}
 #tmenu .tm-st{padding:6px 8px 8px;border-bottom:1px solid var(--line);margin-bottom:4px;display:flex;flex-direction:column;gap:8px}
 #tmenu .tm-st-r{display:flex;align-items:center;gap:8px}#tmenu .tm-st-r input{flex:1;accent-color:#1f6feb;height:28px}
 #tmenu .tm-st-r .a1{font-size:11px;font-weight:700}#tmenu .tm-st-r .a2{font-size:19px;font-weight:700}#tmenu .tm-st-r b{min-width:42px;text-align:right;font-size:13px;font-variant-numeric:tabular-nums}
@@ -270,7 +273,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 4.8 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 4.9 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -4548,7 +4551,29 @@ const T = { tool: 'walk', chain: null, pending: null, buffer: null, auto: false,
 // ---------- helpers ----------
 const ptById = id => M.pts.find(p => p.id === id);
 const PX = p => M.cond ? [p.x0, p.y0] : [p.x !== undefined ? p.x : p.x0, p.y !== undefined ? p.y : p.y0];
-const pname = id => 'Т' + id;
+const pname = id => { const p = ptById(id); return p && p.name ? String(p.name) : 'Т' + id; };
+// ---------- номера точек: свой номер у точки (p.name); следующий — по последнему номеру (буквы сохраняются: А12 → А13) ----------
+function incName(s) { s = String(s || ''); const m = s.match(/^(.*?)(\d+)(\D*)$/); if (!m) return s ? s + '1' : '1'; const n = String(+m[2] + 1).padStart(m[2].length, '0'); return m[1] + n + m[3]; }
+function nextPtName() { if (T.lastPtName) return incName(T.lastPtName); let best = 0, pre = ''; const scan = pts => { for (const q of pts || []) if (q.name) { const m = String(q.name).match(/^(.*?)(\d+)$/); if (m && +m[2] >= best) { best = +m[2]; pre = m[1]; } } };
+  scan(M.pts); try { for (const d of Object.values(PGS.data || {})) scan(JSON.parse(d.m).pts); } catch (e) { } return pre + (best + 1); }
+function setPtName(p, v) { v = String(v == null ? '' : v).trim(); tPush(); if (v) { p.name = v; T.lastPtName = v; } else delete p.name;
+  const dup = v && M.pts.find(q => q !== p && q.name === v); draw(); renderTape();
+  stat(v ? `Точка — № ${v}` + (dup ? ` · внимание: такой номер уже есть у другой точки на этом листе` : '') : 'Свой номер снят — точка снова ' + pname(p.id)); }
+function numBlock(el, p) {
+  const box = document.createElement('div'); box.className = 'tm-num'; const nx = nextPtName();
+  box.innerHTML = `<div class="tm-num-r"><span>№ точки</span><input type="text" autocomplete="off" autocapitalize="characters" value="${escH(p.name || '')}" placeholder="${escH('Т' + p.id)}"><button data-n="ok" class="pri">✓</button></div>`
+    + `<div class="tm-st-b"><button data-n="next">Дать № ${escH(nx)}</button><button data-n="seq">Нумеровать подряд с ${escH(p.name ? incName(p.name) === nx ? p.name : nx : nx)}…</button>${p.name ? '<button data-n="clr">Убрать номер</button>' : ''}</div>`;
+  const hd = el.querySelector('.tm-h'); hd ? hd.after(box) : el.prepend(box);
+  const inp = box.querySelector('input'), stop = e => e.stopPropagation();
+  ['pointerdown', 'pointerup', 'touchstart', 'mousedown', 'click', 'keydown'].forEach(ev => box.addEventListener(ev, stop));
+  const done = () => { closeTapeMenu(); T.sel = null; draw(); renderTape(); };
+  box.querySelector('[data-n="ok"]').onclick = () => { setPtName(p, inp.value); done(); };
+  inp.onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); setPtName(p, inp.value); done(); } };
+  box.querySelector('[data-n="next"]').onclick = () => { setPtName(p, nx); done(); };
+  box.querySelector('[data-n="seq"]').onclick = () => { const start = (p.name && incName(p.name) === nx) ? p.name : nx; setPtName(p, start); T.numbering = { next: incName(start) }; done();
+    stat(`Нумерация подряд: точка — № ${start}. Касайтесь следующих точек по порядку: № ${T.numbering.next}, … Коснитесь пустого места — закончить.`); };
+  const c = box.querySelector('[data-n="clr"]'); if (c) c.onclick = () => { setPtName(p, ''); done(); };
+}
 function tSnap() { return JSON.stringify({ pts: M.pts, meas: M.meas, edges: M.edges, rooms: M.rooms, chains: M.chains, objs: M.objs || [], notes: M.notes || [], marks: M.marks || [], nextId: M.nextId, nextMeas: M.nextMeas, scaleFit: M.scaleFit, scaleAsked: M.scaleAsked, axis: M.axis,
   _u: U.img ? { sn: U.s / (U.ptPerPx || 1), rot: U.rot, tx: U.tx, ty: U.ty, pg: U.srcPage || 1 } : null }); }
 function tApply(txt) { const j = JSON.parse(txt), u = j._u; delete j._u; Object.assign(M, j); M.objs = M.objs || []; M.notes = M.notes || []; M.marks = M.marks || []; markObjEdges();
@@ -4659,7 +4684,7 @@ function tapeMenu(w, cx, cy) {
   }
   const el = document.createElement('div'); el.id = 'tmenu';
   el.innerHTML = `<div class="tm-h">${escH(title)}</div>` + items.map((it, i) => `<button data-i="${i}" class="${it[2] || ''}">${escH(it[0])}</button>`).join('') + '<button data-i="x" class="tm-x">Закрыть</button>';
-  styleBlock(el, h.note || h.mark || h.obj || h.meas || null);
+  styleBlock(el, h.note || h.mark || h.obj || h.meas || null); if (h.pt) numBlock(el, h.pt);
   const host = $('#main'); host.appendChild(el); const r = host.getBoundingClientRect();
   // окошко — сбоку от выбранного, на свободной стороне: правку видно сразу
   const placeMenu = () => {
@@ -5153,7 +5178,7 @@ function continueFrom(p) { // начать (продолжить) обход о�
   stat(`Обход продолжается от ${pname(p.id)}. Касайтесь следующего угла (на пустом месте — новая точка).`); renderTape(); draw();
 }
 function endChain() { if (T.pending && T.pending.got == null) T.pending = null; T.chain = null; T.mA = null; T.tA = null; T.roomIds = null; T.objIds = null; stat('Обход закончен. Коснитесь любой точки — продолжить от неё, или пустого места — начать с новой точки.'); renderTape(); draw(); }
-function setTapeTool(t) { T.opA = null; if (t !== 'hatch' && t !== 'fig') T.hatch = null; if (t === 'fig' && T.tool !== 'fig') setTimeout(pickFigKind, 0); if (T.selSet && t !== 'box') { T.selSet = null; showSelBox(); } T.tool = t; T.chain = null; T.mA = null; T.tA = null; T.roomIds = null; T.objIds = null; T.noteTip = null; renderTape(); }
+function setTapeTool(t) { T.opA = null; if (t !== 'select') T.numbering = null; if (t !== 'hatch' && t !== 'fig') T.hatch = null; if (t === 'fig' && T.tool !== 'fig') setTimeout(pickFigKind, 0); if (T.selSet && t !== 'box') { T.selSet = null; showSelBox(); } T.tool = t; T.chain = null; T.mA = null; T.tA = null; T.roomIds = null; T.objIds = null; T.noteTip = null; renderTape(); }
 function addPoint(w) { const p = { id: M.nextId++, x0: w[0], y0: w[1] }; M.pts.push(p); return p; }
 function nearestPoint(w, px = 7) { let best = null, bd = px * HITK() / S.view.s; for (const p of M.pts) { const [x, y] = PX(p); const d = Math.hypot(x - w[0], y - w[1]); if (d < bd) { bd = d; best = p; } } return best; }
 function nearestEdge(w, px = 8) { let best = null, bd = px * HITK() / S.view.s, bt = 0; for (const e of M.edges) { const a = PX(ptById(e.a)), b = PX(ptById(e.b)); const [d, t] = distSeg(w, a, b); if (d < bd) { bd = d; best = e; bt = t; } } return best ? { e: best, t: bt } : null; }
@@ -5411,6 +5436,9 @@ function tapeDown(e, w) {
     renderTape(); return;
   }
   if (t === 'drag') { if (grabAt(w, 0, 0, true)) return; else if (U.img && e.shiftKey) { T.dragU = { w0: w, tx: U.tx, ty: U.ty }; } return; }
+  if (t === 'select' && T.numbering) { const p = nearestPoint(w, 9);
+    if (!p) { T.numbering = null; stat('Нумерация подряд закончена.'); renderTape(); draw(); return; }
+    const v = T.numbering.next; setPtName(p, v); T.numbering.next = incName(v); stat(`Точка — № ${v}. Следующая — № ${T.numbering.next}. Пустое место — закончить.`); return; }
   if (t === 'select') { if (!tapeMenu(w, e.clientX, e.clientY)) { T.sel = null; renderTape(); } return; }
   if (t === 'erase') { eraseAt(w); return; }
   if (T.pending && T.pending.got == null && t !== 'online') { stat('Сначала выполните замер ' + pendLabel(T.pending) + ' (или Esc — пропустить)'); return; }
@@ -5793,11 +5821,11 @@ function drawTape() {
     ctx.fillStyle = sel ? '#1f6feb' : inCh ? '#e07000' : isA ? '#7b4bd6' : '#fff'; ctx.strokeStyle = '#111'; ctx.lineWidth = 1.5 * dpr;
     if (p.soft && !sel) { ctx.lineWidth = 1 * dpr; ctx.beginPath(); ctx.arc(x, y, 3 * dpr, 0, 7); ctx.fill(); ctx.stroke(); continue; }
     ctx.beginPath(); ctx.arc(x, y, 5 * dpr, 0, 7); ctx.fill(); ctx.stroke();
-    ctx.font = `${10 * dpr}px Golos Text, Segoe UI`; const nm = pname(p.id), tw = ctx.measureText(nm).width, th = 10 * dpr;
+    const own = !!p.name; ctx.font = own ? `bold ${11.5 * dpr}px Golos Text, Segoe UI` : `${10 * dpr}px Golos Text, Segoe UI`; const nm = pname(p.id), tw = ctx.measureText(nm).width, th = (own ? 11.5 : 10) * dpr;
     // номер точки — в первый свободный угол; если все заняты соседями — не пишем (выбранная точка — всегда)
     let put = null; for (const [ox, oy] of [[7, -6], [-7, -6], [7, 14], [-7, 14]]) { const x0 = ox > 0 ? x + ox * dpr : x + ox * dpr - tw, y0 = y + oy * dpr - th; if (!PNR.some(r => x0 < r[2] && x0 + tw > r[0] && y0 < r[3] && y0 + th > r[1])) { put = [x0, y0]; break; } }
-    if (!put && sel) put = [x + 7 * dpr, y - 6 * dpr - th];
-    if (put) { PNR.push([put[0], put[1], put[0] + tw, put[1] + th]); ctx.fillStyle = '#333'; ctx.fillText(nm, put[0], put[1] + th); }
+    if (!put && (sel || own)) put = [x + 7 * dpr, y - 6 * dpr - th];
+    if (put) { PNR.push([put[0], put[1], put[0] + tw, put[1] + th]); if (own) { ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fillRect(put[0] - 2 * dpr, put[1] - 1 * dpr, tw + 4 * dpr, th + 3 * dpr); } ctx.fillStyle = own ? '#0b3d91' : '#333'; ctx.fillText(nm, put[0], put[1] + th); }
   }
   if (T.calMode) { ctx.fillStyle = '#e00'; T.cal.forEach(p => { const [x, y] = W2S(...p); ctx.beginPath(); ctx.arc(x, y, 6 * dpr, 0, 7); ctx.fill(); }); }
 }
@@ -5912,7 +5940,7 @@ function renderTape() {
   const pa = $('#pAcc'); if (pa) pa.onclick = acceptPending; const pr = $('#pRej'); if (pr) pr.onclick = rejectPending;
   const ps = $('#pSkip'); if (ps) ps.onclick = e => { e.preventDefault(); skipPending(); };
   const mfi = $('#mFit'); void mfi;
-  rail.querySelectorAll('[data-tt]').forEach(b => b.onclick = () => { if (b.dataset.tt === 'fig') setTimeout(pickFigKind, 0); else if (T.tool === 'fig') T.hatch = null; if (T.selSet && b.dataset.tt !== 'box') { T.selSet = null; showSelBox(); } T.opA = null; T.tool = b.dataset.tt; T.mA = null; T.tA = null; T.roomIds = null; T.objIds = null; T.noteTip = null; if (T.tool !== 'walk') T.chain = null; const tt = TTOOLS.find(t => t[0] === T.tool); if (tt) stat(tt[1] + ': ' + tt[2]); renderTape(); });
+  rail.querySelectorAll('[data-tt]').forEach(b => b.onclick = () => { T.numbering = null; if (b.dataset.tt === 'fig') setTimeout(pickFigKind, 0); else if (T.tool === 'fig') T.hatch = null; if (T.selSet && b.dataset.tt !== 'box') { T.selSet = null; showSelBox(); } T.opA = null; T.tool = b.dataset.tt; T.mA = null; T.tA = null; T.roomIds = null; T.objIds = null; T.noteTip = null; if (T.tool !== 'walk') T.chain = null; const tt = TTOOLS.find(t => t[0] === T.tool); if (tt) stat(tt[1] + ': ' + tt[2]); renderTape(); });
   $('#tUndo').onclick = tUndo; $('#tRedo').onclick = tRedo;
   $('#orth').onchange = e => { M.ortho = e.target.checked; adjust(); renderTape(); };
   document.querySelectorAll('[data-pdfsz]').forEach(b => b.onclick = () => { try { localStorage.setItem('rul_pdfsz', b.dataset.pdfsz); } catch (e) { } stat('Подписи в PDF: ' + PDFSZ[b.dataset.pdfsz].t.toLowerCase() + '.'); renderTape(); });
@@ -6111,8 +6139,8 @@ async function exportOverlayPdf(opt = {}) {
     }
     // номера точек — мелко и только там, где свободно
     for (const p of M.pts) { if (p.soft) continue; const q = P2(p); page.drawCircle({ x: q[0], y: q[1], size: lw * 1.6, color: rgb(1, 1, 1), borderColor: rgb(0.1, 0.1, 0.1), borderWidth: lw * 0.6 });
-      const s0 = pname(p.id), f0 = fs * 0.55, w = font.getAdvanceWidth(s0, f0) / 2 + f0 * 0.5;
-      place(s0, rgb(0.3, 0.3, 0.3), 0, [[1, 1], [-1, 1], [1, -1], [-1, -1]].map(([sx, sy]) => ({ c: [q[0] + sx * w, q[1] + sy * f0 * 0.95], size: f0 })), false); }
+      const own = !!p.name, s0 = pname(p.id), f0 = fs * (own ? 0.8 : 0.55), w = font.getAdvanceWidth(s0, f0) / 2 + f0 * 0.5;
+      place(s0, own ? rgb(0.04, 0.24, 0.57) : rgb(0.3, 0.3, 0.3), 0, [[1, 1], [-1, 1], [1, -1], [-1, -1]].map(([sx, sy]) => ({ c: [q[0] + sx * w, q[1] + sy * f0 * 0.95], size: f0 })), own); }
     const d = new Date(); text(`Обмер рулеткой · ${d.toLocaleDateString('ru')} · ${M.cond ? 'условно по чертежу' : 'факт по замерам'} · размеры в метрах · Рулетка · © d1sco`, [10, 10], Math.max(4, Math.min(8, W / 160)), GRY, 0, 'l');
     if (wrapped) page.pushOperators(popGraphicsState());
       })();
