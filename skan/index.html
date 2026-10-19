@@ -32,6 +32,7 @@ em{font-style:normal;color:#fff;border-radius:5px;padding:0 5px;font-weight:700;
 .sm{font-size:12px;color:var(--mute);margin:3px 0}.ok{color:#15803d}.wa{color:#b45309}.mu{color:#8a95a3}.bad{color:#c81e1e}
 canvas.band{width:100%;height:32px;display:block;border-radius:6px;touch-action:none;cursor:ew-resize}
 .bt{display:flex;flex-wrap:wrap;gap:3px;align-items:center;font-size:12px;margin-top:4px}.bt span{flex:1 1 100%;color:var(--mute)}.bt button{padding:2px 7px;font-size:12px}
+.hints{background:#fff;border:1px solid var(--line);border-radius:10px;padding:7px;margin-bottom:8px}.hint{display:block;width:100%;text-align:left;font-size:12.5px;margin:3px 0;border-left:4px solid #d97706;background:#fffaf0}.hint.s3{border-left-color:#c81e1e;background:#fff5f5}
 .res{display:flex;flex-wrap:wrap;gap:4px}.res span{background:#fff;border:1px solid var(--line);border-radius:8px;padding:2px 6px;cursor:pointer}.res span em{background:var(--lc)}
 .empty{max-width:640px;margin:60px auto;padding:20px;background:#fff;border-radius:16px;border:1px solid var(--line)}.empty h2{margin-top:0}.empty .h{color:var(--mute)}button.big{font-size:16px;padding:11px 18px}
 .dlg{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;z-index:50}.dlg-b{background:#fff;border-radius:14px;padding:16px;max-width:460px;width:calc(100% - 32px)}.dlg-t{font-weight:700;font-size:15px}.dlg-x{color:var(--mute);margin:8px 0}.row.r{display:flex;gap:6px;justify-content:flex-end;margin-top:12px}.dlg-in{width:100%;margin-top:8px;padding:8px;font:inherit}
@@ -46,15 +47,15 @@ canvas.band{width:100%;height:32px;display:block;border-radius:6px;touch-action:
   <button id="bAdd" class="pri">＋ Сканы</button><span class="sep"></span>
   <div class="grp"><button data-view="grid">▦ Все сканы</button><button data-view="asm">⧉ Сборка</button><button data-view="plan">📐 План</button></div><span class="sep"></span>
   <div class="grp"><button data-tool="hand">✋ Обзор</button><button data-tool="line">／ Линия</button><button data-tool="point">• Точка</button><button data-tool="erase">🗑 Метка</button></div><span class="sep"></span>
-  <button id="bStitch" class="pri">🧩 Сшить</button><button id="bUndo">↶</button><button id="bRedo">↷</button><button id="bFit">⤢</button>
-  <span id="colsBox" class="grp"><span class="sep"></span><button data-cols="1">1</button><button data-cols="2">2</button><button data-cols="3">3</button><button data-cols="4">4</button></span><span class="sep"></span>
+  <button id="bAuto">🤖 Авто</button><button id="bStitch" class="pri">🧩 Сшить</button><button id="bUndo">↶</button><button id="bRedo">↷</button><button id="bFit">⤢</button>
+  <span id="colsBox" class="grp"><span class="sep"></span><button data-cols="1">1</button><button data-cols="2">2</button><button data-cols="3">3</button><button data-cols="4">4</button><button id="bTW" title="Повернуть рамки как в сборке">↻ как в сборке</button></span><span class="sep"></span>
   <button id="bSave">💾 Файл</button><button id="bOpen">📂</button><button id="bNew">Новая</button><button id="bHelp">Справка</button>
 </div>
 <div id="side"><div id="list"></div></div>
 <div id="main"></div>
 <div id="rotbar" title="Повернуть выбранный скан"><button id="bR1">⟲ 1°</button><button id="bR01">⟲ 0,1°</button><button id="bRm01">⟳ 0,1°</button><button id="bRm1">⟳ 1°</button><button id="bR90">⟲ 90°</button></div>
 <div id="ubar"><button id="fUndo" disabled>↶ Отменить шаг</button><button id="fRedo" disabled>↷ Вернуть</button><button id="fDel">🗑 Удалить выбранное</button></div>
-<div id="foot"><span id="status"></span><span id="saved"></span><span id="ver">Скан 2.2 · © d1sco, 2026</span></div>
+<div id="foot"><span id="status"></span><span id="saved"></span><span id="ver">Скан 2.3 · © d1sco, 2026</span></div>
 <div id="busy" hidden><span>…</span></div>
 <input type="file" id="fileIn" multiple accept=".e57" hidden><input type="file" id="projIn" hidden>
 <div id="help" hidden><div class="lh"><h3>Как сшивать</h3><button id="helpX">✕</button></div>
@@ -64,6 +65,7 @@ canvas.band{width:100%;height:32px;display:block;border-radius:6px;touch-action:
 <li><b>Полоса высот</b> у каждого скана в списке слева: тяните её края по графику высот (пол → потолок) или нажмите «Низ / Середина / Верх / Всё». Берите ту часть, где стены видны чисто, без мебели: где-то это низ, где-то верх.</li>
 <li><b>／ Линия</b> — проведите вдоль стены, края проёма, грани колонны. Программа сама подгонит линию по точкам скана (в окне видно, по скольким точкам и с какой точностью). Выберите букву. На соседнем скане отметьте <b>ту же</b> стену или край и выберите <b>ту же</b> букву. Концы линий не обязаны совпадать — важна сама прямая.</li>
 <li>Скану нужно минимум <b>две линии разного направления</b> (например, две стены под углом) или две точки, общие с уже сшитыми. В списке видно, хватает ли меток.</li>
+<li><b>🤖 Авто</b> — автосшивка: программа сама найдёт общие места соседних сканов (углы, коробки, мебель), проверит каждый стык видимостью и уравняет сеть. Затем «💡 Где помочь» слева: какие сканы не пристыковались или стоят неуверенно, на каких парах стены расходятся. Касание подсказки — откроются эти два скана рядом: поставьте на них 2 общие линии и «🧩 Сшить». Уверенно сшитые сканы при этом стоят на месте (🔒; нажать — освободить). «🔍 Проверить стыки» — заново сверить стены всех пар, «📐 Пробный план» — сразу посмотреть план.</li>
 <li><b>⚓ Опорный</b> скан стоит на месте, остальные встают к нему. По умолчанию опорный — первый.</li>
 <li><b>🧩 Сшить</b> — программа ставит сканы по меткам и показывает невязку каждой буквы в мм. Больше 10 мм — красным: вероятно, отмечены разные стены одной буквой.</li>
 <li><b>⧉ Сборка</b> — все сканы вместе. Касание — выбрать скан (он ярче, остальные бледнее). Тянуть — сдвиг, кружок ↻ или два пальца на скане — поворот, правая кнопка мыши — поворот. Кнопки внизу справа — поворот на 0,1° / 1° / 90°, стрелки клавиатуры — сдвиг на 1 см (с Shift — 10 см).</li>
@@ -302,9 +304,359 @@ const E57 = (() => {
     if (cv < fv * 0.15) ceil = floor + 3.0; // no clear ceiling
     return { floor, ceil };
   }
+
+// ---- reg3d.js ----
+/* Программа для ЭВМ «Скан → План». © d1sco, 2026. Все права защищены. */
+// ===== 3D feature registration (FPFH + 4-DoF RANSAC + point-to-plane ICP + visibility evidence + pose graph) =====
+// Scans from a levelled tripod scanner differ by yaw + translation (x, y, z): 4 degrees of freedom.
+const REG3D = (() => {
+  const V = 0.05, RN = 0.3, KN = 32, NK = 9000, NK_FAST = 3000;
+  let seed = 12345; const rnd = () => (seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296;
+
+  // ---------- spatial grid ----------
+  function grid(C, h) {
+    const n = C.length / 3, keys = new Float64Array(n), idx = new Uint32Array(n);
+    const K = (x, y, z) => (Math.floor(x / h) + 4096) * 67108864 + (Math.floor(y / h) + 4096) * 8192 + (Math.floor(z / h) + 4096);
+    for (let i = 0; i < n; i++) { keys[i] = K(C[3 * i], C[3 * i + 1], C[3 * i + 2]); idx[i] = i; }
+    idx.sort((a, b) => keys[a] - keys[b]);
+    const map = new Map(); let s = 0;
+    for (let j = 1; j <= n; j++) if (j === n || keys[idx[j]] !== keys[idx[s]]) { map.set(keys[idx[s]], [s, j]); s = j; }
+    return { h, idx, map, C, K };
+  }
+  // calls f(j, d2) for points within r of (x,y,z); r <= h
+  function around(G, x, y, z, r, f) {
+    const h = G.h, ix = Math.floor(x / h), iy = Math.floor(y / h), iz = Math.floor(z / h), C = G.C, r2 = r * r;
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (let c = -1; c <= 1; c++) {
+      const e = G.map.get((ix + a + 4096) * 67108864 + (iy + b + 4096) * 8192 + (iz + c + 4096)); if (!e) continue;
+      for (let k = e[0]; k < e[1]; k++) { const j = G.idx[k]; const dx = C[3 * j] - x, dy = C[3 * j + 1] - y, dz = C[3 * j + 2] - z, d2 = dx * dx + dy * dy + dz * dz; if (d2 <= r2) f(j, d2); }
+    }
+  }
+  function nearest(G, x, y, z, r) { let bj = -1, bd = r * r; around(G, x, y, z, r, (j, d2) => { if (d2 < bd) { bd = d2; bj = j; } }); return bj; }
+
+  // smallest eigenvector of symmetric 3x3 (Jacobi)
+  function eig3(m) {
+    const a = [[m[0], m[1], m[2]], [m[1], m[3], m[4]], [m[2], m[4], m[5]]], v = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+    for (let sw = 0; sw < 12; sw++) {
+      for (const [p, q] of [[0, 1], [0, 2], [1, 2]]) {
+        if (Math.abs(a[p][q]) < 1e-15) continue;
+        const th = (a[q][q] - a[p][p]) / (2 * a[p][q]), t = Math.sign(th || 1) / (Math.abs(th) + Math.sqrt(th * th + 1)), c = 1 / Math.sqrt(t * t + 1), s = t * c;
+        for (let k = 0; k < 3; k++) { const akp = a[k][p], akq = a[k][q]; a[k][p] = c * akp - s * akq; a[k][q] = s * akp + c * akq; }
+        for (let k = 0; k < 3; k++) { const apk = a[p][k], aqk = a[q][k]; a[p][k] = c * apk - s * aqk; a[q][k] = s * apk + c * aqk; }
+        for (let k = 0; k < 3; k++) { const vkp = v[k][p], vkq = v[k][q]; v[k][p] = c * vkp - s * vkq; v[k][q] = s * vkp + c * vkq; }
+      }
+    }
+    const ev = [a[0][0], a[1][1], a[2][2]]; let mi = 0; if (ev[1] < ev[mi]) mi = 1; if (ev[2] < ev[mi]) mi = 2;
+    return { n: [v[0][mi], v[1][mi], v[2][mi]], curv: ev[mi] / Math.max(1e-12, ev[0] + ev[1] + ev[2]) };
+  }
+
+  // ---------- per-scan preparation ----------
+  // P: local xyz (Float32Array), floor/ceil heights in local z
+  function prep(P, floor, ceil) {
+    const n0 = P.length / 3;
+    // 1. 5 cm voxel centroids within 10 m
+    const vm = new Map();
+    for (let i = 0; i < n0; i++) {
+      const x = P[3 * i], y = P[3 * i + 1], z = P[3 * i + 2]; if (x * x + y * y + z * z > 100) continue;
+      const k = (Math.floor(x / V) + 512) * 1048576 + (Math.floor(y / V) + 512) * 1024 + (Math.floor(z / V) + 512);
+      let e = vm.get(k); if (!e) { e = [0, 0, 0, 0]; vm.set(k, e); } e[0] += x; e[1] += y; e[2] += z; e[3]++;
+    }
+    const n = vm.size, C = new Float32Array(3 * n); let q = 0;
+    for (const e of vm.values()) { C[q++] = e[0] / e[3]; C[q++] = e[1] / e[3]; C[q++] = e[2] / e[3]; }
+    const G = grid(C, RN);
+    // 2. neighbours, normals, curvature
+    const NB = new Int32Array(n * KN).fill(-1), ND = new Float32Array(n * KN), Nrm = new Float32Array(3 * n), curv = new Float32Array(n), nbc = new Uint8Array(n);
+    const tmpJ = [], tmpD = [];
+    for (let i = 0; i < n; i++) {
+      tmpJ.length = 0; tmpD.length = 0;
+      const x = C[3 * i], y = C[3 * i + 1], z = C[3 * i + 2];
+      around(G, x, y, z, RN, (j, d2) => { if (j !== i) { tmpJ.push(j); tmpD.push(d2); } });
+      const ord = tmpJ.map((_, k) => k).sort((a, b) => tmpD[a] - tmpD[b]);
+      const m = Math.min(KN, ord.length); nbc[i] = m;
+      for (let k = 0; k < m; k++) { NB[i * KN + k] = tmpJ[ord[k]]; ND[i * KN + k] = Math.sqrt(tmpD[ord[k]]); }
+      const kk = Math.min(16, m); if (kk < 5) { Nrm[3 * i + 2] = 1; curv[i] = 0; continue; }
+      let mx = x, my = y, mz = z; for (let k = 0; k < kk; k++) { const j = NB[i * KN + k]; mx += C[3 * j]; my += C[3 * j + 1]; mz += C[3 * j + 2]; } mx /= kk + 1; my /= kk + 1; mz /= kk + 1;
+      const cv = [0, 0, 0, 0, 0, 0];
+      const acc = j => { const dx = C[3 * j] - mx, dy = C[3 * j + 1] - my, dz = C[3 * j + 2] - mz; cv[0] += dx * dx; cv[1] += dx * dy; cv[2] += dx * dz; cv[3] += dy * dy; cv[4] += dy * dz; cv[5] += dz * dz; };
+      acc(i); for (let k = 0; k < kk; k++) acc(NB[i * KN + k]);
+      const r = eig3(cv); let [a, b, c] = r.n; if (a * x + b * y + c * z > 0) { a = -a; b = -b; c = -c; }
+      Nrm[3 * i] = a; Nrm[3 * i + 1] = b; Nrm[3 * i + 2] = c; curv[i] = r.curv;
+    }
+    // 3. SPFH for every point
+    const S = new Float32Array(n * 33);
+    for (let i = 0; i < n; i++) {
+      const m = nbc[i]; if (m < 3) continue;
+      const px = C[3 * i], py = C[3 * i + 1], pz = C[3 * i + 2], ux = Nrm[3 * i], uy = Nrm[3 * i + 1], uz = Nrm[3 * i + 2];
+      const w = 100 / m;
+      for (let k = 0; k < m; k++) {
+        const j = NB[i * KN + k], dd = ND[i * KN + k] || 1e-9;
+        const dx = (C[3 * j] - px) / dd, dy = (C[3 * j + 1] - py) / dd, dz = (C[3 * j + 2] - pz) / dd;
+        const nx = Nrm[3 * j], ny = Nrm[3 * j + 1], nz = Nrm[3 * j + 2];
+        let vx = dy * uz - dz * uy, vy = dz * ux - dx * uz, vz = dx * uy - dy * ux; const vn = Math.hypot(vx, vy, vz) + 1e-9; vx /= vn; vy /= vn; vz /= vn;
+        const wx = uy * vz - uz * vy, wy = uz * vx - ux * vz, wz = ux * vy - uy * vx;
+        const al = vx * nx + vy * ny + vz * nz, ph = dx * ux + dy * uy + dz * uz, th = Math.atan2(wx * nx + wy * ny + wz * nz, ux * nx + uy * ny + uz * nz);
+        const b0 = Math.min(10, Math.max(0, Math.floor((al + 1) / 2 * 11))), b1 = Math.min(10, Math.max(0, Math.floor((ph + 1) / 2 * 11))), b2 = Math.min(10, Math.max(0, Math.floor((th + Math.PI) / (2 * Math.PI) * 11)));
+        S[i * 33 + b0] += w; S[i * 33 + 11 + b1] += w; S[i * 33 + 22 + b2] += w;
+      }
+    }
+    // 4. keypoints (not on flat walls) and their FPFH
+    const cand = []; for (let i = 0; i < n; i++) if (nbc[i] >= 8) cand.push(i);
+    const cs = cand.map(i => curv[i]).sort((a, b) => a - b); const thr = cs.length ? cs[Math.floor(cs.length * 0.2)] : 0;
+    const kp = cand.filter(i => curv[i] > thr);
+    for (let i = kp.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); const t = kp[i]; kp[i] = kp[j]; kp[j] = t; }
+    kp.length = Math.min(kp.length, NK);
+    const nk = kp.length, F = new Float32Array(nk * 33), FN = new Float32Array(nk), KP = new Float32Array(nk * 3);
+    for (let q2 = 0; q2 < nk; q2++) {
+      const i = kp[q2]; let ws = 0; const acc = new Float64Array(33);
+      for (let k = 0; k < nbc[i]; k++) { const j = NB[i * KN + k], w = 1 / Math.max(ND[i * KN + k], 0.01); ws += w; for (let b = 0; b < 33; b++) acc[b] += w * S[j * 33 + b]; }
+      let nn = 0; for (let b = 0; b < 33; b++) { const v = S[i * 33 + b] + (ws ? acc[b] / ws : 0); F[q2 * 33 + b] = v; nn += v * v; }
+      FN[q2] = nn; KP[3 * q2] = C[3 * i]; KP[3 * q2 + 1] = C[3 * i + 1]; KP[3 * q2 + 2] = C[3 * i + 2];
+    }
+    // 5. range image (min range per 0.5° x 0.5°) from all points; sample of points for evidence
+    const RI = new Float32Array(720 * 360).fill(Infinity);
+    for (let i = 0; i < n0; i++) {
+      const x = P[3 * i], y = P[3 * i + 1], z = P[3 * i + 2], r = Math.hypot(x, y, z); if (r < 0.3) continue;
+      const ia = ((Math.floor((Math.atan2(y, x) + Math.PI) / (2 * Math.PI) * 720) % 720) + 720) % 720, ie = Math.min(359, Math.max(0, Math.floor((Math.asin(z / r) + Math.PI / 2) / Math.PI * 360)));
+      const k = ie * 720 + ia; if (r < RI[k]) RI[k] = r;
+    }
+    const band = []; for (let i = 0; i < n0; i++) { const z = P[3 * i + 2]; if (z > floor + 0.1 && z < ceil - 0.1 && P[3 * i] ** 2 + P[3 * i + 1] ** 2 < 225) band.push(i); }
+    const ns = Math.min(15000, band.length), S3 = new Float32Array(ns * 3);
+    for (let q2 = 0; q2 < ns; q2++) { const i = band[Math.floor(rnd() * band.length)]; S3[3 * q2] = P[3 * i]; S3[3 * q2 + 1] = P[3 * i + 1]; S3[3 * q2 + 2] = P[3 * i + 2]; }
+    const Gi = grid(C, 0.45), Gf = grid(C, 0.1);
+    return { C, N: Nrm, G: Gi, Gf, KP, F, FN, nk, RI, S3 };
+  }
+
+  // ---------- matching ----------
+  function match(A, B, nk) {
+    const na = Math.min(nk, A.nk), nb = Math.min(nk, B.nk), FA = A.F, FB = B.F;
+    const bestA = new Int32Array(nb), bestAd = new Float32Array(nb).fill(Infinity), bestB = new Int32Array(na), bestBd = new Float32Array(na).fill(Infinity);
+    for (let i = 0; i < nb; i++) {
+      const o = i * 33, fbn = B.FN[i];
+      for (let j = 0; j < na; j++) {
+        const p = j * 33; let dot = 0;
+        for (let k = 0; k < 33; k++) dot += FB[o + k] * FA[p + k];
+        const d = fbn + A.FN[j] - 2 * dot;
+        if (d < bestAd[i]) { bestAd[i] = d; bestA[i] = j; }
+        if (d < bestBd[j]) { bestBd[j] = d; bestB[j] = i; }
+      }
+    }
+    const pa = [], pb = [];
+    for (let i = 0; i < nb; i++) { const j = bestA[i]; if (bestB[j] === i) { pa.push(A.KP[3 * j], A.KP[3 * j + 1], A.KP[3 * j + 2]); pb.push(B.KP[3 * i], B.KP[3 * i + 1], B.KP[3 * i + 2]); } }
+    return { pa: Float32Array.from(pa), pb: Float32Array.from(pb) };
+  }
+  // 4-DoF hypotheses: every pair of correspondences that keeps length and height votes for (yaw, tx, ty, tz);
+  // the best-supported bins are refined on their inliers. Exhaustive, so a small overlap (a doorway) is not missed.
+  function ransac(pa, pb) {
+    const n = pa.length / 3; if (n < 3) return [];
+    const votes = new Map(), DA = Math.PI / 180;
+    const maxPairs = 6e6, step = n * n / 2 > maxPairs ? Math.ceil(n * n / 2 / maxPairs) : 1;
+    for (let i = 0; i < n; i++) {
+      const pax = pa[3 * i], pay = pa[3 * i + 1], dz1 = pa[3 * i + 2] - pb[3 * i + 2], pbx = pb[3 * i], pby = pb[3 * i + 1];
+      for (let j = i + 1 + (step > 1 ? Math.floor(rnd() * step) : 0); j < n; j += step) {
+        const dz2 = pa[3 * j + 2] - pb[3 * j + 2]; if (Math.abs(dz1 - dz2) > 0.05) continue;
+        const ax = pa[3 * j] - pax, ay = pa[3 * j + 1] - pay, bx = pb[3 * j] - pbx, by = pb[3 * j + 1] - pby;
+        const la2 = ax * ax + ay * ay, lb2 = bx * bx + by * by; if (lb2 < 0.25) continue;
+        const la = Math.sqrt(la2), lb = Math.sqrt(lb2); if (Math.abs(la - lb) > 0.04) continue;
+        const a = Math.atan2(ay, ax) - Math.atan2(by, bx), c = Math.cos(a), s = Math.sin(a);
+        const tx = pax - (c * pbx - s * pby), ty = pay - (s * pbx + c * pby), tz = (dz1 + dz2) / 2;
+        const ka = ((Math.round(a / (2 * DA)) % 180) + 180) % 180;
+        const key = ((ka * 512 + Math.round(tx / 0.15) + 256) * 512 + Math.round(ty / 0.15) + 256) * 64 + Math.round(tz / 0.1) + 32;
+        votes.set(key, (votes.get(key) || 0) + 1);
+      }
+    }
+    const bins = [...votes.entries()].sort((p, q) => q[1] - p[1]).slice(0, 60);
+    const H = [];
+    for (const [key, v] of bins) {
+      if (v < 2) break;
+      let k = key; const kz = k % 64 - 32; k = Math.floor(k / 64); const ky = k % 512 - 256; k = Math.floor(k / 512); const kx = k % 512 - 256; const ka = Math.floor(k / 512);
+      let h = { a: ka * 2 * DA, tx: kx * 0.15, ty: ky * 0.15, tz: kz * 0.1 };
+      for (const thr of [0.3, 0.15, 0.1]) { const r = refineH(pa, pb, h, thr); if (!r) break; h = r; }
+      H.push(h);
+    }
+    H.sort((p, q) => q.inl - p.inl);
+    const out = [];
+    for (const h of H) {
+      if (out.every(o => Math.abs(((h.a - o.a + 3 * Math.PI) % (2 * Math.PI)) - Math.PI) > 0.03 || Math.hypot(h.tx - o.tx, h.ty - o.ty) > 0.2)) out.push(h);
+      if (out.length >= 12) break;
+    }
+    return out;
+  }
+  // least squares 4-DoF fit on correspondences within thr of hypothesis h
+  function refineH(pa, pb, h, thr) {
+    const n = pa.length / 3, c = Math.cos(h.a), s = Math.sin(h.a), I = [];
+    for (let k = 0; k < n; k++) { const X = c * pb[3 * k] - s * pb[3 * k + 1] + h.tx - pa[3 * k], Y = s * pb[3 * k] + c * pb[3 * k + 1] + h.ty - pa[3 * k + 1], Z = pb[3 * k + 2] + h.tz - pa[3 * k + 2]; if (X * X + Y * Y + Z * Z < thr * thr) I.push(k); }
+    if (I.length < 2) return null;
+    let ax = 0, ay = 0, bx = 0, by = 0, dz = 0; for (const k of I) { ax += pa[3 * k]; ay += pa[3 * k + 1]; bx += pb[3 * k]; by += pb[3 * k + 1]; dz += pa[3 * k + 2] - pb[3 * k + 2]; }
+    const m = I.length; ax /= m; ay /= m; bx /= m; by /= m; dz /= m;
+    let sxx = 0, sxy = 0; for (const k of I) { const px = pb[3 * k] - bx, py = pb[3 * k + 1] - by, qx = pa[3 * k] - ax, qy = pa[3 * k + 1] - ay; sxx += px * qx + py * qy; sxy += px * qy - py * qx; }
+    const a = I.length >= 2 && Math.hypot(sxx, sxy) > 1e-9 ? Math.atan2(sxy, sxx) : h.a, c2 = Math.cos(a), s2 = Math.sin(a);
+    return { a, tx: ax - (c2 * bx - s2 * by), ty: ay - (s2 * bx + c2 * by), tz: dz, inl: m };
+  }
+  // point-to-plane ICP, 4 DoF; pose maps B-local -> A-local
+  function icp(A, B, p) {
+    let { a, tx, ty, tz } = p; const C = B.C, n = C.length / 3; let rms = 0, cnt = 0, lastM = null;
+    for (const md of [0.45, 0.35, 0.25, 0.15, 0.1, 0.07, 0.05, 0.04, 0.03, 0.03, 0.03]) {
+      const c = Math.cos(a), s = Math.sin(a); const M = new Float64Array(16), g = new Float64Array(4); let se = 0; cnt = 0;
+      const step = md > 0.12 ? 9 : 2, GG = md > 0.1 ? A.G : A.Gf;
+      for (let i = 0; i < n; i += step) {
+        const x = c * C[3 * i] - s * C[3 * i + 1] + tx, y = s * C[3 * i] + c * C[3 * i + 1] + ty, z = C[3 * i + 2] + tz;
+        const j = nearest(GG, x, y, z, md); if (j < 0) continue;
+        const nx = A.N[3 * j], ny = A.N[3 * j + 1], nz = A.N[3 * j + 2];
+        const r = (A.C[3 * j] - x) * nx + (A.C[3 * j + 1] - y) * ny + (A.C[3 * j + 2] - z) * nz;
+        const J = [nx * -y + ny * x, nx, ny, nz];
+        for (let u = 0; u < 4; u++) { g[u] += J[u] * r; for (let v = 0; v < 4; v++) M[u * 4 + v] += J[u] * J[v]; }
+        se += r * r; cnt++;
+      }
+      if (cnt < 30) return null;
+      for (let u = 0; u < 4; u++) M[u * 5] += 1e-6;
+      const x = solve4(M, g); if (!x) return null;
+      lastM = M;
+      const c2 = Math.cos(x[0]), s2 = Math.sin(x[0]);
+      a += x[0]; const ntx = c2 * tx - s2 * ty + x[1], nty = s2 * tx + c2 * ty + x[2]; tx = ntx; ty = nty; tz += x[3];
+      rms = Math.sqrt(se / cnt);
+    }
+    // uncertainty: covariance ~ rms^2 * (J'J)^-1, worst horizontal direction (every 2nd point used -> x2)
+    let unc = 0;
+    if (lastM) { const cov = [1, 2].map(k => solve4(lastM, [0, 1, 2, 3].map(u => u === k ? 1 : 0))); if (cov[0] && cov[1]) { const sxx = cov[0][1], syy = cov[1][2], sxy = cov[0][2]; const lam = (sxx + syy) / 2 + Math.sqrt(((sxx - syy) / 2) ** 2 + sxy * sxy); unc = rms * Math.sqrt(Math.max(0, lam) * 2) ; } }
+    return { a, tx, ty, tz, rms, cnt, unc };
+  }
+  function solve4(M, g) {
+    const A = [0, 1, 2, 3].map(i => [M[i * 4], M[i * 4 + 1], M[i * 4 + 2], M[i * 4 + 3], g[i]]);
+    for (let i = 0; i < 4; i++) {
+      let p = i; for (let k = i + 1; k < 4; k++) if (Math.abs(A[k][i]) > Math.abs(A[p][i])) p = k; [A[i], A[p]] = [A[p], A[i]];
+      if (Math.abs(A[i][i]) < 1e-12) return null;
+      for (let k = 0; k < 4; k++) if (k !== i) { const f = A[k][i] / A[i][i]; for (let j = i; j < 5; j++) A[k][j] -= f * A[i][j]; }
+    }
+    return A.map((r, i) => r[4] / r[i]);
+  }
+  // visibility evidence: points of one scan that the other scanner sees on its surfaces (agree) or sees through (conflict)
+  function seen(A, S, a, tx, ty, tz) { // S: points in their own frame; pose maps them into A's frame
+    const c = Math.cos(a), s = Math.sin(a); let ag = 0, cf = 0;
+    for (let i = 0; i < S.length; i += 3) {
+      const x = c * S[i] - s * S[i + 1] + tx, y = s * S[i] + c * S[i + 1] + ty, z = S[i + 2] + tz, r = Math.hypot(x, y, z); if (r < 0.6) continue;
+      const ia = ((Math.floor((Math.atan2(y, x) + Math.PI) / (2 * Math.PI) * 720) % 720) + 720) % 720, ie = Math.min(359, Math.max(0, Math.floor((Math.asin(z / r) + Math.PI / 2) / Math.PI * 360)));
+      const R = A.RI[ie * 720 + ia]; if (!isFinite(R)) continue;
+      if (Math.abs(r - R) < 0.05) ag++; else if (r < R - 0.12) cf++;
+    }
+    return [ag, cf];
+  }
+  function evidence(A, B, p) {
+    const [a1, c1] = seen(A, B.S3, p.a, p.tx, p.ty, p.tz);
+    const c = Math.cos(p.a), s = Math.sin(p.a), itx = -(c * p.tx + s * p.ty), ity = -(-s * p.tx + c * p.ty);
+    const [a2, c2] = seen(B, A.S3, -p.a, itx, ity, -p.tz);
+    const ag = a1 + a2, cf = c1 + c2; return { ag, cf, ratio: ag / (ag + cf + 1) };
+  }
+  const good = e => e && e.ratio >= 0.65 && e.ag >= 2500;
+  function pair(A, B, nk) {
+    const { pa, pb } = match(A, B, nk); const H = ransac(pa, pb); let best = null;
+    for (const h of H.slice(0, 8)) {
+      const r = icp(A, B, h); if (!r) continue;
+      const e = evidence(A, B, r), sc = e.ag * Math.pow(e.ratio, 4);
+      if (!best || sc > best.sc) best = { ...r, ...e, sc };
+    }
+    return best;
+  }
+
+  // ---------- pose graph (4 DoF) ----------
+  const wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
+  function rel(P, Q) { const c = Math.cos(P.a), s = Math.sin(P.a), dx = Q.tx - P.tx, dy = Q.ty - P.ty; return [Q.a - P.a, c * dx + s * dy, -s * dx + c * dy, Q.tz - P.tz]; }
+  function compose(P, e) { const c = Math.cos(P.a), s = Math.sin(P.a); return { a: P.a + e.a, tx: P.tx + c * e.tx - s * e.ty, ty: P.ty + s * e.tx + c * e.ty, tz: P.tz + e.tz }; }
+  function inv(e) { const c = Math.cos(e.a), s = Math.sin(e.a); return { a: -e.a, tx: -(c * e.tx + s * e.ty), ty: -(-s * e.tx + c * e.ty), tz: -e.tz }; }
+  function optimize(nodes, edges, root, init) {
+    const free = nodes.filter(n => n !== root), ix = new Map(free.map((n, i) => [n, i])), m = free.length * 4; if (!m) return init;
+    let P = new Map(init);
+    const get = (X, n) => n === root ? P.get(root) : { a: X[ix.get(n) * 4], tx: X[ix.get(n) * 4 + 1], ty: X[ix.get(n) * 4 + 2], tz: X[ix.get(n) * 4 + 3] };
+    const X = new Float64Array(m); for (const n of free) { const p = P.get(n), k = ix.get(n) * 4; X[k] = p.a; X[k + 1] = p.tx; X[k + 2] = p.ty; X[k + 3] = p.tz; }
+    const wA = 1 / 0.0005, wT = 1 / 0.003;
+    const res = Xv => { const r = []; for (const e of edges) { const q = rel(get(Xv, e.i), get(Xv, e.j)), sw = Math.sqrt(e.w); r.push(wrap(q[0] - e.a) * wA * sw, (q[1] - e.tx) * wT * sw, (q[2] - e.ty) * wT * sw, (q[3] - e.tz) * wT * sw); } return r; };
+    for (let it = 0; it < 10; it++) {
+      const r0 = res(X), nr = r0.length, J = new Float64Array(nr * m), h = 1e-6;
+      for (let k = 0; k < m; k++) { const o = X[k]; X[k] = o + h; const r1 = res(X); X[k] = o; for (let q = 0; q < nr; q++) J[q * m + k] = (r1[q] - r0[q]) / h; }
+      const A = new Float64Array(m * m), g = new Float64Array(m);
+      for (let q = 0; q < nr; q++) for (let u = 0; u < m; u++) { const ju = J[q * m + u]; if (!ju) continue; g[u] -= ju * r0[q]; for (let v = 0; v < m; v++) A[u * m + v] += ju * J[q * m + v]; }
+      for (let u = 0; u < m; u++) A[u * m + u] += 1e-6;
+      const dx = gauss(A, g, m); if (!dx) break; let mx = 0; for (let k = 0; k < m; k++) { X[k] += dx[k]; mx = Math.max(mx, Math.abs(dx[k])); } if (mx < 1e-7) break;
+    }
+    const out = new Map([[root, P.get(root)]]); for (const n of free) out.set(n, get(X, n)); return out;
+  }
+  function gauss(A, b, n) {
+    const M = A.slice(), x = b.slice();
+    for (let i = 0; i < n; i++) {
+      let p = i; for (let k = i + 1; k < n; k++) if (Math.abs(M[k * n + i]) > Math.abs(M[p * n + i])) p = k;
+      if (p !== i) { for (let j = 0; j < n; j++) { const t = M[i * n + j]; M[i * n + j] = M[p * n + j]; M[p * n + j] = t; } const t = x[i]; x[i] = x[p]; x[p] = t; }
+      const d = M[i * n + i]; if (Math.abs(d) < 1e-14) return null;
+      for (let k = i + 1; k < n; k++) { const f = M[k * n + i] / d; if (!f) continue; for (let j = i; j < n; j++) M[k * n + j] -= f * M[i * n + j]; x[k] -= f * x[i]; }
+    }
+    for (let i = n - 1; i >= 0; i--) { let s = x[i]; for (let j = i + 1; j < n; j++) s -= M[i * n + j] * x[j]; x[i] = s / M[i * n + i]; }
+    return x;
+  }
+
+  // ---------- whole set ----------
+  // D: array of prep() results (index = scan index in list); returns {groups:[[{k, pose, q}]], edges}
+  function registerAll(D, onProg) {
+    const n = D.length, E = [], tried = new Set();
+    const comp = () => { const p = [...Array(n).keys()]; const f = x => p[x] === x ? x : (p[x] = f(p[x])); for (const e of E) p[f(e.i)] = f(e.j); return [...Array(n).keys()].map(f); };
+    const run = (i, j, dense) => {
+      const key = i + '-' + j + (dense ? 'd' : ''); if (tried.has(key)) return null; tried.add(key);
+      const r = pair(D[i], D[j], dense ? NK : NK_FAST);
+      if (good(r)) { const e = { i, j, a: r.a, tx: r.tx, ty: r.ty, tz: r.tz, w: Math.min(3, r.ag / 5000), q: r }; const k = E.findIndex(x => x.i === i && x.j === j); if (k >= 0) E[k] = e; else E.push(e); return e; }
+      return null;
+    };
+    // phase 1: neighbours in shooting order (fast, then dense if fast failed)
+    const W = Math.min(n - 1, 4), P1 = []; for (let i = 0; i < n; i++) for (let j = i + 1; j <= Math.min(n - 1, i + W); j++) P1.push([i, j]);
+    let done = 0; const total = P1.length * 1.6 + 4;
+    for (const [i, j] of P1) { if (!run(i, j, false)) run(i, j, true); onProg && onProg(Math.min(0.95, ++done / total)); }
+    // phase 2: connect components (dense), then close loops between nearby stations
+    for (let pass = 0; pass < 2; pass++) {
+      let c = comp(); const poses = posesOf(n, E, c);
+      const cand = [];
+      for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+        if (tried.has(i + '-' + j + 'd') && tried.has(i + '-' + j)) continue;
+        if (c[i] !== c[j]) cand.push([i, j, 0]);
+        else { const a = poses.get(i), b = poses.get(j), d = Math.hypot(a.tx - b.tx, a.ty - b.ty); if (d < 9 && !E.some(e => (e.i === i && e.j === j))) cand.push([i, j, d]); }
+      }
+      cand.sort((p, q) => p[2] - q[2]);
+      for (const [i, j] of cand) {
+        c = comp(); if (pass === 0 && c[i] === c[j] && cand.some(x => c[x[0]] !== c[x[1]])) continue;
+        if (!run(i, j, false) && c[i] !== c[j]) run(i, j, true);
+        onProg && onProg(Math.min(0.97, ++done / (total + cand.length)));
+      }
+    }
+    // final poses per component
+    const c = comp(), poses = posesOf(n, E, c, true);
+    const groups = new Map();
+    for (let i = 0; i < n; i++) { if (!groups.has(c[i])) groups.set(c[i], []); groups.get(c[i]).push(i); }
+    const out = [];
+    for (const members of groups.values()) {
+      members.sort((a, b) => a - b);
+      out.push(members.map(k => {
+        const es = E.filter(e => e.i === k || e.j === k);
+        const q = es.length && k !== members[0] ? { fit: Math.max(...es.map(e => e.q.ratio)), conflict: Math.min(...es.map(e => e.q.cf / (e.q.ag + e.q.cf + 1))), rms: Math.min(...es.map(e => e.q.rms)), links: es.length, overlap: Math.max(...es.map(e => e.q.cnt)) } : null;
+        const p = poses.get(k); return { k, pose: { ...p, a: wrap(p.a) }, q };
+      }));
+    }
+    return { groups: out, edges: E.map(e => ({ i: e.i, j: e.j, ratio: e.q.ratio, ag: e.q.ag, rms: e.q.rms, unc: e.q.unc })) };
+  }
+  function posesOf(n, E, c, optimizeIt) {
+    const out = new Map();
+    const roots = new Set(c);
+    for (const r of roots) {
+      const members = [...Array(n).keys()].filter(i => c[i] === r); const root = Math.min(...members);
+      // spanning tree by weight (Prim)
+      const P = new Map([[root, { a: 0, tx: 0, ty: 0, tz: 0 }]]);
+      const es = E.filter(e => c[e.i] === r).sort((a, b) => b.w - a.w);
+      let grew = true; while (grew) { grew = false; for (const e of es) { if (P.has(e.i) && !P.has(e.j)) { P.set(e.j, compose(P.get(e.i), e)); grew = true; } else if (P.has(e.j) && !P.has(e.i)) { P.set(e.i, compose(P.get(e.j), inv(e))); grew = true; } } }
+      const Q = optimizeIt && es.length >= members.length ? optimize(members, es, root, P) : P;
+      for (const [k, v] of Q) out.set(k, v);
+    }
+    return out;
+  }
+  return { prep, pair, registerAll, evidence, icp, _: { match, ransac, rel } };
+})();
+
 </script>
 <script id="wsrc" type="text/plain">// фоновое чтение E57: прореживание, пол/потолок, гистограмма высот
 self.onmessage = e => {
+  if (e.data.cmd === 'auto') return autoJob(e.data);
   const { job, name, buf, voxel } = e.data;
   try {
     const list = E57.readE57(buf, { voxel: voxel || 0.02, maxRange: 30, onProgress: p => self.postMessage({ job, prog: p }) });
@@ -322,6 +674,15 @@ self.onmessage = e => {
     self.postMessage({ job, done: true, scans: out }, out.map(o => o.pts.buffer));
   } catch (err) { self.postMessage({ job, error: String(err && err.message || err) }); }
 };
+
+// автосшивка: объёмные признаки (углы, коробки, мебель) + проверка видимостью + уравнивание сети
+function autoJob({ job, scans }) {
+  try {
+    const D = []; scans.forEach((s, k) => { self.postMessage({ job, prog: 0.15 * k / scans.length, stage: 'Готовлю ' + s.name }); D.push(REG3D.prep(s.pts, s.floor, s.ceil)); });
+    const R = REG3D.registerAll(D, p => self.postMessage({ job, prog: 0.15 + 0.85 * p, stage: 'Сшиваю' }));
+    self.postMessage({ job, done: true, res: R });
+  } catch (err) { self.postMessage({ job, error: String(err && err.message || err) }); }
+}
 </script>
 <script>/* Программа для ЭВМ «Скан». © d1sco, 2026. Все права защищены. */
 'use strict';
@@ -489,7 +850,7 @@ function stitch() {
   const used = S.scans.filter(s => S.marks.some(m => m.sid === s.id)); if (used.length < 2) { uiAlert('Метки есть только на одном скане. Отметьте ту же линию на соседнем скане той же буквой.'); return; }
   pushUndo();
   const poses = new Map(S.scans.map(s => [s.id, { ...s.pose }]));
-  let anchors = S.scans.filter(s => s.anchor).map(s => s.id); if (!anchors.length) { const a = used[0]; a.anchor = true; anchors = [a.id]; }
+  let anchors = S.scans.filter(s => s.anchor || s.placed).map(s => s.id); if (!anchors.length) { const a = used[0]; a.anchor = true; anchors = [a.id]; } // уверенно сшитые автоматикой стоят на месте
   const known = new Set(anchors);
   for (let guard = 0; guard < S.scans.length; guard++) { // ставим по очереди: сначала тот, у кого больше общих меток с поставленными
     let best = null, bn = 0; for (const s of S.scans) { if (known.has(s.id)) continue; const n = S.marks.filter(m => m.sid === s.id && S.marks.some(o => o.lab === m.lab && known.has(o.sid))).length; if (n > bn) { bn = n; best = s; } }
@@ -501,7 +862,7 @@ function stitch() {
   // уточнение: обе линии одной буквы подгоняются по ОДНОМУ и тому же участку стены (общему для двух сканов) — так кривизна стены не даёт ошибку поворота
   for (let round = 0; round < 2; round++) { refitCommon(poses); solveLS(free, poses); }
   for (const s of S.scans) if (known.has(s.id)) s.pose = poses.get(s.id);
-  S.lastSolve = report(); renderAll(); saveSoon(); if (S.view !== 'asm') setView('asm');
+  S.lastSolve = report(); try { analyze(); } catch (e) { } renderAll(); saveSoon(); if (S.view !== 'asm') setView('asm');
   const R = S.lastSolve; stat(`Сшито: сканов ${known.size}, меток ${S.marks.length}. Дальше — «📐 План» → «Найти стены». Наибольшая невязка ${R.max != null ? Math.round(R.max * 1000) + ' мм' : '—'}${R.bad.length ? ' — проверьте метки: ' + R.bad.join(', ') : ''}.${R.loose.length ? ' Не хватает меток: ' + R.loose.join(', ') : ''}`);
 }
 function refitCommon(poses) {
@@ -524,8 +885,8 @@ function report() { // невязки по буквам
 }
 
 // ---------- отмена ----------
-const snapState = () => JSON.stringify({ scans: S.scans.map(s => ({ id: s.id, pose: s.pose, band: s.band, anchor: s.anchor, vis: s.vis })), marks: S.marks, plan: S.plan });
-function applyState(t) { const j = JSON.parse(t); for (const q of j.scans) { const s = scanById(q.id); if (!s) continue; const bandChanged = s.band[0] !== q.band[0] || s.band[1] !== q.band[1]; Object.assign(s, { pose: q.pose, band: q.band, anchor: q.anchor, vis: q.vis }); if (bandChanged) prepScan(s); } S.marks = j.marks; if (j.plan) S.plan = j.plan; }
+const snapState = () => JSON.stringify({ hints: S.hints || [], scans: S.scans.map(s => ({ id: s.id, pose: s.pose, band: s.band, anchor: s.anchor, vis: s.vis, placed: s.placed, auto: s.auto })), marks: S.marks, plan: S.plan });
+function applyState(t) { const j = JSON.parse(t); for (const q of j.scans) { const s = scanById(q.id); if (!s) continue; const bandChanged = s.band[0] !== q.band[0] || s.band[1] !== q.band[1]; Object.assign(s, { pose: q.pose, band: q.band, anchor: q.anchor, vis: q.vis, placed: q.placed, auto: q.auto }); if (bandChanged) prepScan(s); } S.marks = j.marks; S.hints = j.hints || []; if (j.plan) S.plan = j.plan; }
 function pushUndo() { S.undo.push(snapState()); if (S.undo.length > 200) S.undo.shift(); S.redo = []; for (const id of ['bUndo', 'fUndo']) { const b = document.getElementById(id); if (b) b.disabled = false; } for (const id of ['bRedo', 'fRedo']) { const b = document.getElementById(id); if (b) b.disabled = true; } }
 function undo() { if (!S.undo.length) { stat('Отменять нечего.'); return; } S.redo.push(snapState()); applyState(S.undo.pop()); S.lastSolve = null; if (S.markSel && !S.marks.some(m => m.id === S.markSel)) S.markSel = null; renderAll(); renderMarkCard(); saveSoon(); stat('Шаг отменён. ↷ — вернуть.'); }
 function redo() { if (!S.redo.length) return; S.undo.push(snapState()); applyState(S.redo.pop()); renderAll(); renderMarkCard(); saveSoon(); stat('Возвращено.'); }
@@ -537,13 +898,13 @@ async function put(k, v) { const d = await db(); if (!d) return false; return ne
 async function get(k) { const d = await db(); if (!d) return null; return new Promise(res => { try { const tx = d.transaction('kv', 'readonly'), r = tx.objectStore('kv').get(k); r.onsuccess = () => res(r.result); r.onerror = () => res(null); } catch (e) { res(null); } }); }
 async function del(k) { const d = await db(); if (!d) return; return new Promise(res => { const tx = d.transaction('kv', 'readwrite'); tx.objectStore('kv').delete(k); tx.oncomplete = () => res(); tx.onerror = () => res(); }); }
 let saveT = 0;
-function stateObj() { return { v: 1, nextMark: S.nextMark, nextScan: S.nextScan, asmV: S.asmV, cols: S.cols, plan: S.plan, scans: S.scans.map(s => ({ id: s.id, key: s.key, name: s.name, floor: s.floor, ceil: s.ceil, hist: s.hist, color: s.color, pose: s.pose, band: s.band, anchor: s.anchor, vis: s.vis, tile: s.tile })), marks: S.marks }; }
+function stateObj() { return { v: 1, nextMark: S.nextMark, nextScan: S.nextScan, asmV: S.asmV, cols: S.cols, plan: S.plan, scans: S.scans.map(s => ({ id: s.id, key: s.key, name: s.name, floor: s.floor, ceil: s.ceil, hist: s.hist, color: s.color, pose: s.pose, band: s.band, anchor: s.anchor, vis: s.vis, tile: s.tile, placed: s.placed, auto: s.auto })), marks: S.marks, hints: S.hints || [] }; }
 function saveSoon() { clearTimeout(saveT); saveT = setTimeout(async () => { const ok = await put('state', JSON.stringify(stateObj())); $('#saved').textContent = ok ? '✓ сохранено ' + new Date().toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '⚠ не сохранилось'; }, 500); }
 async function restore() {
   const t = await get('state'); if (!t) return false; let j; try { j = JSON.parse(t); } catch (e) { return false; }
   busy('Открываю сохранённую работу…'); let miss = 0;
   for (const q of j.scans || []) { const buf = await get('pts:' + q.key); if (!buf) { miss++; continue; } const s = Object.assign({}, q, { pts: new Float32Array(buf) }); prepScan(s); S.scans.push(s); }
-  S.marks = (j.marks || []).filter(m => scanById(m.sid)); S.nextMark = j.nextMark || 1; S.nextScan = j.nextScan || S.scans.length + 1; if (j.asmV) S.asmV = j.asmV; if (j.cols) S.cols = j.cols; if (j.plan) S.plan = j.plan;
+  S.marks = (j.marks || []).filter(m => scanById(m.sid)); S.nextMark = j.nextMark || 1; S.nextScan = j.nextScan || S.scans.length + 1; if (j.asmV) S.asmV = j.asmV; if (j.cols) S.cols = j.cols; if (j.plan) S.plan = j.plan; S.hints = j.hints || [];
   busy(''); renderAll(); stat(`Работа восстановлена: сканов ${S.scans.length}, меток ${S.marks.length}${miss ? ` (не прочитались из памяти: ${miss})` : ''}.`); return true;
 }
 
@@ -609,8 +970,8 @@ function tag(ctx, t, p, col) { ctx.font = `bold ${13 * dpr()}px system-ui, sans-
 function drawTile(sc) {
   const cv = $(`#tile-${sc.id} canvas`); if (!cv) return; const W = cv.width, H = cv.height, ctx = cv.getContext('2d'); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
   const V = sc.tile; const lv = { ...V }; // вид плитки — в локальных координатах скана
-  const tmp = { ...sc, pose: { x: 0, y: 0, a: 0 } }; drawScan(ctx, tmp, lv, W, H, 1);
-  const toS = p => w2s(lv, W, H, p);
+  const ta = tileRot(sc), tmp = { ...sc, pose: { x: 0, y: 0, a: ta } }; drawScan(ctx, tmp, lv, W, H, 1);
+  const toS = p => w2s(lv, W, H, rot(p, ta));
   // станция
   const o = toS([0, 0]); ctx.fillStyle = '#111'; ctx.beginPath(); ctx.moveTo(o[0], o[1] - 7 * dpr()); ctx.lineTo(o[0] + 6 * dpr(), o[1] + 5 * dpr()); ctx.lineTo(o[0] - 6 * dpr(), o[1] + 5 * dpr()); ctx.fill();
   for (const m of S.marks) if (m.sid === sc.id) drawMark(ctx, m, toS, S.hlLab === m.lab);
@@ -635,7 +996,7 @@ function knob(sc) { const c = bandCenter(sc), R = Math.max(1.5, 60 / S.asmV.s); 
 function renderAll() { renderList(); renderMain(); renderBar(); }
 function renderBar() { $('#rotbar').hidden = S.view !== 'asm';
   $$('[data-view]').forEach(b => b.classList.toggle('on', b.dataset.view === S.view)); $$('[data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === S.tool));
-  $('#bUndo').disabled = !S.undo.length; $('#bRedo').disabled = !S.redo.length; $('#fUndo').disabled = !S.undo.length; $('#fRedo').disabled = !S.redo.length; $$('[data-cols]').forEach(b => b.classList.toggle('on', +b.dataset.cols === S.cols)); $('#colsBox').hidden = S.view !== 'grid';
+  $('#bUndo').disabled = !S.undo.length; $('#bRedo').disabled = !S.redo.length; $('#fUndo').disabled = !S.undo.length; $('#fRedo').disabled = !S.redo.length; $$('[data-cols]').forEach(b => b.classList.toggle('on', +b.dataset.cols === S.cols)); const tw = $('#bTW'); if (tw) tw.classList.toggle('on', !!S.tileWorld); $('#colsBox').hidden = S.view !== 'grid';
 }
 function renderMain() {
   const main = $('#main');
@@ -653,7 +1014,8 @@ function renderMain() {
 }
 function sizeCanvas(cv) { const r = cv.getBoundingClientRect(); cv.width = Math.max(10, Math.round(r.width * dpr())); cv.height = Math.max(10, Math.round(r.height * dpr())); }
 function sizeTiles() { for (const s of S.scans) { const cv = $(`#tile-${s.id} canvas`); if (!cv) continue; sizeCanvas(cv); if (!s.tile) fitTile(s); } }
-function fitTile(s) { const cv = $(`#tile-${s.id} canvas`); const c = s.core; const w = cv ? cv.width / dpr() : 400, h = cv ? cv.height / dpr() : 300; const W = c[2] - c[0], H = c[3] - c[1]; s.tile = { cx: (c[0] + c[2]) / 2, cy: (c[1] + c[3]) / 2, s: Math.min(w / W, h / H) * 0.95 }; }
+function fitTile(s) { const cv = $(`#tile-${s.id} canvas`); const c0 = s.core, ta = tileRot(s), Q = [[c0[0], c0[1]], [c0[2], c0[1]], [c0[2], c0[3]], [c0[0], c0[3]]].map(p => rot(p, ta)), c = [Math.min(...Q.map(q => q[0])), Math.min(...Q.map(q => q[1])), Math.max(...Q.map(q => q[0])), Math.max(...Q.map(q => q[1]))]; const w = cv ? cv.width / dpr() : 400, h = cv ? cv.height / dpr() : 300; const W = c[2] - c[0], H = c[3] - c[1]; s.tile = { cx: (c[0] + c[2]) / 2, cy: (c[1] + c[3]) / 2, s: Math.min(w / W, h / H) * 0.95 }; }
+const tileRot = sc => S.tileWorld ? sc.pose.a : 0; // рамки можно показать повёрнутыми как в сборке — одинаковые стены смотрят в одну сторону
 function fitAsm() { const cv = $('#asm') || $('#plan'); const vis = S.scans.filter(s => s.vis); if (!vis.length) return; let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; for (const s of vis) for (const p of scanBBoxW(s)) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); } const w = cv ? cv.width / dpr() : innerWidth - 340, h = cv ? cv.height / dpr() : innerHeight - 120; S.asmV = { cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, s: Math.min(w / (x1 - x0), h / (y1 - y0)) * 0.92 }; redraw(); }
 function soloWith(id) { const keep = new Set([id]); if (S.sel && S.sel !== id) keep.add(S.sel); else { const other = S.scans.find(s => s.id !== id && s.vis && S.marks.some(m => m.sid === s.id && S.marks.some(o => o.sid === id && o.lab === m.lab))); if (other) keep.add(other.id); } for (const s of S.scans) s.vis = keep.has(s.id); S.cols = Math.min(2, keep.size); renderAll(); saveSoon(); stat('Рядом два скана. Вернуть все — «👁 Все» в списке.'); }
 function redraw() { if (S.view === 'grid') S.scans.forEach(s => s.vis && drawTile(s)); else if (S.view === 'plan') drawPlan(); else drawAsm(); }
@@ -661,18 +1023,22 @@ function redraw() { if (S.view === 'grid') S.scans.forEach(s => s.vis && drawTil
 // ---------- список сканов слева: видимость, опора, полоса высот ----------
 function renderList() {
   const el = $('#list'); const R = S.lastSolve;
-  el.innerHTML = `<div class="lh"><b>Сканы (${S.scans.length})</b><button id="allVis">👁 Все</button></div>` + S.scans.map(s => { const d = dofOf(s.id), H = s.ceil - s.floor;
+  const H = S.hints || [];
+  el.innerHTML = (S.scans.length > 1 ? `<div class="hints"><div class="lh"><b>${H.length ? '💡 Где помочь (' + H.length + ')' : (S.scans.some(s => s.auto) || S.lastSolve ? '✓ Стыки сходятся' : '🤖 Автосшивка')}</b></div>${H.slice(0, 12).map((h, i) => `<button class="hint s${h.sev}" data-hint="${i}">${escH(h.t)}</button>`).join('')}<div class="row" style="display:flex;gap:5px;flex-wrap:wrap;margin-top:4px"><button id="hAuto">🤖 Сшить автоматически</button><button id="hCheck">🔍 Проверить стыки</button><button id="hPlan">📐 Пробный план</button></div></div>` : '') +
+    `<div class="lh"><b>Сканы (${S.scans.length})</b><button id="allVis">👁 Все</button></div>` + S.scans.map(s => { const d = dofOf(s.id), H = s.ceil - s.floor;
     return `<div class="si ${S.sel === s.id ? 'sel' : ''}" data-sid="${s.id}"><div class="sr"><i style="background:${s.color}"></i><b>${escH(s.name)}</b>
-      <button data-vis="${s.id}" class="${s.vis ? 'on' : ''}" title="Показывать">${s.vis ? '👁' : '◌'}</button><button data-anc="${s.id}" class="${s.anchor ? 'on' : ''}" title="Опорный: стоит на месте при сшивке">⚓</button></div>
-      <div class="sm">${s.anchor ? '<b>опорный</b>' : S.marks.some(m => m.sid === s.id) ? (d.ok ? '<span class="ok">метки: ' + d.n + ' — хватает</span>' : '<span class="wa">' + escH(d.need) + '</span>') : '<span class="mu">меток нет</span>'} · высота ${nf(H, 2)} м</div>
+      <button data-vis="${s.id}" class="${s.vis ? 'on' : ''}" title="Показывать">${s.vis ? '👁' : '◌'}</button><button data-anc="${s.id}" class="${s.anchor || s.placed ? 'on' : ''}" title="${s.placed ? 'Сшит автоматикой и стоит на месте. Нажать — освободить: встанет по меткам' : 'Опорный: стоит на месте при сшивке'}">${s.placed && !s.anchor ? '🔒' : '⚓'}</button></div>
+      <div class="sm">${s.auto ? (s.auto.group > 0 ? '<span class="bad">авто: не пристыкован</span> · ' : s.auto.root ? '<span class="ok">авто: основа</span> · ' : `<span class="${s.auto.fit != null && s.auto.fit < 0.35 || s.auto.links === 1 ? 'wa' : 'ok'}">авто: связей ${s.auto.links || 0}${s.auto.fit != null ? ', ' + Math.round(s.auto.fit * 100) + '%' : ''}</span> · `) : ''}${s.anchor ? '<b>опорный</b>' : S.marks.some(m => m.sid === s.id) ? (d.ok ? '<span class="ok">метки: ' + d.n + ' — хватает</span>' : '<span class="wa">' + escH(d.need) + '</span>') : '<span class="mu">меток нет</span>'} · высота ${nf(H, 2)} м</div>
       <canvas class="band" data-band="${s.id}" width="560" height="64"></canvas>
       <div class="bt"><span>полоса ${nf(s.band[0], 2)}–${nf(s.band[1], 2)} м от пола</span><button data-bp="lo" data-s="${s.id}">Низ</button><button data-bp="mid" data-s="${s.id}">Середина</button><button data-bp="hi" data-s="${s.id}">Верх</button><button data-bp="all" data-s="${s.id}">Всё</button></div></div>`; }).join('')
     + (R && R.labs.length ? `<div class="lh"><b>Невязки по меткам</b></div><div class="res">${R.labs.map(l => `<span data-hl="${escH(l.lab)}" class="${l.max > 0.01 ? 'bad' : l.max > 0.004 ? 'wa' : 'ok'}" style="--lc:${labColor(l.lab)}"><em>${escH(l.lab)}</em> ${Math.round(l.max * 1000)} мм</span>`).join('')}</div>` : '');
   S.scans.forEach(s => drawBand(s));
+  $$('[data-hint]').forEach(b => b.onclick = () => hintGo(H[+b.dataset.hint]));
+  const ha = $('#hAuto'); if (ha) ha.onclick = autoStitch; const hc = $('#hCheck'); if (hc) hc.onclick = () => { const r = analyze(); stat(r.length ? `Найдено мест, где помочь: ${r.length}. Касание подсказки — открыть нужную пару сканов.` : 'Стыки сходятся: стены соседних сканов совпадают.'); }; const hp = $('#hPlan'); if (hp) hp.onclick = trialPlan;
   $('#allVis') && ($('#allVis').onclick = () => { S.scans.forEach(s => s.vis = true); S.cols = Math.max(S.cols, 2); renderAll(); saveSoon(); });
   $$('.si').forEach(d => d.onclick = e => { if (e.target.closest('button') || e.target.closest('canvas')) return; S.sel = +d.dataset.sid; renderAll(); });
   $$('[data-vis]').forEach(b => b.onclick = () => { const s = scanById(+b.dataset.vis); s.vis = !s.vis; renderAll(); saveSoon(); });
-  $$('[data-anc]').forEach(b => b.onclick = () => { pushUndo(); const s = scanById(+b.dataset.anc); s.anchor = !s.anchor; renderAll(); saveSoon(); stat(s.anchor ? `«${s.name}» опорный — при сшивке стоит на месте, остальные встают к нему.` : `«${s.name}» больше не опорный.`); });
+  $$('[data-anc]').forEach(b => b.onclick = () => { pushUndo(); const s = scanById(+b.dataset.anc); if (s.placed && !s.anchor) { s.placed = false; renderAll(); saveSoon(); stat(`«${s.name}» освобождён — при «🧩 Сшить» встанет по меткам.`); return; } s.anchor = !s.anchor; renderAll(); saveSoon(); stat(s.anchor ? `«${s.name}» опорный — при сшивке стоит на месте, остальные встают к нему.` : `«${s.name}» больше не опорный.`); });
   $$('[data-bp]').forEach(b => b.onclick = () => { const s = scanById(+b.dataset.s), H = s.ceil - s.floor; pushUndo(); s.band = b.dataset.bp === 'lo' ? [0.05, Math.min(1.2, H)] : b.dataset.bp === 'hi' ? [Math.max(0.05, H - 1.0), H - 0.03] : b.dataset.bp === 'mid' ? [Math.max(0.05, H * 0.3), Math.min(H - 0.05, H * 0.75)] : [0.05, H - 0.03]; s.band = s.band.map(v => +v.toFixed(2)); prepScan(s); renderAll(); saveSoon(); });
   $$('[data-hl]').forEach(b => b.onclick = () => { S.hlLab = S.hlLab === b.dataset.hl ? null : b.dataset.hl; redraw(); });
   $$('canvas.band').forEach(bindBand);
@@ -698,7 +1064,7 @@ function bindCanvas(cv, ctxInfo) {
   const V = () => ctxInfo.kind === 'asm' ? S.asmV : scanById(ctxInfo.sid).tile;
   const toW = e => { const r = cv.getBoundingClientRect(); return s2w(V(), cv.width, cv.height, e.clientX - r.left, e.clientY - r.top); };
   const scanAt = w => { const list = S.scans.filter(s => s.vis).slice().reverse(); if (S.sel) { const s = scanById(S.sel); if (s && s.vis) list.unshift(s); } for (const s of list) { const l = W2L(s, w), r = s.rast, u = Math.floor((l[0] - r.x0) / r.res), v = Math.floor((r.y1 - l[1]) / r.res); if (u < 0 || v < 0 || u >= r.w || v >= r.h) continue; let hit = 0; for (let dv = -4; dv <= 4; dv++) for (let du = -4; du <= 4; du++) { const uu = u + du, vv = v + dv; if (uu >= 0 && vv >= 0 && uu < r.w && vv < r.h && r.cnt[vv * r.w + uu]) hit++; } if (hit > 3) return s; } return null; };
-  const local = (sc, w) => ctxInfo.kind === 'asm' ? W2L(sc, w) : w;
+  const local = (sc, w) => ctxInfo.kind === 'asm' ? W2L(sc, w) : rot(w, -tileRot(sc));
   cv.oncontextmenu = e => e.preventDefault();
   cv.onwheel = e => { e.preventDefault(); const v = V(), w = toW(e), k = Math.exp(-e.deltaY * 0.0015); v.s *= k; const w2 = toW(e); v.cx += w[0] - w2[0]; v.cy += w[1] - w2[1]; redrawOne(); };
   const redrawOne = () => ctxInfo.kind === 'asm' ? drawAsm() : drawTile(scanById(ctxInfo.sid));
@@ -723,7 +1089,7 @@ function bindCanvas(cv, ctxInfo) {
     if (S.tool === 'hand') { // метки правятся пальцем: касание — выбрать, тянуть концы или саму линию
       const sc = ctxInfo.kind === 'tile' ? scanById(ctxInfo.sid) : (S.sel && scanById(S.sel));
       if (sc) { const m0 = S.markSel && S.marks.find(m => m.id === S.markSel && m.sid === sc.id);
-        if (m0 && m0.kind === 'line') { const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) * dpr(), y = (e.clientY - r.top) * dpr(), Vv = V(); const toS = p => w2s(Vv, cv.width, cv.height, ctxInfo.kind === 'asm' ? L2W(sc, p) : p);
+        if (m0 && m0.kind === 'line') { const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) * dpr(), y = (e.clientY - r.top) * dpr(), Vv = V(); const toS = p => w2s(Vv, cv.width, cv.height, ctxInfo.kind === 'asm' ? L2W(sc, p) : rot(p, tileRot(sc)));
           for (const end of ['a', 'b']) { const Q = toS(m0[end]); if (Math.hypot(Q[0] - x, Q[1] - y) < 22 * dpr()) { pushUndo(); g = { kind: 'mEnd', m: m0, end, sc }; return; } } }
         const hit = markAt(sc, cv, e, ctxInfo); if (hit) { S.markSel = hit.id; S.sel = sc.id; pushUndo(); g = { kind: 'mMove', m: hit, sc, w0: local(sc, w), a0: hit.a.slice(), b0: hit.b ? hit.b.slice() : null, moved: false }; redraw(); renderMarkCard(); return; } } }
     if (ctxInfo.kind === 'asm') {
@@ -764,7 +1130,7 @@ function bindCanvas(cv, ctxInfo) {
   cv.onpointerup = end; cv.onpointercancel = end;
 }
 function setRot(sc, p0, c, da) { const rel = rot([p0.x - c[0], p0.y - c[1]], da); sc.pose = { x: c[0] + rel[0], y: c[1] + rel[1], a: normA(p0.a + da) }; }
-function markAt(sc, cv, e, ctxInfo) { const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) * dpr(), y = (e.clientY - r.top) * dpr(); const V = ctxInfo.kind === 'asm' ? S.asmV : sc.tile; const toS = p => w2s(V, cv.width, cv.height, ctxInfo.kind === 'asm' ? L2W(sc, p) : p); let best = null, bd = 16 * dpr();
+function markAt(sc, cv, e, ctxInfo) { const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) * dpr(), y = (e.clientY - r.top) * dpr(); const V = ctxInfo.kind === 'asm' ? S.asmV : sc.tile; const toS = p => w2s(V, cv.width, cv.height, ctxInfo.kind === 'asm' ? L2W(sc, p) : rot(p, tileRot(sc))); let best = null, bd = 16 * dpr();
   for (const m of S.marks) { if (m.sid !== sc.id) continue; const A = toS(m.a), B = m.b ? toS(m.b) : A, dx = B[0] - A[0], dy = B[1] - A[1], L = dx * dx + dy * dy || 1e-9; let t = ((x - A[0]) * dx + (y - A[1]) * dy) / L; t = Math.max(0, Math.min(1, t)); const d = Math.hypot(A[0] + t * dx - x, A[1] + t * dy - y); if (d < bd) { bd = d; best = m; } } return best; }
 async function finishMark(sid, a, b, x, y) {
   const sc = scanById(sid); let m;
@@ -823,7 +1189,7 @@ document.addEventListener('DOMContentLoaded', async () => { layoutTop();
   $('#bAdd').onclick = () => $('#fileIn').click(); $('#fileIn').onchange = e => { const f = e.target.files; if (f && f.length) loadFiles(f); e.target.value = ''; };
   $$('[data-view]').forEach(b => b.onclick = () => setView(b.dataset.view)); $$('[data-tool]').forEach(b => b.onclick = () => setTool(b.dataset.tool));
   $$('[data-cols]').forEach(b => b.onclick = () => { S.cols = +b.dataset.cols; S.scans.forEach(s => s.tile = null); renderAll(); saveSoon(); });
-  $('#bStitch').onclick = stitch; $('#bUndo').onclick = undo; $('#bRedo').onclick = redo; $('#fUndo').onclick = undo; $('#fRedo').onclick = redo; $('#fDel').onclick = delSelected; $('#bFit').onclick = () => { if (S.view === 'asm' || S.view === 'plan') fitAsm(); else { S.scans.forEach(fitTile); redraw(); } };
+  $('#bTW').onclick = () => { S.tileWorld = !S.tileWorld; S.scans.forEach(x => x.tile = null); renderAll(); stat(S.tileWorld ? 'Рамки повёрнуты как в сборке: одна и та же стена на соседних сканах смотрит в одну сторону.' : 'Рамки — каждый скан как снят.'); }; $('#bStitch').onclick = stitch; $('#bAuto').onclick = autoStitch; $('#bUndo').onclick = undo; $('#bRedo').onclick = redo; $('#fUndo').onclick = undo; $('#fRedo').onclick = redo; $('#fDel').onclick = delSelected; $('#bFit').onclick = () => { if (S.view === 'asm' || S.view === 'plan') fitAsm(); else { S.scans.forEach(fitTile); redraw(); } };
   $('#bR1').onclick = () => rotSel(1); $('#bR01').onclick = () => rotSel(0.1); $('#bRm01').onclick = () => rotSel(-0.1); $('#bRm1').onclick = () => rotSel(-1); $('#bR90').onclick = () => rotSel(90);
   $('#bSave').onclick = saveProjectFile; $('#bOpen').onclick = () => $('#projIn').click(); $('#projIn').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) openProjectFile(f); };
   $('#bNew').onclick = async () => { if (!(await uiDialog({ title: 'Начать новую сшивку?', text: 'Все сканы и метки этой работы будут убраны из программы. Если нужно — сначала «Сохранить файл».', ok: 'Начать заново', cancel: 'Отмена' }))) return; for (const s of S.scans) await del('pts:' + s.key); await del('state'); location.reload(); };
@@ -1068,5 +1434,67 @@ function exportDXF() {
   const blob = new Blob([new Uint8Array(out)], { type: 'application/dxf' }), a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'План_по_сканам_' + new Date().toISOString().slice(0, 10) + '.dxf'; document.body.appendChild(a); a.click(); a.remove();
   stat('DXF сохранён: слои STENY, PROEMY, RAZMERY, SKANY; единицы — мм.');
 }
+
+// ===================== АВТОСШИВКА, разбор стыков и подсказки =====================
+function runAuto(scans) { return new Promise((res, rej) => { const w = getWorker(), job = Math.random(); const on = e => { const d = e.data; if (d.job !== job) return; if (d.prog != null && !d.done) { busy(`${d.stage || 'Сшиваю'}… ${Math.round(d.prog * 100)}%`); return; } w.removeEventListener('message', on); if (d.error) rej(new Error(d.error)); else res(d.res); }; w.addEventListener('message', on);
+  w.postMessage({ cmd: 'auto', job, scans: scans.map(s => ({ name: s.name, floor: s.floor, ceil: s.ceil, pts: s.pts.slice() })) }); }); }
+const scanOrder = (a, b) => { const na = +(String(a.name).match(/\d+/g) || [0]).pop(), nb = +(String(b.name).match(/\d+/g) || [0]).pop(); return na - nb || String(a.name).localeCompare(String(b.name)); };
+async function autoStitch() {
+  const list = S.scans.slice().sort(scanOrder); if (list.length < 2) { uiAlert('Для сшивки нужно хотя бы два скана.'); return; }
+  if (!(await uiDialog({ title: 'Сшить автоматически?', text: `Программа сама найдёт общие места на соседних сканах (углы, коробки, мебель), проверит каждый стык видимостью и уравняет всю сеть. Сканов: ${list.length}, это займёт примерно ${Math.max(1, Math.round(list.length * 0.4))} мин. Метки, которые вы уже поставили, останутся. Вернуть как было — «↶ Отменить шаг».`, ok: 'Сшить', cancel: 'Отмена' }))) return;
+  pushUndo(); let R;
+  try { R = await runAuto(list); } catch (e) { busy(''); uiAlert('Автосшивка не удалась: ' + e.message); return; }
+  busy('');
+  const groups = R.groups.slice().sort((a, b) => b.length - a.length);
+  // главная группа — на месте опорного (или первого) скана; остальные группы — рядом, чтобы было видно
+  let ox = 0; const main = groups[0]; const anchor = list.find(s => s.anchor) || list[0];
+  groups.forEach((g, gi) => { const inMain = gi === 0;
+    // привязать группу к текущему положению её первого скана — чтобы главная группа не прыгала
+    const ref = inMain ? (g.find(x => list[x.k] === anchor) || g[0]) : g[0], refS = list[ref.k];
+    const base = inMain ? refS.pose : { x: ox, y: -18, a: 0 }; if (!inMain) ox += 16;
+    const dA = base.a - ref.pose.a, c = Math.cos(dA), sn = Math.sin(dA);
+    for (const x of g) { const s = list[x.k], dx = x.pose.tx - ref.pose.tx, dy = x.pose.ty - ref.pose.ty;
+      s.pose = { x: base.x + c * dx - sn * dy, y: base.y + sn * dx + c * dy, a: normA(x.pose.a + dA) };
+      s.auto = { group: gi, links: x.q ? x.q.links : null, fit: x.q ? x.q.fit : null, rms: x.q ? x.q.rms : null, root: x === ref };
+      s.placed = inMain; } });
+  S.autoEdges = R.edges.map(e => ({ a: list[e.i].id, b: list[e.j].id, ratio: e.ratio, rms: e.rms }));
+  S.asmFitted = false; analyze(); setView('asm'); fitAsm(); saveSoon();
+  const H = S.hints; stat(`Автосшивка: в общей группе ${main.length} из ${list.length} сканов${groups.length > 1 ? `, отдельно — ${list.length - main.length}` : ''}. ${H.length ? 'Подсказки, где помочь, — слева в списке.' : 'Все стыки сходятся.'}`);
+}
+// --- проверка стыков: стены соседних сканов должны лечь друг на друга ---
+function wallSample(s, maxN = 6000) { const r = s.rast, P = s.pts, z0 = s.floor + s.band[0], z1 = s.floor + s.band[1], out = []; if (!r || !r.F) return out; const step = Math.max(1, Math.floor((s.nBand || 1) / maxN)); let k = 0;
+  for (let i = 0; i < P.length; i += 3) { const z = P[i + 2]; if (z < z0 || z > z1) continue; if ((k++ % step) !== 0) continue; const u = Math.floor((P[i] - r.x0) / r.res), v = Math.floor((r.y1 - P[i + 1]) / r.res); if (u < 0 || v < 0 || u >= r.w || v >= r.h || r.F[v * r.w + u] < 0.6) continue; out.push(L2W(s, [P[i], P[i + 1]])); } return out; }
+function pairCheck(A, B, SA, SB) { // доля стен A в зоне B, у которых рядом есть стена B: совпадение, расхождение
+  const C = 0.05, G = new Map(); for (const p of SB) { const k = Math.floor(p[0] / C) + ',' + Math.floor(p[1] / C); (G.get(k) || G.set(k, []).get(k)).push(p); }
+  const bb = scanBBoxW(B), xs = bb.map(p => p[0]), ys = bb.map(p => p[1]), inB = p => p[0] > Math.min(...xs) && p[0] < Math.max(...xs) && p[1] > Math.min(...ys) && p[1] < Math.max(...ys);
+  let n = 0, near = 0, mid = 0; const ds = [];
+  for (const p of SA) { if (!inB(p)) continue; const lB = W2L(B, p); if (len(lB) > 12) continue; n++; const gx = Math.floor(p[0] / C), gy = Math.floor(p[1] / C); let best = 1;
+    for (let dx = -2; dx <= 2; dx++) for (let dy = -2; dy <= 2; dy++) { const L = G.get((gx + dx) + ',' + (gy + dy)); if (L) for (const q of L) { const d = Math.hypot(q[0] - p[0], q[1] - p[1]); if (d < best) best = d; } }
+    if (best < 0.02) near++; else if (best < 0.1) { mid++; ds.push(best); } }
+  ds.sort((a, b) => a - b); return { n, ok: n ? near / n : 0, off: n ? mid / n : 0, typ: ds.length ? ds[Math.floor(ds.length / 2)] : 0 };
+}
+function analyze() {
+  const vis = S.scans.slice().sort(scanOrder), smp = new Map(vis.map(s => [s.id, wallSample(s)])), H = [];
+  for (const s of vis) { const a = s.auto;
+    if (a && a.group > 0) H.push({ kind: 'alone', s: s.id, sev: 3, t: `«${s.name}» не пристыковался — отметьте 2 общие линии с соседним сканом (стены разного направления) и «🧩 Сшить».` });
+    else if (a && !a.root && (a.links === 1 || (a.fit != null && a.fit < 0.35)) && !S.marks.some(m => m.sid === s.id)) { s.placed = false; H.push({ kind: 'weak', s: s.id, sev: 2, t: `«${s.name}» стоит неуверенно (связей ${a.links || 0}${a.fit != null ? ', совпадение ' + Math.round(a.fit * 100) + '%' : ''}) — проверьте стык и поставьте общие линии.` }); } }
+  // стыки по стенам: в общей зоне двух сканов стены должны совпасть до 2 см
+  for (let i = 0; i < vis.length; i++) for (let j = i + 1; j < vis.length; j++) { const A = vis[i], B = vis[j]; if (A.auto && B.auto && A.auto.group !== B.auto.group) continue;
+    const r1 = pairCheck(A, B, smp.get(A.id), smp.get(B.id)), r2 = pairCheck(B, A, smp.get(B.id), smp.get(A.id)), n = r1.n + r2.n; if (n < 400) continue;
+    const okF = (r1.ok * r1.n + r2.ok * r2.n) / n, offF = (r1.off * r1.n + r2.off * r2.n) / n, typ = Math.max(r1.typ, r2.typ);
+    if (offF > 0.25 && offF > okF * 0.6) { if (B.placed && !B.anchor && B.auto && !B.auto.root) B.placed = false; H.push({ kind: 'pair', s: A.id, s2: B.id, sev: offF > 0.45 ? 3 : 2, t: `Стык «${A.name}» — «${B.name}»: стены расходятся примерно на ${Math.round(typ * 100)} см — поставьте 2 общие линии на этой паре.`, okF, offF }); } }
+  // метки с большой невязкой
+  const R = S.lastSolve; if (R) for (const l of R.labs) if (l.max > 0.01) H.push({ kind: 'mark', lab: l.lab, sev: 2, t: `Метка «${l.lab}»: невязка ${Math.round(l.max * 1000)} мм — похоже, одной буквой отмечены разные стены. Коснитесь её и поправьте или удалите.` });
+  H.sort((a, b) => b.sev - a.sev); S.hints = H; renderList(); return H;
+}
+function hintGo(h) {
+  if (h.kind === 'mark') { S.hlLab = h.lab; const m = S.marks.find(q => q.lab === h.lab); if (m) { S.markSel = m.id; S.sel = m.sid; } setView('grid'); renderMarkCard && renderMarkCard(); return; }
+  const a = scanById(h.s); let b = h.s2 && scanById(h.s2);
+  if (!b) { // ближайший по порядку съёмки сосед из общей группы
+    const L = S.scans.slice().sort(scanOrder), i = L.indexOf(a); b = [L[i - 1], L[i + 1]].filter(x => x && (!x.auto || x.auto.group === 0))[0] || L.find(x => x !== a); }
+  S.sel = a.id; for (const s of S.scans) s.vis = s === a || s === b; S.cols = 2; S.tileWorld = true; S.scans.forEach(s => s.tile = null); setView('grid'); setTool('line');
+  stat(`Рядом «${a.name}» и «${b.name}». Проведите на обоих одну и ту же стену (одной буквой), затем вторую стену другого направления — и «🧩 Сшить». Вернуть все сканы — «👁 Все».`);
+}
+async function trialPlan() { setView('plan'); fitAsm(); buildWalls(); }
 </script>
 </body></html>
