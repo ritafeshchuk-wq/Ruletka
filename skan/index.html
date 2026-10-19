@@ -7,7 +7,7 @@
 [hidden]{display:none!important}*{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
 button{font:inherit;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:9px;padding:7px 11px;cursor:pointer;touch-action:manipulation}
 button:disabled{opacity:.4}button.on{background:#dbe7ff;border-color:#9bb7f5}button.pri{background:var(--acc);color:#fff;border-color:var(--acc)}
-#top{position:fixed;left:0;right:0;top:0;height:54px;background:var(--top);color:#fff;display:flex;align-items:center;gap:6px;padding:0 10px;z-index:5;overflow-x:auto;scrollbar-width:none}
+#top{position:fixed;left:0;right:0;top:0;min-height:54px;background:var(--top);color:#fff;display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:7px 10px;z-index:5}
 #top::-webkit-scrollbar{display:none}#top b.lg{font-size:16px;margin-right:6px;white-space:nowrap}
 #top button{background:#243142;color:#e8eef6;border-color:#344357;white-space:nowrap;padding:7px 10px}#top button.on{background:#e3a21a;color:#16202c;border-color:#e3a21a}#top button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
 #top .sep{width:1px;height:28px;background:#344357;margin:0 4px;flex:0 0 1px}#top .grp{display:flex;gap:3px}
@@ -15,6 +15,9 @@ button:disabled{opacity:.4}button.on{background:#dbe7ff;border-color:#9bb7f5}but
 #main{position:fixed;left:320px;right:0;top:54px;bottom:30px;overflow:auto}
 #foot{position:fixed;left:0;right:0;bottom:0;height:30px;background:#fff;border-top:1px solid var(--line);display:flex;align-items:center;gap:10px;padding:0 10px;font-size:13px}
 #status{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#saved{color:var(--mute)}#ver{color:var(--mute)}
+#ubar{position:fixed;left:332px;bottom:42px;display:flex;gap:4px;background:rgba(22,32,44,.9);padding:6px;border-radius:12px;z-index:6}#ubar button{background:#243142;color:#fff;border-color:#344357;font-size:15px;padding:9px 14px}#ubar button:disabled{opacity:.35}
+@media (max-width:900px){#ubar{left:272px}}@media (max-width:640px){#ubar{left:12px}}
+#mcard2{position:fixed;left:50%;transform:translateX(-50%);bottom:96px;width:min(380px,calc(100% - 24px));background:#fff;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.2);padding:10px;z-index:20}
 #rotbar{position:fixed;right:12px;bottom:42px;display:flex;gap:4px;background:rgba(22,32,44,.9);padding:6px;border-radius:12px;z-index:4}#rotbar button{background:#243142;color:#fff;border-color:#344357}
 #asm,#plan{width:100%;height:100%;display:block;touch-action:none;background:#fff}
 #pcard{position:absolute;right:12px;top:12px;width:min(330px,calc(100% - 24px));background:#fff;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:10px;z-index:3}.pc-h{font-weight:700;margin-bottom:6px}.pc-r{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin:5px 0}.pc-r label{color:var(--mute);font-size:13px}.pc-r input{width:90px;font:inherit;font-size:16px;padding:6px 8px;border:1px solid var(--line);border-radius:8px}.pc-s{color:var(--mute);font-size:12px;margin-top:6px}button.dang{color:#c81e1e}.pc-anc button{font-size:12px;padding:5px 8px}
@@ -50,7 +53,8 @@ canvas.band{width:100%;height:32px;display:block;border-radius:6px;touch-action:
 <div id="side"><div id="list"></div></div>
 <div id="main"></div>
 <div id="rotbar" title="Повернуть выбранный скан"><button id="bR1">⟲ 1°</button><button id="bR01">⟲ 0,1°</button><button id="bRm01">⟳ 0,1°</button><button id="bRm1">⟳ 1°</button><button id="bR90">⟲ 90°</button></div>
-<div id="foot"><span id="status"></span><span id="saved"></span><span id="ver">Скан 2.1 · © d1sco, 2026</span></div>
+<div id="ubar"><button id="fUndo" disabled>↶ Отменить шаг</button><button id="fRedo" disabled>↷ Вернуть</button><button id="fDel">🗑 Удалить выбранное</button></div>
+<div id="foot"><span id="status"></span><span id="saved"></span><span id="ver">Скан 2.2 · © d1sco, 2026</span></div>
 <div id="busy" hidden><span>…</span></div>
 <input type="file" id="fileIn" multiple accept=".e57" hidden><input type="file" id="projIn" hidden>
 <div id="help" hidden><div class="lh"><h3>Как сшивать</h3><button id="helpX">✕</button></div>
@@ -389,14 +393,13 @@ function ptsNear(sc, a, b, pad) { // индексы точек полосы в �
   return out;
 }
 // подогнать нарисованную линию к точкам скана (стена, край, угол): итеративно, с сужением допуска
-function fitLine(sc, a, b) {
+function fitLine1(sc, a, b, tol0) {
   const P = sc.pts; let A = a.slice(), B = b.slice(), last = null;
-  const L0 = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L0 < 0.08) return null;
-  const cand = ptsNear(sc, a, b, 0.3);
-  for (const tol of [0.15, 0.08, 0.04, 0.02, 0.015]) {
+  const cand = ptsNear(sc, a, b, tol0 + 0.05);
+  for (const tol of [tol0, tol0 * 0.6, 0.03, 0.02, 0.015].filter((v, k, arr) => k === 0 || v < arr[0])) {
     const dx = B[0] - A[0], dy = B[1] - A[1], L = Math.hypot(dx, dy), ux = dx / L, uy = dy / L, nx = -uy, ny = ux;
     let n = 0, mx = 0, my = 0; const sel = [];
-    for (const i of cand) { const px = P[i] - A[0], py = P[i + 1] - A[1], t = px * ux + py * uy, d = px * nx + py * ny; if (t < -0.1 || t > L + 0.1 || Math.abs(d) > tol) continue; sel.push(i); mx += P[i]; my += P[i + 1]; n++; }
+    for (const i of cand) { const px = P[i] - A[0], py = P[i + 1] - A[1], t = px * ux + py * uy, d = px * nx + py * ny; if (t < 0 || t > L || Math.abs(d) > tol) continue; sel.push(i); mx += P[i]; my += P[i + 1]; n++; }
     if (n < 12) break;
     mx /= n; my /= n; let sxx = 0, sxy = 0, syy = 0;
     for (const i of sel) { const x = P[i] - mx, y = P[i + 1] - my; sxx += x * x; sxy += x * y; syy += y * y; }
@@ -407,6 +410,17 @@ function fitLine(sc, a, b) {
     last = { a: A, b: B, n, rms: Math.sqrt(ss / n), tol };
   }
   return last;
+}
+// подогнать нарисованную линию к точкам скана: несколько ширин поиска, берём ту прямую, что ближе к нарисованной
+// (не уводим линию на соседнюю мебель и не разворачиваем: не больше 4° и 8 см от того, как провели)
+function fitLine(sc, a, b) {
+  const L0 = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L0 < 0.08) return null;
+  const ang0 = Math.atan2(b[1] - a[1], b[0] - a[0]); let best = null;
+  for (const t0 of [0.04, 0.08, 0.13]) { const f = fitLine1(sc, a, b, t0); if (!f) continue;
+    const da = Math.abs(Math.sin(Math.atan2(f.b[1] - f.a[1], f.b[0] - f.a[0]) - ang0)); const off = Math.max(Math.hypot(f.a[0] - a[0], f.a[1] - a[1]), Math.hypot(f.b[0] - b[0], f.b[1] - b[1]));
+    if (da > Math.sin(4 * Math.PI / 180) || off > 0.08 + t0 * 0.3) continue;
+    const score = f.n * (1 - off * 4); if (!best || score > best.score) best = { ...f, score, off, da }; }
+  return best;
 }
 
 // ---------- сшивка по меткам ----------
@@ -499,7 +513,7 @@ function refitCommon(poses) {
     if (hi - lo < 0.3) continue; // общий участок слишком мал — оставляем как есть
     for (const w of W) { const inv = q => rot([q[0] - w.p.x, q[1] - w.p.y], -w.p.a); // концы общего участка на линии этого скана
       const proj = tt => { const q = [r.a[0] + ux * tt, r.a[1] + uy * tt]; const ex = w.b[0] - w.a[0], ey = w.b[1] - w.a[1], El = Math.hypot(ex, ey), k = ((q[0] - w.a[0]) * ex + (q[1] - w.a[1]) * ey) / El; return [w.a[0] + ex / El * k, w.a[1] + ey / El * k]; };
-      const f = fitLine(w.sc, inv(proj(lo)), inv(proj(hi))); if (f) { w.m.sa = f.a; w.m.sb = f.b; } }
+      const f = fitLine1(w.sc, inv(proj(lo)), inv(proj(hi)), 0.03); if (f) { w.m.sa = f.a; w.m.sb = f.b; } }
   }
 }
 function report() { // невязки по буквам
@@ -512,9 +526,9 @@ function report() { // невязки по буквам
 // ---------- отмена ----------
 const snapState = () => JSON.stringify({ scans: S.scans.map(s => ({ id: s.id, pose: s.pose, band: s.band, anchor: s.anchor, vis: s.vis })), marks: S.marks, plan: S.plan });
 function applyState(t) { const j = JSON.parse(t); for (const q of j.scans) { const s = scanById(q.id); if (!s) continue; const bandChanged = s.band[0] !== q.band[0] || s.band[1] !== q.band[1]; Object.assign(s, { pose: q.pose, band: q.band, anchor: q.anchor, vis: q.vis }); if (bandChanged) prepScan(s); } S.marks = j.marks; if (j.plan) S.plan = j.plan; }
-function pushUndo() { S.undo.push(snapState()); if (S.undo.length > 200) S.undo.shift(); S.redo = []; }
-function undo() { if (!S.undo.length) return; S.redo.push(snapState()); applyState(S.undo.pop()); S.lastSolve = null; renderAll(); saveSoon(); stat('Отменено.'); }
-function redo() { if (!S.redo.length) return; S.undo.push(snapState()); applyState(S.redo.pop()); renderAll(); saveSoon(); stat('Возвращено.'); }
+function pushUndo() { S.undo.push(snapState()); if (S.undo.length > 200) S.undo.shift(); S.redo = []; for (const id of ['bUndo', 'fUndo']) { const b = document.getElementById(id); if (b) b.disabled = false; } for (const id of ['bRedo', 'fRedo']) { const b = document.getElementById(id); if (b) b.disabled = true; } }
+function undo() { if (!S.undo.length) { stat('Отменять нечего.'); return; } S.redo.push(snapState()); applyState(S.undo.pop()); S.lastSolve = null; if (S.markSel && !S.marks.some(m => m.id === S.markSel)) S.markSel = null; renderAll(); renderMarkCard(); saveSoon(); stat('Шаг отменён. ↷ — вернуть.'); }
+function redo() { if (!S.redo.length) return; S.undo.push(snapState()); applyState(S.redo.pop()); renderAll(); renderMarkCard(); saveSoon(); stat('Возвращено.'); }
 
 // ---------- хранение: всё в памяти устройства (IndexedDB), переживает обновление страницы ----------
 let DB = null;
@@ -586,8 +600,8 @@ function drawScan(ctx, sc, V, W, H, alpha) { const r = sc.rast; let lv = r.level
 const w2s = (V, W, H, p) => [(p[0] - V.cx) * V.s * dpr() + W / 2, (V.cy - p[1]) * V.s * dpr() + H / 2];
 const s2w = (V, W, H, x, y) => [(x * dpr() - W / 2) / (V.s * dpr()) + V.cx, V.cy - (y * dpr() - H / 2) / (V.s * dpr())];
 function drawMark(ctx, m, toS, hl) {
-  const col = labColor(m.lab), A = toS(m.a); ctx.save(); ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = (hl ? 4 : 3) * dpr(); ctx.lineCap = 'round';
-  if (m.kind === 'line') { const B = toS(m.b); ctx.beginPath(); ctx.moveTo(...A); ctx.lineTo(...B); ctx.stroke(); for (const P of [A, B]) { ctx.beginPath(); ctx.arc(P[0], P[1], 3.5 * dpr(), 0, 7); ctx.fill(); } const M = [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2]; tag(ctx, m.lab, M, col); }
+  const col = labColor(m.lab), A = toS(m.a); hl = hl || S.markSel === m.id; ctx.save(); ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = (hl ? 4 : 3) * dpr(); ctx.lineCap = 'round';
+  if (m.kind === 'line') { const B = toS(m.b); ctx.beginPath(); ctx.moveTo(...A); ctx.lineTo(...B); ctx.stroke(); for (const P of [A, B]) { ctx.beginPath(); ctx.arc(P[0], P[1], 3.5 * dpr(), 0, 7); ctx.fill(); } if (S.markSel === m.id) for (const P of [A, B]) { ctx.fillStyle = '#fff'; ctx.lineWidth = 2.5 * dpr(); ctx.beginPath(); ctx.arc(P[0], P[1], 10 * dpr(), 0, 7); ctx.fill(); ctx.stroke(); ctx.fillStyle = col; } const M = [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2]; tag(ctx, m.lab, M, col); }
   else { ctx.beginPath(); ctx.arc(A[0], A[1], 6 * dpr(), 0, 7); ctx.stroke(); ctx.beginPath(); ctx.arc(A[0], A[1], 2 * dpr(), 0, 7); ctx.fill(); tag(ctx, m.lab, [A[0] + 12 * dpr(), A[1] - 12 * dpr()], col); }
   ctx.restore();
 }
@@ -621,7 +635,7 @@ function knob(sc) { const c = bandCenter(sc), R = Math.max(1.5, 60 / S.asmV.s); 
 function renderAll() { renderList(); renderMain(); renderBar(); }
 function renderBar() { $('#rotbar').hidden = S.view !== 'asm';
   $$('[data-view]').forEach(b => b.classList.toggle('on', b.dataset.view === S.view)); $$('[data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === S.tool));
-  $('#bUndo').disabled = !S.undo.length; $('#bRedo').disabled = !S.redo.length; $$('[data-cols]').forEach(b => b.classList.toggle('on', +b.dataset.cols === S.cols)); $('#colsBox').hidden = S.view !== 'grid';
+  $('#bUndo').disabled = !S.undo.length; $('#bRedo').disabled = !S.redo.length; $('#fUndo').disabled = !S.undo.length; $('#fRedo').disabled = !S.redo.length; $$('[data-cols]').forEach(b => b.classList.toggle('on', +b.dataset.cols === S.cols)); $('#colsBox').hidden = S.view !== 'grid';
 }
 function renderMain() {
   const main = $('#main');
@@ -706,6 +720,12 @@ function bindCanvas(cv, ctxInfo) {
       if (S.tool === 'erase') { const hit = markAt(sc, cv, e, ctxInfo); if (hit) { pushUndo(); S.marks = S.marks.filter(m => m !== hit); S.lastSolve = null; renderList(); redraw(); refreshTileHead(hit.sid); saveSoon(); stat(`Метка «${hit.lab}» удалена.`); } g = null; return; }
       const l = local(sc, w); g = { kind: 'draw', sid: sc.id, a: l, x: e.clientX, y: e.clientY }; S.drawing = { sid: sc.id, a: l, b: l, where: ctxInfo.kind }; return;
     }
+    if (S.tool === 'hand') { // метки правятся пальцем: касание — выбрать, тянуть концы или саму линию
+      const sc = ctxInfo.kind === 'tile' ? scanById(ctxInfo.sid) : (S.sel && scanById(S.sel));
+      if (sc) { const m0 = S.markSel && S.marks.find(m => m.id === S.markSel && m.sid === sc.id);
+        if (m0 && m0.kind === 'line') { const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) * dpr(), y = (e.clientY - r.top) * dpr(), Vv = V(); const toS = p => w2s(Vv, cv.width, cv.height, ctxInfo.kind === 'asm' ? L2W(sc, p) : p);
+          for (const end of ['a', 'b']) { const Q = toS(m0[end]); if (Math.hypot(Q[0] - x, Q[1] - y) < 22 * dpr()) { pushUndo(); g = { kind: 'mEnd', m: m0, end, sc }; return; } } }
+        const hit = markAt(sc, cv, e, ctxInfo); if (hit) { S.markSel = hit.id; S.sel = sc.id; pushUndo(); g = { kind: 'mMove', m: hit, sc, w0: local(sc, w), a0: hit.a.slice(), b0: hit.b ? hit.b.slice() : null, moved: false }; redraw(); renderMarkCard(); return; } } }
     if (ctxInfo.kind === 'asm') {
       const sel = S.sel && scanById(S.sel);
       if (sel) { const k = knob(sel), K = w2s(S.asmV, cv.width, cv.height, k.p), r = cv.getBoundingClientRect(), sx = (e.clientX - r.left) * dpr(), sy = (e.clientY - r.top) * dpr(); if (Math.hypot(sx - K[0], sy - K[1]) < 22 * dpr()) { pushUndo(); g = { kind: 'knob', sc: sel, c: k.c, a0: Math.atan2(w[1] - k.c[1], w[0] - k.c[0]), pose0: { ...sel.pose } }; return; } }
@@ -726,6 +746,8 @@ function bindCanvas(cv, ctxInfo) {
     if (g.kind === 'pan') { const k = v.s; v.cx = g.v0.cx - (e.clientX - g.x) / k; v.cy = g.v0.cy + (e.clientY - g.y) / k; if (Math.hypot(e.clientX - g.x, e.clientY - g.y) > 6) g.tap = false; redrawOne(); return; }
     const w = toW(e);
     if (g.kind === 'draw') { const sc = scanById(g.sid); S.drawing.b = S.tool === 'point' ? S.drawing.a : local(sc, w); redrawOne(); return; }
+    if (g.kind === 'mEnd') { const l = local(g.sc, w); g.m[g.end] = l; g.m.edited = true; redrawOne(); return; }
+    if (g.kind === 'mMove') { const l = local(g.sc, w), dx = l[0] - g.w0[0], dy = l[1] - g.w0[1]; if (Math.hypot(dx, dy) * V().s > 4) g.moved = true; if (!g.moved) return; g.m.a = [g.a0[0] + dx, g.a0[1] + dy]; if (g.b0) g.m.b = [g.b0[0] + dx, g.b0[1] + dy]; g.m.edited = true; redrawOne(); return; }
     if (g.kind === 'move') { g.sc.pose = { ...g.pose0, x: g.pose0.x + w[0] - g.w0[0], y: g.pose0.y + w[1] - g.w0[1] }; drawAsm(); return; }
     if (g.kind === 'knob') { const a = Math.atan2(w[1] - g.c[1], w[0] - g.c[0]); let da = a - g.a0; if (e.shiftKey) da = Math.round(da / (Math.PI / 180)) * Math.PI / 180; setRot(g.sc, g.pose0, g.c, da); drawAsm(); return; }
     if (g.kind === 'rot') { const da = -(e.clientX - g.x) * 0.004 * (e.ctrlKey ? 0.1 : 1); setRot(g.sc, g.pose0, g.c, da); drawAsm(); return; }
@@ -735,7 +757,8 @@ function bindCanvas(cv, ctxInfo) {
     if ((g.kind === 'pinch' || g.kind === 'twist') && P.size) return;
     const was = g; g = null;
     if (was.kind === 'draw') { const D = S.drawing; S.drawing = null; finishMark(was.sid, D.a, S.tool === 'point' ? null : D.b, e.clientX, e.clientY); return; }
-    if (was.kind === 'pan' && was.tap && ctxInfo.kind === 'asm') { S.sel = null; renderList(); drawAsm(); return; }
+    if (was.kind === 'mEnd' || was.kind === 'mMove') { if (was.kind === 'mMove' && !was.moved) { S.undo.pop(); renderMarkCard(); return; } const m = was.m; if (m.kind === 'line' && m.snap !== false) { const f = fitLine(was.sc, m.a, m.b); if (f) { m.a = f.a; m.b = f.b; m.fit = { n: f.n, rms: f.rms }; } else m.fit = null; } S.lastSolve = null; redraw(); renderList(); renderMarkCard(); saveSoon(); return; }
+    if (was.kind === 'pan' && was.tap) { if (S.markSel) { S.markSel = null; redraw(); renderMarkCard(); } if (ctxInfo.kind === 'asm') { S.sel = null; renderList(); drawAsm(); } return; }
     if (was.kind === 'move' || was.kind === 'knob' || was.kind === 'rot' || was.kind === 'twist') { S.lastSolve = null; saveSoon(); renderList(); }
   };
   cv.onpointerup = end; cv.onpointercancel = end;
@@ -746,15 +769,36 @@ function markAt(sc, cv, e, ctxInfo) { const r = cv.getBoundingClientRect(), x = 
 async function finishMark(sid, a, b, x, y) {
   const sc = scanById(sid); let m;
   if (b && Math.hypot(b[0] - a[0], b[1] - a[1]) < 0.08) { redraw(); stat('Линия слишком короткая — проведите вдоль стены подлиннее.'); return; }
-  if (b) { const f = fitLine(sc, a, b); m = { id: S.nextMark++, sid, kind: 'line', a: f ? f.a : a, b: f ? f.b : b, raw: [a, b], fit: f ? { n: f.n, rms: f.rms } : null }; }
+  if (b) { const f = fitLine(sc, a, b); m = { id: S.nextMark++, sid, kind: 'line', a: f ? f.a : a, b: f ? f.b : b, raw: [a.slice(), b.slice()], fit: f ? { n: f.n, rms: f.rms } : null }; }
   else m = { id: S.nextMark++, sid, kind: 'point', a, fit: null };
   S.marks.push(m); redraw();
   const lab = await labelPicker(m, x, y);
   if (!lab) { S.marks = S.marks.filter(q => q !== m); redraw(); return; }
   S.marks = S.marks.filter(q => q !== m); pushUndo(); m.lab = lab; S.marks.push(m); S.lastSolve = null;
-  renderList(); redraw(); refreshTileHead(sid); saveSoon();
+  S.markSel = m.id; renderList(); redraw(); refreshTileHead(sid); renderMarkCard(); saveSoon();
   const others = S.marks.filter(q => q.lab === lab && q.sid !== sid);
   stat(others.length ? `«${lab}» есть на ${others.map(q => scanById(q.sid).name).join(', ')}. Когда меток хватит, нажмите «🧩 Сшить».` : `Метка «${lab}». Теперь отметьте эту же стену или край на соседнем скане и выберите «${lab}».`);
+}
+function delSelected() {
+  const m = S.markSel && S.marks.find(q => q.id === S.markSel);
+  if (m) { pushUndo(); S.marks = S.marks.filter(q => q !== m); S.markSel = null; S.lastSolve = null; renderList(); redraw(); refreshTileHead(m.sid); renderMarkCard(); saveSoon(); stat(`Метка «${m.lab}» удалена. «↶ Отменить шаг» — вернуть.`); return; }
+  if (S.view === 'plan' && S.planSel) { const pl = S.plan; pushUndo(); if (S.planSel.o) pl.ops = pl.ops.filter(o => o.id !== S.planSel.o); else { pl.walls = pl.walls.filter(w => w.id !== S.planSel.w); pl.ops = pl.ops.filter(o => o.w !== S.planSel.w); } S.planSel = null; drawPlan(); saveSoon(); stat('Удалено. «↶ Отменить шаг» — вернуть.'); return; }
+  stat('Сначала выберите, что удалить: в режиме «✋ Обзор» коснитесь метки (или стены на плане).');
+}
+function renderMarkCard() {
+  let el = $('#mcard2'); const m = S.markSel && S.marks.find(q => q.id === S.markSel);
+  if (!m) { if (el) el.remove(); return; } if (!el) { el = document.createElement('div'); el.id = 'mcard2'; document.body.appendChild(el); }
+  const sc = scanById(m.sid);
+  el.innerHTML = `<div class="pc-h"><em style="background:${labColor(m.lab)}">${escH(m.lab)}</em> ${m.kind === 'line' ? 'линия' : 'точка'} на «${escH(sc.name)}»</div>
+    <div class="pc-s">${m.kind === 'line' ? (m.snap === false ? 'как нарисована (без подгонки)' : m.fit ? `подогнана по ${m.fit.n} точкам, ±${Math.round(m.fit.rms * 1000)} мм` : '<b style="color:#b45309">стена рядом не нашлась — стоит как нарисована</b>') : ''}</div>
+    ${m.kind === 'line' ? `<div class="pc-r"><button id="mkSnap" class="${m.snap === false ? '' : 'on'}">${m.snap === false ? '☐' : '☑'} Подгонять по точкам</button><button id="mkRefit">🎯 Заново</button></div>` : ''}
+    <div class="pc-r"><button id="mkLab">Буква…</button><button id="mkDel" class="dang">🗑 Удалить</button><button id="mkOk">Готово</button></div>
+    <div class="pc-s">Тяните кружки на концах — поправить линию; тяните саму линию — сдвинуть.</div>`;
+  const sn = $('#mkSnap'); if (sn) sn.onclick = () => { pushUndo(); m.snap = m.snap === false ? true : false; if (m.snap !== false) { const f = fitLine(sc, m.a, m.b); if (f) { m.a = f.a; m.b = f.b; m.fit = { n: f.n, rms: f.rms }; } } else if (m.raw) { m.a = m.raw[0].slice(); m.b = m.raw[1].slice(); m.fit = null; } S.lastSolve = null; redraw(); renderMarkCard(); saveSoon(); };
+  const rf = $('#mkRefit'); if (rf) rf.onclick = () => { pushUndo(); const f = fitLine(sc, m.a, m.b); if (f) { m.a = f.a; m.b = f.b; m.fit = { n: f.n, rms: f.rms }; m.snap = true; stat(`Подогнана по ${f.n} точкам.`); } else stat('Рядом с линией нет ровной стены — оставлена как есть. Попробуйте другую полосу высот.'); redraw(); renderMarkCard(); saveSoon(); };
+  $('#mkLab').onclick = async () => { const r = el.getBoundingClientRect(); const lab = await labelPicker(m, r.left, r.top); if (!lab) return; pushUndo(); m.lab = lab; S.lastSolve = null; renderList(); redraw(); refreshTileHead(m.sid); renderMarkCard(); saveSoon(); };
+  $('#mkDel').onclick = () => { pushUndo(); S.marks = S.marks.filter(q => q !== m); S.markSel = null; S.lastSolve = null; renderList(); redraw(); refreshTileHead(m.sid); renderMarkCard(); saveSoon(); };
+  $('#mkOk').onclick = () => { S.markSel = null; redraw(); renderMarkCard(); };
 }
 function refreshTileHead(sid) { const t = $(`#tile-${sid} .th span`); if (t) t.innerHTML = S.marks.filter(m => m.sid === sid).map(m => `<em style="background:${labColor(m.lab)}">${escH(m.lab)}</em>`).join(''); }
 function rotSel(deg) { const s = scanById(S.sel); if (!s) { stat('Выберите скан (касание по нему в «Сборке» или в списке).'); return; } pushUndo(); setRot(s, { ...s.pose }, bandCenter(s), deg * Math.PI / 180); S.lastSolve = null; drawAsm(); saveSoon(); }
@@ -773,11 +817,13 @@ function setTool(t) { S.tool = t; renderBar(); stat({ hand: 'Обзор: тян�
 window.addEventListener('resize', () => { if (S.view === 'grid') { sizeTiles(); redraw(); } else { const cv = $('#asm') || $('#plan'); if (cv) { sizeCanvas(cv); redraw(); } } });
 document.addEventListener('keydown', e => { if (e.target.closest('input')) return; if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }
   else if (S.view === 'asm' && S.sel && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'q', 'e', 'й', 'у'].includes(e.key)) { const s = scanById(S.sel), st = e.shiftKey ? 0.1 : 0.01; pushUndo(); if (e.key === 'ArrowLeft') s.pose.x -= st; if (e.key === 'ArrowRight') s.pose.x += st; if (e.key === 'ArrowUp') s.pose.y += st; if (e.key === 'ArrowDown') s.pose.y -= st; if (e.key === 'q' || e.key === 'й') setRot(s, { ...s.pose }, bandCenter(s), (e.shiftKey ? 1 : 0.1) * Math.PI / 180); if (e.key === 'e' || e.key === 'у') setRot(s, { ...s.pose }, bandCenter(s), -(e.shiftKey ? 1 : 0.1) * Math.PI / 180); e.preventDefault(); drawAsm(); saveSoon(); } });
-document.addEventListener('DOMContentLoaded', async () => {
+function layoutTop() { const h = $('#top').offsetHeight; for (const id of ['side', 'main']) $('#' + id).style.top = h + 'px'; $('#help').style.top = (h + 8) + 'px'; }
+window.addEventListener('resize', layoutTop);
+document.addEventListener('DOMContentLoaded', async () => { layoutTop();
   $('#bAdd').onclick = () => $('#fileIn').click(); $('#fileIn').onchange = e => { const f = e.target.files; if (f && f.length) loadFiles(f); e.target.value = ''; };
   $$('[data-view]').forEach(b => b.onclick = () => setView(b.dataset.view)); $$('[data-tool]').forEach(b => b.onclick = () => setTool(b.dataset.tool));
   $$('[data-cols]').forEach(b => b.onclick = () => { S.cols = +b.dataset.cols; S.scans.forEach(s => s.tile = null); renderAll(); saveSoon(); });
-  $('#bStitch').onclick = stitch; $('#bUndo').onclick = undo; $('#bRedo').onclick = redo; $('#bFit').onclick = () => { if (S.view === 'asm' || S.view === 'plan') fitAsm(); else { S.scans.forEach(fitTile); redraw(); } };
+  $('#bStitch').onclick = stitch; $('#bUndo').onclick = undo; $('#bRedo').onclick = redo; $('#fUndo').onclick = undo; $('#fRedo').onclick = redo; $('#fDel').onclick = delSelected; $('#bFit').onclick = () => { if (S.view === 'asm' || S.view === 'plan') fitAsm(); else { S.scans.forEach(fitTile); redraw(); } };
   $('#bR1').onclick = () => rotSel(1); $('#bR01').onclick = () => rotSel(0.1); $('#bRm01').onclick = () => rotSel(-0.1); $('#bRm1').onclick = () => rotSel(-1); $('#bR90').onclick = () => rotSel(90);
   $('#bSave').onclick = saveProjectFile; $('#bOpen').onclick = () => $('#projIn').click(); $('#projIn').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) openProjectFile(f); };
   $('#bNew').onclick = async () => { if (!(await uiDialog({ title: 'Начать новую сшивку?', text: 'Все сканы и метки этой работы будут убраны из программы. Если нужно — сначала «Сохранить файл».', ok: 'Начать заново', cancel: 'Отмена' }))) return; for (const s of S.scans) await del('pts:' + s.key); await del('state'); location.reload(); };
