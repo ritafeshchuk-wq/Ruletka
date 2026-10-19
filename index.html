@@ -274,7 +274,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 5.3 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 5.4 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -6138,7 +6138,8 @@ async function exportOverlayPdf(opt = {}) {
           const sx = W / vp.width, sy = H / vp.height; const [a, b, c, d, e, f] = vp.transform;
           const m = [a * sx, -b * sy, c * sx, -d * sy, e * sx, H - f * sy]; void mb; // лист скопирован как есть: его координаты — исходные, без сдвига MediaBox
           const det = m[0] * m[3] - m[1] * m[2]; const inv = [m[3] / det, -m[1] / det, -m[2] / det, m[0] / det, (m[2] * m[5] - m[3] * m[4]) / det, (m[1] * m[4] - m[0] * m[5]) / det];
-          page = doc.addPage(copied.get(pg)); page.pushOperators(pushGraphicsState(), concatTransformationMatrix(...inv)); wrapped = true; drawn = true;
+          page = doc.addPage(copied.get(pg)); try { flattenAnnots(PL, doc, page); } catch (e) { console.warn('annots', e); }
+          page.pushOperators(pushGraphicsState(), concatTransformationMatrix(...inv)); wrapped = true; drawn = true;
         } catch (e) { console.warn('pdf page', e); page = null; }
       }
       if (!page) page = doc.addPage([W, H]);
@@ -6294,6 +6295,38 @@ async function exportOverlayPdf(opt = {}) {
     await fileReady(fname, bytes, 'application/pdf', `PDF готов: ${pages.length === 1 ? '1 лист' : 'листов ' + pages.length}, ${(bytes.length / 1048576).toFixed(1).replace('.', ',')} МБ`);
   } catch (e) { busy(''); console.error(e); uiAlert('Не удалось сделать PDF: ' + (e.message || e)); }
   finally { veil.remove(); if (held) { back(); AS.hold = Math.max(0, (AS.hold || 1) - 1); asSoon(); } }
+}
+
+// пометки исходного PDF (облака, рамки, текстовые замечания) — впечатать в лист так, как их показывает программа:
+// иначе другие просмотрщики (iPad, Acrobat) перерисовывают их по-своему и они «уезжают» с места
+function flattenAnnots(PL, doc, page) {
+  const { PDFName, PDFArray, PDFDict, PDFNumber, PDFStream, PDFRef, pushGraphicsState, popGraphicsState, concatTransformationMatrix, drawObject } = PL;
+  const N = k => PDFName.of(k), arr = page.node.lookup(N('Annots'), PDFArray); if (!arr) return 0;
+  const nums = a => { const o = []; for (let i = 0; i < a.size(); i++) { const v = a.lookup(i); o.push(v && v.asNumber ? v.asNumber() : 0); } return o; };
+  const keep = [], ops = []; let n = 0;
+  for (let i = 0; i < arr.size(); i++) {
+    const ref = arr.get(i), a = arr.lookup(i, PDFDict); if (!a) { keep.push(ref); continue; }
+    const st = String(a.get(N('Subtype')) || ''), F = (a.lookup(N('F')) && a.lookup(N('F')).asNumber) ? a.lookup(N('F')).asNumber() : 0;
+    if (/Link|Popup|Widget|Screen|Movie|3D|Sound|FileAttachment/.test(st) || (F & 2) || (F & 32)) { keep.push(ref); continue; }
+    const ap = a.lookup(N('AP'), PDFDict); let nRef = ap && ap.get(N('N'));
+    if (nRef && !(nRef instanceof PDFRef) && !(nRef instanceof PDFStream)) { const d = ap.lookup(N('N'), PDFDict), as = a.get(N('AS')); nRef = d && as ? d.get(as) : null; }
+    const str = nRef ? (nRef instanceof PDFRef ? doc.context.lookup(nRef) : nRef) : null;
+    const rect = a.lookup(N('Rect'), PDFArray);
+    if (!str || !(str instanceof PDFStream) || !rect) { keep.push(ref); continue; }
+    const R = nums(rect), x0r = Math.min(R[0], R[2]), y0r = Math.min(R[1], R[3]), wr = Math.abs(R[2] - R[0]), hr = Math.abs(R[3] - R[1]);
+    const bb = str.dict.lookup(N('BBox'), PDFArray); if (!bb || !(wr > 0) || !(hr > 0)) { keep.push(ref); continue; }
+    const B = nums(bb), mA = str.dict.lookup(N('Matrix'), PDFArray), Mx = mA ? nums(mA) : [1, 0, 0, 1, 0, 0];
+    const cs = [[B[0], B[1]], [B[2], B[1]], [B[2], B[3]], [B[0], B[3]]].map(([x, y]) => [Mx[0] * x + Mx[2] * y + Mx[4], Mx[1] * x + Mx[3] * y + Mx[5]]);
+    const bx0 = Math.min(...cs.map(c => c[0])), bx1 = Math.max(...cs.map(c => c[0])), by0 = Math.min(...cs.map(c => c[1])), by1 = Math.max(...cs.map(c => c[1]));
+    if (!(bx1 - bx0 > 1e-6) || !(by1 - by0 > 1e-6)) { keep.push(ref); continue; }
+    const sx = wr / (bx1 - bx0), sy = hr / (by1 - by0);
+    const xr = nRef instanceof PDFRef ? nRef : doc.context.register(str); const nm = page.node.newXObject('Ann' + i, xr);
+    ops.push(pushGraphicsState(), concatTransformationMatrix(sx, 0, 0, sy, x0r - bx0 * sx, y0r - by0 * sy), drawObject(nm), popGraphicsState()); n++;
+  }
+  if (!n) return 0;
+  page.pushOperators(...ops);
+  const na = doc.context.obj([]); keep.forEach(r => na.push(r)); if (keep.length) page.node.set(N('Annots'), na); else page.node.delete(N('Annots'));
+  return n;
 }
 // ---------- conversion to sheet plan ----------
 function tapePlan() {
