@@ -285,7 +285,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 6.3 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 6.4 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -4237,8 +4237,13 @@ async function applyProject(j) {
 // ---------- автосохранение в браузере (IndexedDB): обновление страницы, закрытие вкладки или вылет Safari не стирают работу ----------
 const AS = { db: null, last: '', savedAt: 0, fileAt: 0, busy: false, off: false, snapAt: 0, sid: Date.now(), dirty: false, pid: null, pname: '' };
 const SNAP_EVERY = 120000, SNAP_KEEP = 40; // копия каждые 2 минуты, хранится 40 последних (~1,5 часа работы) + последнее состояние каждого сеанса
-function asDB() { return new Promise(res => { try { const r = indexedDB.open('scan2plan', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => res(r.result); r.onerror = () => res(null); r.onblocked = () => res(null); } catch (e) { res(null); } }); }
-async function asTx(mode, fn, wait = 25000) { try { const db = AS.db || (AS.db = await asDB()); if (!db) return null; return await new Promise(res => { let done = false; const fin = v => { if (!done) { done = true; clearTimeout(tm); res(v); } }; const tm = setTimeout(() => { AS.db = null; try { db.close(); } catch (e) { } fin(null); }, wait); const tx = db.transaction('kv', mode), st = tx.objectStore('kv'); let out = null; const r = fn(st); if (r) r.onsuccess = () => { out = r.result; }; tx.oncomplete = () => fin(out === null ? true : out); tx.onerror = tx.onabort = () => fin(null); }); } catch (e) { AS.db = null; return null; } }
+// память может «зависнуть» (WebKit на iPad): не ждём вечно — через 7 с показываем экран, а если память ответит позже, подхватываем её
+function asDB(ms = 7000) { return new Promise(res => { let done = false; const fin = v => { if (!done) { done = true; res(v); } };
+  const tm = setTimeout(() => { AS.dbHung = true; fin(null); }, ms);
+  try { const r = indexedDB.open('scan2plan', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv');
+    r.onsuccess = () => { clearTimeout(tm); const db = r.result; if (!done) { AS.dbHung = false; fin(db); } else if (AS.db === null) { AS.db = db; AS.dbHung = false; projIndex().then(() => { if (!AS.pid) renderHome(); stat('Память браузера ответила — проекты доступны'); }).catch(() => { }); } };
+    r.onerror = () => { clearTimeout(tm); fin(null); }; r.onblocked = () => { }; } catch (e) { clearTimeout(tm); fin(null); } }); }
+async function asTx(mode, fn, wait = 25000) { try { const db = AS.db || (AS.dbHung ? null : (AS.db = await asDB())); if (!db) return null; return await new Promise(res => { let done = false; const fin = v => { if (!done) { done = true; clearTimeout(tm); res(v); } }; const tm = setTimeout(() => { AS.db = null; try { db.close(); } catch (e) { } fin(null); }, wait); const tx = db.transaction('kv', mode), st = tx.objectStore('kv'); let out = null; const r = fn(st); if (r) r.onsuccess = () => { out = r.result; }; tx.oncomplete = () => fin(out === null ? true : out); tx.onerror = tx.onabort = () => fin(null); }); } catch (e) { AS.db = null; return null; } }
 const asGetK = (k, wait) => asTx('readonly', st => st.get(k), wait);
 const asPutK = (k, v) => asTx('readwrite', st => st.put(v, k));
 const asDelK = k => asTx('readwrite', st => st.delete(k));
@@ -4455,7 +4460,7 @@ async function snapsDialog() {
 }
 // ---------- проекты ----------
 const PJ = { list: [] };
-async function projIndex() { const l = await asGetK('projects'); PJ.list = Array.isArray(l) ? l : []; return PJ.list; }
+async function projIndex(wait) { const l = await asGetK('projects', wait); PJ.list = Array.isArray(l) ? l : []; return PJ.list; }
 async function projIndexTouch(id, patch) { await projIndex(); const p = PJ.list.find(x => x.id === id); if (p) Object.assign(p, patch); await asPutK('projects', PJ.list); }
 async function projCreate(name, keepWork) {
   await projIndex(); const id = 'p' + Date.now(); const now = Date.now(); AS.restoreFailed = false;
@@ -4544,11 +4549,12 @@ async function renderHome() {
     <h2>Мои проекты <span class="hint" style="margin:0">${list.length ? '(' + list.length + ')' : ''}</span></h2>
     ${list.length ? list.map(p => `<div class="pj-item ${p.id === AS.pid ? 'cur' : ''}"><button class="pj-open" data-open="${p.id}"><b>${escH(p.name)}</b><span>${t(p.updated)} · ${escH(p.summary || '')}</span></button><button data-ren="${p.id}" title="Переименовать">✎</button><button data-del="${p.id}" title="Удалить" class="danger">🗑</button></div>`).join('') : '<p class="hint">Проектов пока нет. Создайте первый — работа будет сохраняться в нём сама.</p>'}
   </div>
-  ${AS.db === null ? '<div class="asbox" style="border-color:#C4372F;background:#FDECEA">⚠ Память браузера недоступна — проекты не сохранятся сами. Сохраняйте работу кнопкой «Сохранить проект».</div>' : ''}`;
+  ${AS.db === null ? '<div class="asbox" style="border-color:#C4372F;background:#FDECEA"><b>⚠ Память браузера не отвечает — список проектов не прочитан.</b><br>Проекты при этом <b>не удалены</b>. Чаще всего помогает полная перезагрузка iPad: выключить (кнопка питания + громкость → «Выключить»), включить, открыть Рулетку снова. Проверьте, что на iPad есть свободное место (Настройки → Основные → Хранилище). <b>Не удаляйте Bluefy и не очищайте данные сайтов</b> — проекты хранятся там.<div class="row" style="margin-top:8px"><button id="dbRetry" class="pri">↻ Повторить</button></div></div>' : ''}`;
   const nm = () => ($('#pjName').value || '').trim() || def;
   $('#pjNewU').onclick = () => { const n = nm(); $('#uFile') ? null : null; const fi = document.createElement('input'); fi.type = 'file'; fi.accept = IOS ? '' : '.pdf,.png,.jpg,.jpeg'; fi.onchange = async () => { const f = fi.files[0]; await projNew(n, true); if (f) { await loadUnderlay(f); asSoon(); } }; fi.click(); };
   $('#pjNewB').onclick = () => projNew(nm(), false);
   $('#pjImport').onclick = () => { PJ.importing = true; $('#fProj').click(); };
+  { const rb = $('#dbRetry'); if (rb) rb.onclick = async () => { rb.disabled = true; rb.textContent = 'Пробую…'; const db = await asDB(10000); if (db) { AS.db = db; await projIndex(10000); stat('Память ответила — проекты доступны'); } else stat('Память всё ещё не отвечает — перезагрузите iPad'); renderHome(); }; }
   host.querySelectorAll('[data-open]').forEach(b => b.onclick = () => projOpen(b.dataset.open));
   host.querySelectorAll('[data-ren]').forEach(b => b.onclick = () => projRename(b.dataset.ren));
   host.querySelectorAll('[data-del]').forEach(b => b.onclick = () => projDelete(b.dataset.del));
@@ -4564,7 +4570,7 @@ setTimeout(checkUpdate, 4000); setInterval(checkUpdate, 30 * 60000);
 (async () => {
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) { }
   AS.db = await asDB();
-  await projIndex();
+  await projIndex(10000); if (AS.db === null && !AS.dbHung) AS.dbHung = true;
   { let oa = null; try { oa = localStorage.getItem('rul_openAfter'); localStorage.removeItem('rul_openAfter'); } catch (e) { } if (oa && /[?&]safe=1/.test(location.search) && PJ.list.some(x => x.id === oa)) setTimeout(() => projOpen(oa), 300); }
   setTimeout(() => { let t = 0; try { t = +localStorage.getItem('rul_gcAt') || 0; } catch (e) { } if (Date.now() - t < 86400000 || AS.opening || AS.restoring) return; try { localStorage.setItem('rul_gcAt', Date.now()); } catch (e) { } asGC(); }, 90000);
   // перенос работы из прежних версий (без проектов) в проект
