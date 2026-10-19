@@ -274,7 +274,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 5.2 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 5.3 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -2119,7 +2119,7 @@ const TAPE = (() => {
     const fixedAng = new Set((M.meas || []).filter(m => m.type === 'angle' && m.on !== false).map(m => m.b));
     const freeIds = new Set((M.pts || []).filter(p => p.free || p.gpsPt).map(p => p.id));
     for (const c of angCons) { const key = c.join(','); if (!seenA.has(key) && idx.has(c[0]) && idx.has(c[1]) && idx.has(c[2]) && !freeIds.has(c[1]) && !fixedAng.has(c[1])) { seenA.add(key); AC.push(c); } }
-    const meas = (M.meas || []).filter(m => m.on !== false && [m.a, m.b, m.c, m.d, m.p].filter(v => v !== undefined).every(id => idx.has(id)));
+    const meas = (M.meas || []).filter(m => m.on !== false && !m.lab && [m.a, m.b, m.c, m.d, m.p].filter(v => v !== undefined).every(id => idx.has(id)));
     let iter = 0;
     const N = 2 * n;
     for (iter = 0; iter < 15; iter++) {
@@ -5237,19 +5237,22 @@ function gpsFind(name) { const D = T.gpsDb; if (!D || name == null) return null;
 function gpsDropTape(p) { // старые длины и диагонали между пикетами GPS больше не нужны — длины будут из съёмки
   const n0 = M.meas.length; M.meas = M.meas.filter(m => !(!m.gps && (m.type === 'dist' || m.type === 'line' || m.type === 'angle') && [m.a, m.b, m.p].includes(p.id) && [m.a, m.b, m.p].filter(v => v != null && v !== p.id).every(id => { const q = ptById(id); return q && q.gpsPt; })));
   if (T.pending && [T.pending.a, T.pending.b].includes(p.id)) T.pending = null; return n0 - M.meas.length; }
-function gpsUnbind(p) { delete p.gps; delete p.fixed; M.meas = M.meas.filter(m => !(m.gps && (m.a === p.id || m.b === p.id))); }
+function gpsUnbind(p) { if (p.pre) { p.x0 = p.pre[0]; p.y0 = p.pre[1]; delete p.pre; } delete p.gps; delete p.fixed; delete p.gpsCond; M.meas = M.meas.filter(m => !(m.gps && (m.a === p.id || m.b === p.id))); }
 function gpsMeas() { // длины по координатам — для каждой линии между двумя пикетами с координатами
   const ok = new Set(M.meas.filter(m => m.gps).map(m => m.a < m.b ? m.a + ',' + m.b : m.b + ',' + m.a)); let n = 0;
   M.meas = M.meas.filter(m => !m.gps || (hasEdge(m.a, m.b) && ptById(m.a) && ptById(m.b) && ptById(m.a).gps && ptById(m.b).gps));
   for (const e of M.edges) { if (e.obj) continue; const A = ptById(e.a), B = ptById(e.b); if (!A || !B || !A.gps || !B.gps) continue;
     const v = Math.hypot(A.gps.X - B.gps.X, A.gps.Y - B.gps.Y); const old = M.meas.find(m => m.type === 'dist' && ((m.a === e.a && m.b === e.b) || (m.a === e.b && m.b === e.a)));
-    if (old && old.gps) { old.v = v; continue; } if (old) M.meas = M.meas.filter(m => m !== old); M.meas.push({ id: M.nextMeas++, type: 'dist', a: e.a, b: e.b, v, on: true, gps: true }); n++; }
+    const lab = !!(A.gpsCond || B.gpsCond);
+    if (old && old.gps) { old.v = v; if (lab) old.lab = true; else delete old.lab; continue; } if (old) M.meas = M.meas.filter(m => m !== old); M.meas.push(Object.assign({ id: M.nextMeas++, type: 'dist', a: e.a, b: e.b, v, on: true, gps: true }, lab ? { lab: true } : {})); n++; }
   void ok; return n; }
 async function gpsApply(auto) {
   const D = T.gpsDb; if (!D) return;
-  adjust(); const gnm = p => p.name || (p.gpsPt ? pname(p.id) : null); let pairs = M.pts.filter(p => gnm(p) && !p.soft).map(p => ({ p, r: gpsFind(gnm(p)) })).filter(x => x.r);
+  adjust(); const gnm = p => p.name || pname(p.id); let pairs = M.pts.filter(p => p.gpsPt && !p.soft).map(p => ({ p, r: gpsFind(gnm(p)) })).filter(x => x.r);
   const lost = M.pts.filter(p => p.gpsPt && !gpsFind(gnm(p))).map(p => pname(p.id));
-  if (!pairs.length) { if (!auto) uiAlert(`Ни один номер точки на этом листе не совпал с номерами в «${D.name}» (${D.pts.length} точек). Подпишите пикеты теми же номерами, что в приёмнике.`); return; }
+  if (!pairs.length) { if (!auto) uiAlert(`Ни один пикет GPS на этом листе не совпал с номерами в «${D.name}» (${D.pts.length} точек). Пикеты ставятся и переназначаются в режиме «🛰 Исп GPS», номера — как в приёмнике. Обычные точки обмера файл GPS не трогает.`); return; }
+  let mode = T.gpsMode || 'cond';
+  if (!auto) { const k = await ask3('Как поставить точки GPS?', `Совпало пикетов: ${pairs.length}. «Условно» — точки остаются там, где вы их поставили на плане, а подписаны верные длины из съёмки (геометрия примерная). «Истинные» — точки встают точно по координатам.`, [['cond', 'Условно: длины из GPS', 'pri'], ['true', 'Истинные размеры'], ['no', 'Отмена']]); if (k === 'no') return; mode = T.gpsMode = k; }
   tPush();
   const fit = () => { const S = pairs.map(x => [x.r.Y, x.r.X]), Dd = pairs.map(x => PX(x.p)), n = S.length; // мир: x — восток (Y), y — север (X)
     const cs = [0, 1].map(i => S.reduce((a, q) => a + q[i], 0) / n), cd = [0, 1].map(i => Dd.reduce((a, q) => a + q[i], 0) / n);
@@ -5258,13 +5261,14 @@ async function gpsApply(auto) {
     const tr = q => { const a = [q[0] - cs[0], q[1] - cs[1]]; return [cd[0] + c * a[0] - s * a[1], cd[1] + s * a[0] + c * a[1]]; };
     return { tr, k, span: Math.sqrt(ss / n) }; };
   let F = fit();
-  if (!auto && pairs.length >= 2 && F.span > 1 && Math.abs(F.k - 1) > 0.02 && U.img && !pairs.every(x => x.p.gps)) {
+  if (mode === 'true' && !auto && pairs.length >= 2 && F.span > 1 && Math.abs(F.k - 1) > 0.02 && U.img && !pairs.every(x => x.p.gps)) {
     if (await uiDialog({ title: 'Подложка в другом масштабе, чем съёмка', text: `Расстояния между пикетами на подложке ${F.k > 1 ? 'больше' : 'меньше'}, чем по GPS, в ${nf(F.k > 1 ? F.k : 1 / F.k, 3)} раза. Подогнать масштаб подложки под GPS? Тогда точки встанут на свои места на плане.`, ok: 'Подогнать', cancel: 'Нет, только точки' })) { T.undo.pop(); fitScale(1 / F.k); tPush(); adjust(); F = fit(); } }
   let dmax = 0;
-  for (const { p, r } of pairs) { const q = F.tr([r.Y, r.X]), cur = PX(p); dmax = Math.max(dmax, Math.hypot(q[0] - cur[0], q[1] - cur[1]));
+  for (const { p, r } of pairs) { const cur = PX(p), q = mode === 'cond' ? cur : F.tr([r.Y, r.X]); dmax = Math.max(dmax, Math.hypot(q[0] - cur[0], q[1] - cur[1]));
+    if (!p.pre) p.pre = [p.x0, p.y0]; if (mode === 'cond') p.gpsCond = true; else delete p.gpsCond;
     p.x0 = q[0]; p.y0 = q[1]; p.fixed = true; p.gpsPt = true; gpsDropTape(p); p.gps = { X: r.X, Y: r.Y, H: isFinite(r.H) ? r.H : null }; }
   const nm = gpsMeas(); adjust(); draw(); renderTape();
-  const msg = `GPS «${D.name}»: на места встали ${pairs.length} точ.${pairs.length === 1 ? ' (одна общая точка — поворот не определён, нужно минимум две)' : ''}; длин по координатам: ${M.meas.filter(m => m.gps).length}${nm ? ' (новых ' + nm + ')' : ''}. Самый большой сдвиг от того, где вы ставили, — ${nf(dmax, 2)} м.` + (lost.length ? ` Нет в файле: ${lost.slice(0, 12).join(', ')}${lost.length > 12 ? '…' : ''}.` : '');
+  const msg = mode === 'cond' ? `GPS «${D.name}», условно: пикетов ${pairs.length} — стоят, где вы их поставили; длин из съёмки подписано: ${M.meas.filter(m => m.gps).length}.` : `GPS «${D.name}», истинные размеры: на места встали ${pairs.length} точ.${pairs.length === 1 ? ' (одна общая точка — поворот не определён, нужно минимум две)' : ''}; длин по координатам: ${M.meas.filter(m => m.gps).length}${nm ? ' (новых ' + nm + ')' : ''}. Самый большой сдвиг от того, где вы ставили, — ${nf(dmax, 2)} м.` + (lost.length ? ` Нет в файле: ${lost.slice(0, 12).join(', ')}${lost.length > 12 ? '…' : ''}.` : '');
   stat(msg); if (!auto) uiAlert(msg);
 }
 async function gpsAskName(p, def) {
@@ -5283,7 +5287,7 @@ async function gpsTap(w, e) {
   if (p) { if (!p.name && !(await gpsMark(p))) return;
     tPush(); if (gpsLine() && prev && !hasEdge(prev, p.id)) M.edges.push({ a: prev, b: p.id });
     T.gpsPrev = p.id; gpsMeas(); adjust(); draw(); renderTape(); stat(`Пикет ${pname(p.id)}. Дальше — следующий пикет; ещё раз коснуться ${pname(p.id)} — разорвать линию.`); return; }
-  tPush(); p = addPoint(w); p.gpsPt = true; draw();
+  tPush(); zoomNote(); p = addPoint(w); p.gpsPt = true; draw();
   if (!(await gpsAskName(p, nextPtName()))) { M.pts = M.pts.filter(q => q !== p); T.undo.pop(); draw(); stat('Пикет не поставлен.'); return; }
   if (gpsLine() && prev && ptById(prev)) M.edges.push({ a: prev, b: p.id });
   T.gpsPrev = p.id;
@@ -5294,12 +5298,14 @@ function gpsPanel() {
   return `<div class="gpsbox"><div class="row" style="align-items:center"><b style="flex:1">🛰 Исп GPS</b><span class="hint" style="margin:0">пикетов ${n}${n ? ' · по координатам ' + ng : ''}</span></div>
   <div class="row"><button id="gLoad" class="pri" style="flex:1">📂 Загрузить PCO</button><input type="file" id="gFile" hidden></div>
   ${D ? `<div class="row"><span class="hint" style="flex:1;margin:0">${escH(D.name)} · ${D.pts.length} точек</span><button id="gApply">↻ Подставить</button></div>` : ''}
+  ${ng ? '<div class="row"><button id="gUnAll" style="flex:1">↺ Отвязать все точки листа от GPS</button></div>' : ''}
   <div class="chk"><input type="checkbox" id="gLine" ${gpsLine() ? 'checked' : ''}><label for="gLine">Соединять пикеты линией</label></div>
   ${T.gpsPrev && ptById(T.gpsPrev) ? `<div class="row"><span style="flex:1">Линия от <b>${escH(pname(T.gpsPrev))}</b></span><button id="gBreak">✂ Новый участок</button></div>` : ''}
   <p class="hint">Коснитесь места пикета — введите номер как в приёмнике. «✂ Новый участок» (внизу) — следующий пикет не соединится с предыдущим. Касание старой точки — переназначить её на GPS (без линий; условные длины к другим пикетам убираются). Длины рулеткой не нужны: после «Загрузить PCO» точки с теми же номерами встанут по координатам, длины между ними посчитаются сами.</p></div>`; }
 function gpsPanelBind() {
   const l = $('#gLoad'), f = $('#gFile'); if (l) l.onclick = () => f.click(); if (f) f.onchange = e => { const x = e.target.files[0]; e.target.value = ''; if (x) gpsLoadFile(x); };
   const a = $('#gApply'); if (a) a.onclick = () => gpsApply(false);
+  const ua = $('#gUnAll'); if (ua) ua.onclick = async () => { const L = M.pts.filter(p => p.gps); if (!L.length) return; if (!(await uiDialog({ title: `Отвязать от GPS все точки листа (${L.length})?`, text: 'Точки вернутся туда, где стояли до загрузки PCO (если программа это помнит), длины из GPS уберутся. Пикеты останутся пикетами — можно загрузить PCO заново.', ok: 'Отвязать', cancel: 'Отмена' }))) return; tPush(); L.forEach(gpsUnbind); adjust(); renderTape(); draw(); stat(`Отвязано от GPS: ${L.length}.`); };
   const g = $('#gLine'); if (g) g.onchange = () => { try { localStorage.setItem('rul_gpsline', g.checked ? '1' : '0'); } catch (e) { } if (!g.checked) T.gpsPrev = null; renderTape(); draw(); };
   const b = $('#gBreak'); if (b) b.onclick = () => { T.gpsPrev = null; renderTape(); draw(); stat('Линия разорвана.'); }; }
 function endChain() { if (T.pending && T.pending.got == null) T.pending = null; T.chain = null; T.mA = null; T.tA = null; T.roomIds = null; T.objIds = null; stat('Обход закончен. Коснитесь любой точки — продолжить от неё, или пустого места — начать с новой точки.'); renderTape(); draw(); }
@@ -5310,7 +5316,7 @@ function nearestEdge(w, px = 8) { let best = null, bd = px * HITK() / S.view.s, 
 const hasEdge = (a, b) => M.edges.find(e => (e.a === a && e.b === b) || (e.a === b && e.b === a));
 function distMeas(a, b) { return M.meas.find(m => m.type === 'dist' && m.v != null && ((m.a === a && m.b === b) || (m.a === b && m.b === a))); }
 function drawnLen(m) { const A = ptById(m.a), B = ptById(m.b); return A && B ? Math.hypot(B.x0 - A.x0, B.y0 - A.y0) : 0; }
-function scaleRatio() { const r = M.meas.filter(m => m.type === 'dist' && m.on !== false && m.v > 0.3).map(m => m.v / drawnLen(m)).filter(v => isFinite(v) && v > 0).sort((a, b) => a - b); return r.length ? { k: r[Math.floor(r.length / 2)], n: r.length } : null; }
+function scaleRatio() { const r = M.meas.filter(m => m.type === 'dist' && m.on !== false && !m.lab && m.v > 0.3).map(m => m.v / drawnLen(m)).filter(v => isFinite(v) && v > 0).sort((a, b) => a - b); return r.length ? { k: r[Math.floor(r.length / 2)], n: r.length } : null; }
 function fitScale(k) { // масштабировать подложку и точки так, чтобы чертёж совпал с замерами
   if (!(k > 0) || Math.abs(k - 1) < 1e-4) return; tPush();
   const xs = M.pts.map(p => [p.x0, p.y0]); const c = xs.length ? [xs.reduce((s, q) => s + q[0], 0) / xs.length, xs.reduce((s, q) => s + q[1], 0) / xs.length] : [0, 0];
@@ -6163,7 +6169,8 @@ async function exportOverlayPdf(opt = {}) {
     const med = lens.length ? lens[Math.floor(lens.length / 2)] : 100, o0 = toPt(0, 0), o1 = toPt(1, 0), ppm = Math.hypot(o1[0] - o0[0], o1[1] - o0[1]) || 28;
     // как на экране: подпись на экране 12 px при том увеличении, на котором вы работаете (медиана по замерам) → те же метры на листе
     const zl = ((M.zoomLog && M.zoomLog.length ? M.zoomLog : T.zoomAll) || []).slice().sort((a, b) => a - b), zw = zl.length ? zl[Math.floor(zl.length / 2)] : null;
-    const fsM = Math.max(0.06, Math.min(0.8, zw ? 13.5 / zw : 0.22)); void med;
+    const lensW = M.edges.filter(e => !e.obj).map(e => { const A = ptById(e.a), B = ptById(e.b); return A && B ? Math.hypot(PX(A)[0] - PX(B)[0], PX(A)[1] - PX(B)[1]) : 0; }).filter(v => v > 0.05).sort((a, b) => a - b), medW = lensW.length ? lensW[Math.floor(lensW.length / 2)] : null;
+    const fsM = Math.max(0.04, Math.min(0.8, zw ? 13.5 / zw : 0.22, medW ? medW * 0.12 : 9)); void med;
     const fs = Math.max(0.6, Math.min(16, ppm * fsM * (PDFSZ[pdfSz()] || PDFSZ.s).m)); const lw = Math.max(0.06, fs * 0.09);
     const sc = (x, d) => { const c = x && x.st && x.st.c; if (!c) return d; const n = parseInt(c.slice(1), 16); return rgb(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255); };
     const RED = rgb(0.80, 0.02, 0.10), BLUE = rgb(0.05, 0.25, 0.75), VIO = rgb(0.42, 0.20, 0.72), GRN = rgb(0.05, 0.55, 0.25), GRY = rgb(0.45, 0.48, 0.52);
