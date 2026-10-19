@@ -281,11 +281,11 @@ header .modes,#bOpen,.homein .lead{display:none!important}
   <button class="hb" id="bAbout" title="О программе, авторство, лицензии">О программе</button>
   <button class="hb" id="bOpen">Открыть проект</button>
   <span id="asInd" class="asind"></span><button class="hb" id="bSnaps" title="Вернуться к копии, сделанной раньше">Копии</button><button class="hb" id="bSave">💾 Сохранить</button>
-  <input type="file" id="fProj" accept=".json,.txt,application/json,text/plain" hidden>
+  <input type="file" id="fProj" accept=".json,.txt,.pdf,application/json,text/plain,application/pdf" hidden>
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 6.5 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 6.6 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -4177,6 +4177,27 @@ function exportDXF() {
   download(fileBase() + '.dxf', data, 'application/dxf');
 }
 
+// ---------- проект внутри PDF ----------
+// в PDF с замерами вкладывается файл проекта (и исходная подложка): открыв такой PDF в Рулетке на другом устройстве, работу можно править
+const PDF_PROJ = 'ruletka-proekt.json';
+async function embedProj(doc) {
+  const proj = buildProject(); proj.pid = AS.pid; proj.pname = AS.pname; proj.embedded = Date.now();
+  const src = (proj.tape && proj.tape.U && U.src && U.src.bytes) ? U.src : null;
+  if (src) proj.tape.U.srcAtt = 'ruletka-podlozhka.' + (src.kind === 'pdf' ? 'pdf' : src.kind === 'png' ? 'png' : 'jpg');
+  const now = new Date();
+  await doc.attach(new TextEncoder().encode(JSON.stringify(proj)), PDF_PROJ, { mimeType: 'application/json', description: 'Проект Рулетки: откройте этот PDF в Рулетке, чтобы править замеры', creationDate: now, modificationDate: now });
+  if (src) await doc.attach(src.bytes, proj.tape.U.srcAtt, { mimeType: src.kind === 'pdf' ? 'application/pdf' : src.kind === 'png' ? 'image/png' : 'image/jpeg', description: 'Исходная подложка (без замеров)', creationDate: now, modificationDate: now });
+  return true;
+}
+function isPdfBytes(u8) { return u8 && u8.length > 4 && u8[0] === 0x25 && u8[1] === 0x50 && u8[2] === 0x44 && u8[3] === 0x46; }
+async function pdfProjAtt(u8) { // проект Рулетки, вложенный в PDF, или null
+  if (!window.pdfjsLib || !isPdfBytes(u8)) return null; let pdf = null;
+  try { pdf = await pdfjsLib.getDocument({ data: u8.slice(0) }).promise; const at = await pdf.getAttachments(); const a = at && (at[PDF_PROJ] || Object.values(at).find(x => x && x.filename === PDF_PROJ)); if (!a) return null;
+    const j = JSON.parse(new TextDecoder('utf-8').decode(a.content)); if (!j || j.app !== 'scan2plan') return null;
+    const sa = j.tape && j.tape.U && j.tape.U.srcAtt, b = sa && (at[sa] || Object.values(at).find(x => x && x.filename === sa));
+    if (b) j.tape.U.srcObj = { kind: j.tape.U.srcKind || 'pdf', bytes: new Uint8Array(b.content) };
+    return j; } catch (e) { console.warn('pdfProjAtt', e); return null; } finally { try { pdf && pdf.destroy(); } catch (e) { } } }
+
 // ---------- project save / load ----------
 function buildProject() {
   return { app: 'scan2plan', v: 1, creator: 'Скан → План ' + APP.version + '. ' + APP.notice, h1: S.h1, h2: S.h2, sheetOpt: S.sheetOpt, gidCounter: S.gidCounter, active: S.active,
@@ -4203,24 +4224,35 @@ if (IOS) $('#fProj').removeAttribute('accept');
 $('#bOpen').onclick = () => $('#fProj').click();
 async function readProjFile(f) {
   const buf = new Uint8Array(await f.arrayBuffer());
+  if (isPdfBytes(buf)) { const j = await pdfProjAtt(buf); if (j) return j; throw new Error(`в PDF «${f.name}» нет проекта Рулетки (он сохранён до версии 6.6 или другой программой). Такой PDF можно открыть только как подложку.`); }
   let txt = new TextDecoder('utf-8').decode(buf).replace(/^\uFEFF/, '').trim();
   if (!txt.startsWith('{')) throw new Error(`«${f.name}» — это не файл проекта Рулетки (ожидается …scanplan.json)`);
   try { return JSON.parse(txt); } catch (e) { throw new Error(`файл «${f.name}» (${(f.size / 1048576).toFixed(1)} МБ) повреждён или сохранён не полностью`); }
 }
 $('#fProj').onchange = async e => {
   const f = e.target.files[0]; if (!f) return; busy('Открываю проект «' + f.name + '»…');
-  try { const j = await readProjFile(f); busy(''); if (!(await leaveProject())) { e.target.value = ''; return; }
-    const nm = j.pname || (j.sheetOpt && j.sheetOpt.info && j.sheetOpt.info.object) || f.name.replace(/\.scanplan\.json$|\.json$/i, '').replace(/[ _-]*\(?\d+\)?$/, '');
-    await projIndex(); const same = PJ.list.find(x => j.pid && x.id === j.pid) || PJ.list.find(x => x.name === nm); let target = null;
-    if (same) { const k = await ask3(`Проект «${same.name}» уже есть в списке`, 'Заменить его содержимым этого файла? Нынешнее состояние проекта останется в «Копии».', [['repl', 'Заменить', 'pri'], ['new', 'Открыть отдельным проектом', ''], ['stay', 'Отмена', '']]);
-      if (k === 'stay') { e.target.value = ''; return; } if (k === 'repl') target = same; }
-    busy('Открываю проект…');
-    if (target) { const old = await asGetK('proj:' + target.id); if (typeof old === 'string') await addSnap({ when: Date.now(), summary: 'до замены из файла', proj: old, sid: AS.sid, pid: target.id, pname: target.name }); }
-    resetWork(); if (target) { AS.pid = target.id; AS.pname = target.name; AS.sid = Date.now(); AS.snapAt = 0; AS.restoreFailed = false; showProjName(); } else await projCreate(nm, false);
-    await applyProject(j); await autosave(true); markSaved(); stat(`Файл открыт ${target ? 'в проект' : 'как проект'} «${AS.pname}» и сохранён.`); }
+  try { const j = await readProjFile(f); busy(''); await importProj(j, f.name); }
   catch (err) { busy(''); uiAlert('Не удалось открыть проект: ' + (err && err.message || err)); }
   busy(''); e.target.value = '';
 };
+// открыть данные проекта (из файла проекта или из PDF) как проект в списке; o.intoEmpty — в текущий пустой проект
+async function importProj(j, fname, o = {}) {
+  if (!(await leaveProject())) return false;
+  const nm = j.pname || (j.sheetOpt && j.sheetOpt.info && j.sheetOpt.info.object) || fname.replace(/_замеры\.pdf$|\.pdf$|\.scanplan\.json$|\.json$/i, '').replace(/[ _-]*\(?\d+\)?$/, '');
+  await projIndex(); let target = null, rename = false;
+  const cur = AS.pid && PJ.list.find(x => x.id === AS.pid);
+  if (o.intoEmpty && cur && !mHas(M) && !Object.keys(PGS.data || {}).some(n => pgHas(+n))) { target = cur; rename = true; }
+  else { const same = PJ.list.find(x => j.pid && x.id === j.pid) || PJ.list.find(x => x.name === nm);
+    if (same) { const k = await ask3(`Проект «${same.name}» уже есть в списке`, 'Заменить его содержимым этого файла? Нынешнее состояние проекта останется в «Копии».', [['repl', 'Заменить', 'pri'], ['new', 'Открыть отдельным проектом', ''], ['stay', 'Отмена', '']]);
+      if (k === 'stay') return false; if (k === 'repl') target = same; } }
+  busy('Открываю проект…');
+  try {
+    if (target && !rename) { const old = await asGetK('proj:' + target.id); if (typeof old === 'string') await addSnap({ when: Date.now(), summary: 'до замены из файла', proj: old, sid: AS.sid, pid: target.id, pname: target.name }); }
+    resetWork(); if (target) { AS.pid = target.id; AS.pname = target.name; AS.sid = Date.now(); AS.snapAt = 0; AS.restoreFailed = false; if (rename && nm) { target.name = nm; AS.pname = nm; await asPutK('projects', PJ.list); } showProjName(); } else await projCreate(nm, false);
+    await applyProject(j); await autosave(true); markSaved(); stat(`${/\.pdf$/i.test(fname) ? 'Проект из PDF' : 'Файл'} открыт ${target && !rename ? 'в проект' : 'как проект'} «${AS.pname}» и сохранён — замеры можно править.`);
+  } finally { busy(''); }
+  return true;
+}
 async function applyProject(j) {
   {
     if (j.app !== 'scan2plan') throw new Error('Это не файл проекта');
@@ -5511,6 +5543,11 @@ async function loadUnderlay(file) {
     if (/\.pdf$/i.test(file.name)) {
       if (!window.pdfjsLib) throw new Error('Модуль PDF не загружен');
       const data = new Uint8Array(await file.arrayBuffer()); const was = { pdf: U.pdf, pages: U.pages, page: U.page, titles: U.titles };
+      { const pj = await pdfProjAtt(data);
+        if (pj) { busy(''); const k = await ask3('В этом PDF сохранён проект Рулетки', `${pj.pname ? '«' + pj.pname + '». ' : ''}Замеры, точки, номера помещений, сканы и подписи можно открыть для правки. Или взять PDF просто картинкой-подложкой.`, [['proj', '✎ Открыть проект с замерами', 'pri'], ['under', 'Только как подложку', ''], ['stay', 'Отмена', '']]);
+          if (k === 'stay') { stat('Подложка не заменена.'); renderTape(); return; }
+          if (k === 'proj') { try { await importProj(pj, file.name, { intoEmpty: true }); } catch (e) { uiAlert('Не удалось открыть проект из PDF: ' + (e.message || e)); } busy(''); renderTape(); return; }
+          busy('Открываю подложку…'); } }
       U.pdf = await pdfjsLib.getDocument({ data: data.slice(0) }).promise; U.pages = U.pdf.numPages; U.page = 1;
       U.titles = await pdfTitles(U.pdf);
       if (U.pages > 1) { busy(''); const pg = await pickPage(); if (!pg) { Object.assign(U, was); stat('Подложка не заменена.'); return; } U.page = pg; busy('Открываю лист…'); }
@@ -6467,9 +6504,10 @@ async function exportOverlayPdf(opt = {}) {
       })();
     }
     back(); AS.hold--; held = false; veil.remove();
+    let emb = false; try { emb = await embedProj(doc, PL); } catch (e) { console.warn('embedProj', e); }
     const bytes = await doc.save();
     busy(''); const fname = ((AS.pname || U.name || 'Обмер').replace(/\.[^.]+$/, '').replace(/[\\/:*?"<>|]/g, '_')) + '_замеры.pdf';
-    stat(`PDF готов: листов ${pages.length}${work.length && pages.length > 1 ? ' (с замерами: ' + work.join(', ') + ')' : ''}, подложка в исходном качестве, замеры поверх — векторные.`);
+    stat(`PDF готов: листов ${pages.length}${work.length && pages.length > 1 ? ' (с замерами: ' + work.join(', ') + ')' : ''}, подложка в исходном качестве, замеры поверх — векторные.${emb ? ' Внутри PDF — проект: на другом устройстве откройте этот PDF в Рулетке, и замеры можно править.' : ''}`);
     await fileReady(fname, bytes, 'application/pdf', `PDF готов: ${pages.length === 1 ? '1 лист' : 'листов ' + pages.length}, ${(bytes.length / 1048576).toFixed(1).replace('.', ',')} МБ`);
   } catch (e) { busy(''); console.error(e); uiAlert('Не удалось сделать PDF: ' + (e.message || e)); }
   finally { veil.remove(); if (held) { back(); AS.hold = Math.max(0, (AS.hold || 1) - 1); asSoon(); } }
