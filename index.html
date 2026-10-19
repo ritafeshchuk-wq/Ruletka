@@ -285,7 +285,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 6.6 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 6.7 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -4181,7 +4181,7 @@ function exportDXF() {
 // в PDF с замерами вкладывается файл проекта (и исходная подложка): открыв такой PDF в Рулетке на другом устройстве, работу можно править
 const PDF_PROJ = 'ruletka-proekt.json';
 async function embedProj(doc) {
-  const proj = buildProject(); proj.pid = AS.pid; proj.pname = AS.pname; proj.embedded = Date.now();
+  const proj = buildProject(); proj.pid = AS.pid; proj.pname = AS.pname; proj.embedded = Date.now(); proj.sheetOpt = { ...(proj.sheetOpt || {}), pdfSz: pdfSz() };
   const src = (proj.tape && proj.tape.U && U.src && U.src.bytes) ? U.src : null;
   if (src) proj.tape.U.srcAtt = 'ruletka-podlozhka.' + (src.kind === 'pdf' ? 'pdf' : src.kind === 'png' ? 'png' : 'jpg');
   const now = new Date();
@@ -4207,7 +4207,7 @@ function buildProject() {
     tape: tapeProject() };
 }
 function saveProjectFile() {
-  const proj = buildProject(); proj.pid = AS.pid; proj.pname = AS.pname;
+  const proj = buildProject(); proj.pid = AS.pid; proj.pname = AS.pname; proj.sheetOpt = { ...(proj.sheetOpt || {}), pdfSz: pdfSz() };
   if (proj.tape && proj.tape.U && U.src && U.src.bytes) { let bs = ''; const u = U.src.bytes; for (let i = 0; i < u.length; i += 32768) bs += String.fromCharCode.apply(null, u.subarray(i, i + 32768)); proj.tape.U.srcB64 = btoa(bs); proj.tape.U.srcKind = U.src.kind; }
   const js = JSON.stringify(proj); saveFileDialog((AS.pname || S.sheetOpt.info.object || 'проект').replace(/[\\/:*?"<>|]/g, '_') + '.scanplan.json', js, 'application/json', `Файл проекта готов: ${(js.length / 1048576).toFixed(1)} МБ`);
   AS.fileAt = Date.now(); showAS();
@@ -4503,7 +4503,7 @@ function showProjName() { const el = $('#projName'); if (el) el.textContent = AS
 function resetWork() {
   Object.assign(M, { axis: null, snap90: true, pts: [], meas: [], edges: [], rooms: [], chains: [], objs: [], notes: [], marks: [], lastNum: {}, nextId: 1, nextMeas: 1, cond: false, scaleFit: false, scaleAsked: false, zoomLog: [], gpsHidden: [] });
   Object.assign(U, { img: null, pdf: null, pages: 0, page: 1, name: '', src: null, ptPerPx: null, srcPage: 1, _imgKey: null, _imgKeyFor: null, _imgSaved: false, _srcKey: null, _data: null, _dataFor: null, mip: null, mipSrc: null, pdfPage: null, s: 0.01, rot: 0, tx: 0, ty: 0, pw: null, ph: null, titles: null, zoomPdf: 0 });
-  Object.assign(T, { gpsDb: null, gpsMode: null, gpsPrev: null, lastPtName: null, numbering: null, figLast: null, selRect: null, resume: null, jumpFrom: null, moveObj: null, mPress: null }); M.ortho = true;
+  Object.assign(T, { zoomAll: [], gpsDb: null, gpsMode: null, gpsPrev: null, lastPtName: null, numbering: null, figLast: null, selRect: null, resume: null, jumpFrom: null, moveObj: null, mPress: null }); M.ortho = true;
   Object.assign(T, { mk: null, dragMark: null, dragSel: null, dragEdge: null, snapG: null, selSet: null, box: null, noteTip: null, undo: [], redo: [], pending: null, chain: null, sel: null, buffer: null, objIds: null, roomIds: null, mA: null, tA: null, fitted: false });
   PGS.data = {}; AS.last = ''; AS.savedAt = 0; AS.epoch = (AS.epoch || 0) + 1;
   adjust(); markSaved();
@@ -6299,7 +6299,7 @@ function renderTape() {
     setTimeout(() => document.addEventListener('pointerdown', flyOut, true), 0); }
   $('#tUndo').onclick = tUndo; $('#tRedo').onclick = tRedo;
   $('#orth').onchange = e => { M.ortho = e.target.checked; adjust(); renderTape(); };
-  document.querySelectorAll('[data-pdfsz]').forEach(b => b.onclick = () => { try { localStorage.setItem('rul_pdfsz', b.dataset.pdfsz); } catch (e) { } stat('Подписи в PDF: ' + PDFSZ[b.dataset.pdfsz].t.toLowerCase() + '.'); renderTape(); });
+  document.querySelectorAll('[data-pdfsz]').forEach(b => b.onclick = () => { try { localStorage.setItem('rul_pdfsz', b.dataset.pdfsz); } catch (e) { } if (S.sheetOpt) { S.sheetOpt.pdfSz = b.dataset.pdfsz; try { asSoon(); } catch (e) { } } stat('Подписи в PDF: ' + PDFSZ[b.dataset.pdfsz].t.toLowerCase() + '.'); renderTape(); });
   side.querySelectorAll('[data-mon]').forEach(c => c.onchange = () => { const m = M.meas.find(x => x.id === +c.dataset.mon); tPush(); m.on = c.checked; adjust(); renderTape(); });
   side.querySelectorAll('[data-mv]').forEach(c => c.onchange = () => { const m = M.meas.find(x => x.id === +c.dataset.mv); const v = parseManual(c.value); if (v) { tPush(); m.v = v; adjust(); } renderTape(); });
   side.querySelectorAll('[data-mdel]').forEach(c => c.onclick = () => { tPush(); M.meas = M.meas.filter(x => x.id !== +c.dataset.mdel); adjust(); renderTape(); });
@@ -6317,7 +6317,7 @@ function pdfKit() {
   PDFK = { L: window.PDFLib, font: window.opentype.parse(u8.buffer) }; return PDFK;
 }
 const PDFSZ = { s: { m: 1, t: 'Как на экране' }, m: { m: 1.6, t: 'Крупнее' }, l: { m: 2.5, t: 'Крупно' } };
-function pdfSz() { try { return localStorage.getItem('rul_pdfsz') || 's'; } catch (e) { return 's'; } }
+function pdfSz() { const v = S.sheetOpt && S.sheetOpt.pdfSz; if (v && PDFSZ[v]) return v; try { return localStorage.getItem('rul_pdfsz') || 's'; } catch (e) { return 's'; } } // размер подписей хранится и в проекте — PDF на другом устройстве выйдет таким же
 async function exportOverlayPdf(opt = {}) {
   const isPdf = !!(U.src && U.src.kind === 'pdf'); if (isPdf) await ensurePdf();
   const work = isPdf ? pagesWithWork().filter(n => pgHas(n) || (n === U.srcPage && mHas(M))) : [U.srcPage || 1]; const curPg = U.srcPage || 1;
@@ -6591,7 +6591,7 @@ function tapePlan() {
       extra.push({ a: st, b: tp, w: 0.2 }); const a = Math.atan2(dy, dx), h = 0.18; extra.push({ a: tp, b: [tp[0] - h * Math.cos(a - 0.35), tp[1] - h * Math.sin(a - 0.35)], w: 0.2 }, { a: tp, b: [tp[0] - h * Math.cos(a + 0.35), tp[1] - h * Math.sin(a + 0.35)], w: 0.2 }); } }
   return { gid: 'tape', XY: new Float32Array(0), stations: [], segs, openings, walls, rooms, dims: [], texts, extra };
 }
-function tapeProject() { return { M: JSON.parse(JSON.stringify(M)), U: U.img ? { s: U.s, rot: U.rot, tx: U.tx, ty: U.ty, alpha: U.alpha, name: U.name, ptPerPx: U.ptPerPx || null, srcPage: U.srcPage || 1, pw: U.pw || null, ph: U.ph || null, srcKind: U.src ? U.src.kind : null, data: imgToData() } : null, pages: (savePage(), PGS.data) }; }
+function tapeProject() { return { zl: (T.zoomAll || []).slice(-80), M: JSON.parse(JSON.stringify(M)), U: U.img ? { s: U.s, rot: U.rot, tx: U.tx, ty: U.ty, alpha: U.alpha, name: U.name, ptPerPx: U.ptPerPx || null, srcPage: U.srcPage || 1, pw: U.pw || null, ph: U.ph || null, srcKind: U.src ? U.src.kind : null, data: imgToData() } : null, pages: (savePage(), PGS.data) }; }
 function imgToData() { if (U._dataFor === U.img && U._data) return U._data; const r = imgToData0(); if (r) { U._dataFor = U.img; U._data = r; } return r; }
 function imgToData0() { try { const c = document.createElement('canvas'); const k = Math.min(1, 4000 / Math.max(U.img.width, U.img.height)); c.width = U.img.width * k; c.height = U.img.height * k; c.getContext('2d').drawImage(U.img, 0, 0, c.width, c.height); U._k = k; return { url: c.toDataURL('image/jpeg', 0.9), k }; } catch (e) { return null; } }
 // после открытия проекта: вместо сжатой копии (3000 px JPEG) — исходник в полном качестве
@@ -6615,7 +6615,7 @@ async function upgradeUnderlay() {
 }
 async function tapeRestore(j) {
   if (!j) return;
-  AS.epoch = (AS.epoch || 0) + 1; Object.assign(M, { cond: false, snap90: true, ortho: true, scaleFit: false, scaleAsked: false, axis: null, zoomLog: [], gpsHidden: [] }, j.M); M.objs = M.objs || []; M.notes = M.notes || []; M.marks = M.marks || []; markObjEdges(); T.undo = []; T.redo = []; T.pending = null; T.chain = null; T.sel = null; T.selSet = null; PGS.data = j.pages || {};
+  AS.epoch = (AS.epoch || 0) + 1; T.zoomAll = Array.isArray(j.zl) ? j.zl.slice() : []; Object.assign(M, { cond: false, snap90: true, ortho: true, scaleFit: false, scaleAsked: false, axis: null, zoomLog: [], gpsHidden: [] }, j.M); M.objs = M.objs || []; M.notes = M.notes || []; M.marks = M.marks || []; markObjEdges(); T.undo = []; T.redo = []; T.pending = null; T.chain = null; T.sel = null; T.selSet = null; PGS.data = j.pages || {};
   if (j.U && j.U.data) { const img = new Image(); img.src = j.U.data.url; await img.decode(); const bmp = await createImageBitmap(img); Object.assign(U, j.U); U.img = bmp; U.s = j.U.s / j.U.data.k; if (j.U.data.ref) { U._imgKey = j.U.data.ref; U._imgKeyFor = bmp; U._imgSaved = true; U._data = { url: j.U.data.url, k: 1 }; U._dataFor = bmp; } U.ptPerPx = j.U.ptPerPx ? j.U.ptPerPx / j.U.data.k : null; U.src = j.U.srcObj || null; U._srcKey = j.U.srcRef || null; delete U.srcObj; U.pdf = null; U.pdfPage = null; U.pages = 0; U.pw = bmp.width; U.ph = bmp.height; hqReset();
     if (j.U.srcB64 && !U.src) { const b = atob(j.U.srcB64), u8 = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u8[i] = b.charCodeAt(i); U.src = { kind: j.U.srcKind || 'pdf', bytes: u8 }; U._srcKey = null; } delete U.srcB64;
     U.page = U.srcPage || 1; if (!/[?&]safe=1/.test(location.search)) upgradeUnderlay(); }
