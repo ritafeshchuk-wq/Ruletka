@@ -285,7 +285,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 6.2 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 6.3 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -4238,8 +4238,8 @@ async function applyProject(j) {
 const AS = { db: null, last: '', savedAt: 0, fileAt: 0, busy: false, off: false, snapAt: 0, sid: Date.now(), dirty: false, pid: null, pname: '' };
 const SNAP_EVERY = 120000, SNAP_KEEP = 40; // копия каждые 2 минуты, хранится 40 последних (~1,5 часа работы) + последнее состояние каждого сеанса
 function asDB() { return new Promise(res => { try { const r = indexedDB.open('scan2plan', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => res(r.result); r.onerror = () => res(null); r.onblocked = () => res(null); } catch (e) { res(null); } }); }
-async function asTx(mode, fn) { try { const db = AS.db || (AS.db = await asDB()); if (!db) return null; return await new Promise(res => { let done = false; const fin = v => { if (!done) { done = true; clearTimeout(tm); res(v); } }; const tm = setTimeout(() => { AS.db = null; try { db.close(); } catch (e) { } fin(null); }, 25000); const tx = db.transaction('kv', mode), st = tx.objectStore('kv'); let out = null; const r = fn(st); if (r) r.onsuccess = () => { out = r.result; }; tx.oncomplete = () => fin(out === null ? true : out); tx.onerror = tx.onabort = () => fin(null); }); } catch (e) { AS.db = null; return null; } }
-const asGetK = k => asTx('readonly', st => st.get(k));
+async function asTx(mode, fn, wait = 25000) { try { const db = AS.db || (AS.db = await asDB()); if (!db) return null; return await new Promise(res => { let done = false; const fin = v => { if (!done) { done = true; clearTimeout(tm); res(v); } }; const tm = setTimeout(() => { AS.db = null; try { db.close(); } catch (e) { } fin(null); }, wait); const tx = db.transaction('kv', mode), st = tx.objectStore('kv'); let out = null; const r = fn(st); if (r) r.onsuccess = () => { out = r.result; }; tx.oncomplete = () => fin(out === null ? true : out); tx.onerror = tx.onabort = () => fin(null); }); } catch (e) { AS.db = null; return null; } }
+const asGetK = (k, wait) => asTx('readonly', st => st.get(k), wait);
 const asPutK = (k, v) => asTx('readwrite', st => st.put(v, k));
 const asDelK = k => asTx('readwrite', st => st.delete(k));
 const asGet = () => asGetK('last');
@@ -4281,7 +4281,8 @@ const pgMsig = o => JSON.stringify(Object.keys(o || {}).sort((x, y) => x - y).ma
 function quickSave(bg) { // аварийная копия при закрытии/сворачивании: все листы + положение подложки; в IndexedDB (большие проекты) и, если влезет, в localStorage
   try { if (AS.hold || AS.restoring || AS.restoreFailed || !AS.pid || !AS.dirty) return; savePage();
     const q = { v: 2, when: Date.now(), pid: AS.pid, page: U.srcPage || 1, M, pages: PGS.data, U: U.img ? { sn: U.s / (U.ptPerPx || 1), rot: U.rot, tx: U.tx, ty: U.ty, alpha: U.alpha } : null };
-    const txt = JSON.stringify(q); asPutK('quick:' + AS.pid, txt); if (bg) return;
+    const txt = JSON.stringify(q), sig = txt.length + ':' + (txt.length > 400 ? txt.slice(-400) : txt); if (bg && (sig === AS.qsSig || Date.now() - (AS.qsAt || 0) < 30000)) { if (sig !== AS.qsSig && !AS.qsT) AS.qsT = setTimeout(() => { AS.qsT = 0; if (AS.dirty) quickSave(true); }, 30000); return; }
+    AS.qsSig = sig; AS.qsAt = Date.now(); asPutK('quick:' + AS.pid, txt); if (bg) return;
     try { localStorage.setItem('ruletka_quick', txt); } catch (e) { try { localStorage.setItem('ruletka_quick', JSON.stringify({ ...q, pages: null, big: true })); } catch (e2) { } } } catch (e) { } }
 // сохранения идут строго по очереди: вызов во время записи не теряется, а ставится следом (с самым свежим состоянием)
 let AS_Q = Promise.resolve();
@@ -4350,7 +4351,7 @@ function curSig() { try {
   return JSON.stringify([pg, U.name || '', U.src ? U.src.kind : '', !!U.img], SIGR);
 } catch (e) { return 'err' + Math.random(); } }
 function checkDirty() { clearTimeout(asTimer); asTimer = 0; if (!AS.pid || AS.restoring) return; const d = curSig() !== AS.savedSig; if (d && !AS.dirty) AS.dirtySince = Date.now(); AS.dirty = d; showAS();
-  if (d && !AS.qsT) AS.qsT = setTimeout(() => { AS.qsT = 0; if (AS.dirty) quickSave(true); }, 2000); }
+  if (d && !AS.qsT) AS.qsT = setTimeout(() => { AS.qsT = 0; if (AS.dirty) quickSave(true); }, 5000); }
 function markSaved() { AS.savedSig = curSig(); AS.dirty = false; AS.dirtySince = 0; showAS(); }
 function asSoon() { AS.gen = (AS.gen || 0) + 1; if (!asTimer) asTimer = setTimeout(() => { asTimer = 0; checkDirty(); }, 400); }
 // при закрытии с несохранёнными изменениями — только аварийная копия (в проект она не пишется; при открытии программа спросит)
@@ -4370,7 +4371,7 @@ async function asGC() { // только при запуске; при любой
   } catch (e) { }
 }
 async function restoreFrom(r, label, asSaved) {
-  AS.restoring = true; busy('Восстанавливаю…');
+  AS.restoring = true; busy(AS.opening ? 'Открываю: подложка и листы…' : 'Восстанавливаю…');
   let ok = false;
   try { const j = await unpackProj(r.proj); await applyProject(j); AS.last = ''; AS.savedAt = r.when; ok = true; AS.restoreFailed = false; stat(`Работа восстановлена (${label || tfmt(r.when)}). Можно продолжать.`); }
   catch (err) { console.error(err); AS.restoreFailed = true; uiAlert('Не удалось открыть: ' + err.message + '\n\nСохранённые данные НЕ тронуты и не перезаписаны. Попробуйте «Копии» — более раннюю копию, или откройте файл проекта. Сделайте снимок экрана с этим сообщением.'); }
@@ -4481,13 +4482,23 @@ async function keepQuickOld(q) { // аварийную копию, от кото
     if (idx.some(x => x.key === key)) return; if (!(await asPutK(key, JSON.stringify(q)))) return; idx.push({ key, pid: q.pid, when: q.when });
     while (idx.filter(x => x.pid === q.pid).length > 10) { const k = idx.findIndex(x => x.pid === q.pid); await asDelK(idx[k].key); idx.splice(k, 1); }
     await asPutK('quickolds', idx); } catch (e) { } }
+function openSlow() { // открытие идёт дольше 15 с — показать, что происходит, и выход
+  if (!AS.opening || document.getElementById('slowBar')) return; const b = document.createElement('div'); b.id = 'slowBar';
+  b.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:999;background:#1B2430;color:#fff;padding:12px 16px;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.3);font:15px Golos Text,sans-serif;max-width:min(560px,calc(100% - 24px));display:flex;flex-direction:column;gap:8px';
+  b.innerHTML = `<div>Проект открывается долго (${busyEl.textContent || 'жду память iPad'}). Большие проекты на iPad открываются до минуты — подождите ещё.</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button id="slowSafe" style="background:#E3A21A;border:0;border-radius:9px;padding:8px 12px;font-weight:700">Перезапустить и открыть безопасно</button><button id="slowX" style="background:#2c3643;color:#fff;border:0;border-radius:9px;padding:8px 12px">Ждать</button></div>`;
+  document.body.appendChild(b); b.querySelector('#slowX').onclick = () => b.remove();
+  b.querySelector('#slowSafe').onclick = () => { try { localStorage.setItem('rul_openAfter', AS.openingId || AS.pid || ''); } catch (e) { } location.replace(location.pathname + '?safe=1&v=' + Date.now()); }; }
 async function projOpen(id) {
   if (!(await leaveProject())) return; await projIndex(); const p = PJ.list.find(x => x.id === id); if (!p) return;
-  let q = null; try { q = JSON.parse(localStorage.getItem('ruletka_quick') || 'null'); } catch (e) { }
-  try { const qi = await asGetK('quick:' + id); if (typeof qi === 'string') { const qj = JSON.parse(qi); if (!q || q.pid !== id || q.big || (qj.when || 0) >= (q.when || 0)) q = qj; } } catch (e) { }
+  const safe = /[?&]safe=1/.test(location.search); AS.opening = Date.now(); AS.openingId = id; const wd = setTimeout(openSlow, 15000);
+  let q = null; if (!safe) { busy('Открываю «' + p.name + '»: проверяю несохранённое…'); try { q = JSON.parse(localStorage.getItem('ruletka_quick') || 'null'); } catch (e) { }
+  try { const qi = await asGetK('quick:' + id, 8000); if (typeof qi === 'string') { const qj = JSON.parse(qi); if (!q || q.pid !== id || q.big || (qj.when || 0) >= (q.when || 0)) q = qj; } } catch (e) { } }
+  busy('Открываю «' + p.name + '»: читаю проект из памяти iPad…');
   const txt = await asGetK('proj:' + id); resetWork(); AS.restoreFailed = false; AS.pid = id; AS.pname = p.name; AS.sid = Date.now(); AS.snapAt = 0; showProjName();
   let ok = true;
   if (txt && txt !== true) ok = await restoreFrom({ when: p.updated, proj: txt }, p.name, true); else { T.fitted = true; setMode('tape'); fitTape(); draw(); renderTape(); markSaved(); }
+  clearTimeout(wd); AS.opening = 0; const sl = document.getElementById('slowBar'); if (sl) sl.remove(); busy('');
+  if (safe) { stat('Безопасное открытие: аварийная копия не проверялась. Если всё на месте — работайте как обычно.'); q = null; }
   { // аварийная копия новее сохранённого — программа закрылась без «Сохранить»
     if (ok && q && q.v === 2 && q.pid === id && q.M && q.when > (p.updated || 0) && (U.img ? (savePage(), pgMsig(q.pages) !== pgMsig(PGS.data)) : msig(q.M) !== msig(M))
       && await uiDialog({ title: 'Вернуть несохранённые изменения?', text: `Программа закрылась ${tfmt(q.when)}, а последние изменения не были сохранены. Вернуть их (все листы)? В проект они попадут, только когда нажмёте «Сохранить проект».`, ok: 'Вернуть', cancel: 'Нет, открыть сохранённое' })) {
@@ -4554,7 +4565,8 @@ setTimeout(checkUpdate, 4000); setInterval(checkUpdate, 30 * 60000);
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) { }
   AS.db = await asDB();
   await projIndex();
-  asGC();
+  { let oa = null; try { oa = localStorage.getItem('rul_openAfter'); localStorage.removeItem('rul_openAfter'); } catch (e) { } if (oa && /[?&]safe=1/.test(location.search) && PJ.list.some(x => x.id === oa)) setTimeout(() => projOpen(oa), 300); }
+  setTimeout(() => { let t = 0; try { t = +localStorage.getItem('rul_gcAt') || 0; } catch (e) { } if (Date.now() - t < 86400000 || AS.opening || AS.restoring) return; try { localStorage.setItem('rul_gcAt', Date.now()); } catch (e) { } asGC(); }, 90000);
   // перенос работы из прежних версий (без проектов) в проект
   const r = await asGet();
   if (r && r.proj && !r.pid && !PJ.list.length) { const id = 'p' + (r.when || Date.now()); PJ.list.push({ id, name: 'Обмер ' + tfmt(r.when), created: r.when, updated: r.when, summary: r.summary || '' }); await asPutK('proj:' + id, r.proj); await asPutK('projects', PJ.list); await asPutK('last', { ...r, pid: id }); }
@@ -6560,7 +6572,7 @@ async function tapeRestore(j) {
   AS.epoch = (AS.epoch || 0) + 1; Object.assign(M, { cond: false, snap90: true, ortho: true, scaleFit: false, scaleAsked: false, axis: null, zoomLog: [], gpsHidden: [] }, j.M); M.objs = M.objs || []; M.notes = M.notes || []; M.marks = M.marks || []; markObjEdges(); T.undo = []; T.redo = []; T.pending = null; T.chain = null; T.sel = null; T.selSet = null; PGS.data = j.pages || {};
   if (j.U && j.U.data) { const img = new Image(); img.src = j.U.data.url; await img.decode(); const bmp = await createImageBitmap(img); Object.assign(U, j.U); U.img = bmp; U.s = j.U.s / j.U.data.k; if (j.U.data.ref) { U._imgKey = j.U.data.ref; U._imgKeyFor = bmp; U._imgSaved = true; U._data = { url: j.U.data.url, k: 1 }; U._dataFor = bmp; } U.ptPerPx = j.U.ptPerPx ? j.U.ptPerPx / j.U.data.k : null; U.src = j.U.srcObj || null; U._srcKey = j.U.srcRef || null; delete U.srcObj; U.pdf = null; U.pdfPage = null; U.pages = 0; U.pw = bmp.width; U.ph = bmp.height; hqReset();
     if (j.U.srcB64 && !U.src) { const b = atob(j.U.srcB64), u8 = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u8[i] = b.charCodeAt(i); U.src = { kind: j.U.srcKind || 'pdf', bytes: u8 }; U._srcKey = null; } delete U.srcB64;
-    U.page = U.srcPage || 1; upgradeUnderlay(); }
+    U.page = U.srcPage || 1; if (!/[?&]safe=1/.test(location.search)) upgradeUnderlay(); }
   else if (!j.U) Object.assign(U, { img: null, pdf: null, pages: 0, page: 1, name: '', src: null, ptPerPx: null, srcPage: 1, _imgKey: null, _imgKeyFor: null, _imgSaved: false, _srcKey: null, _data: null, _dataFor: null, mip: null, mipSrc: null, pdfPage: null, pw: null, ph: null, titles: null, s: 0.01, rot: 0, tx: 0, ty: 0 });
   adjust();
 }
