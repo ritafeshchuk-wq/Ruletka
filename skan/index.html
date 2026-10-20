@@ -55,9 +55,9 @@ canvas.band{width:100%;height:32px;display:block;border-radius:6px;touch-action:
   <div class="grp ctx" data-for="grid"><button id="bAdd" class="pri">＋ Сканы</button></div>
   <div class="grp ctx" data-for="grid"><button data-tool="line" title="Метка-линия вдоль стены, края проёма">／ Линия</button><button data-tool="point" title="Метка-точка: угол, колонна">• Точка</button><button data-tool="erase" title="Удалить метку касанием">⌫ Метка</button></div>
   <div class="grp ctx" data-for="asm"><button id="bAuto" class="pri" title="Сшить с нуля: программа сама найдёт общие места">🤖 Автосшивка</button><button id="bRefine" title="Точно подогнать от нынешнего положения — после автосшивки и ручной правки">🎯 Уточнить</button><button id="bStitch" title="Сшить по вашим меткам (буквам)">🧩 По меткам</button></div>
-  <div class="grp ctx" data-for="asm"><button data-tool="corner" title="Общий угол, видный на нескольких сканах">⌖ Общий угол</button></div>
+  <div class="grp ctx" data-for="asm"><button id="bSph" title="Найти шары на сканах: они держат длинные однотипные объекты (тоннель, коллектор)">⚪ Шары</button><button data-tool="corner" title="Общий угол, видный на нескольких сканах">⌖ Общий угол</button></div>
   <div class="grp ctx" data-for="grid asm"><button data-tool="brush" title="Стереть мебель, людей, двери">🧹 Стереть</button><button data-tool="keep" title="Отметить нужное: стены, колонны">✏ Нужное</button></div>
-  <div class="grp ctx" data-for="plan"><button data-tool="line" title="Нарисовать стену">／ Стена</button><button data-tool="erase" title="Удалить стену или проём касанием">⌫ Удалить</button></div>
+  <div class="grp ctx" data-for="plan"><button data-tool="wfit" title="Коснитесь стены в срезе — программа впишет прямую по точкам и сама замкнёт угол с соседней">⌇ Стена по точкам</button><button data-tool="line" title="Нарисовать стену вручную">／ Стена</button><button data-tool="erase" title="Удалить стену или проём касанием">⌫ Удалить</button></div>
   <span id="colsBox" class="grp ctx" data-for="grid"><button data-cols="1">1</button><button data-cols="2">2</button><button data-cols="3">3</button><button data-cols="4">4</button><button id="bTW" title="Повернуть рамки как в сборке">↻</button></span>
   <span class="fill"></span><button id="bFit" title="Показать всё">⤢</button><button id="bHelp" title="Справка">?</button>
 </div>
@@ -66,7 +66,7 @@ canvas.band{width:100%;height:32px;display:block;border-radius:6px;touch-action:
 <div id="main"></div>
 <div id="rotbar" title="Повернуть выбранный скан"><button id="bMulti" title="Выбрать несколько сканов: касание — добавить/убрать, рамка по пустому месту — выбрать все внутри">⬚ Несколько</button><button id="bR1">⟲ 1°</button><button id="bR01">⟲ 0,1°</button><button id="bRm01">⟳ 0,1°</button><button id="bRm1">⟳ 1°</button><button id="bR90">⟲ 90°</button></div>
 <div id="ubar"><button id="fUndo" disabled>↶ Отменить шаг</button><button id="fRedo" disabled>↷ Вернуть</button><button id="fDel">🗑 Удалить выбранное</button></div>
-<div id="foot"><span id="status"></span><span id="saved"></span><span id="ver">Скан 3.0 · © d1sco, 2026</span></div>
+<div id="foot"><span id="status"></span><span id="saved"></span><span id="ver">Скан 3.1 · © d1sco, 2026</span></div>
 <div id="busy" hidden><span>…</span></div>
 <input type="file" id="fileIn" multiple accept=".e57" hidden><input type="file" id="projIn" hidden>
 <div id="help" hidden><div class="lh"><h3>Как работать</h3><button id="helpX">✕</button></div>
@@ -82,11 +82,11 @@ canvas.band{width:100%;height:32px;display:block;border-radius:6px;touch-action:
 <ul><li><b>🤖 Автосшивка</b> — с нуля: программа сама найдёт общие места, проверит и уравняет. Слева «💡 Где помочь» — какие стыки посмотреть.</li>
 <li>Поправить руками: тянуть скан — сдвиг, кружок ↻ / два пальца / правая кнопка — поворот, кнопки внизу справа — 0,1° / 1° / 90°, стрелки — 1 см (Shift — 10 см).</li>
 <li><b>🎯 Уточнить</b> — после ручной правки: точно подгоняет стыки от того, как сканы стоят сейчас (до ~30 см). Можно жать сколько угодно.</li>
-<li><b>🧩 По меткам</b> — сшить по вашим буквам, невязка каждой в мм (больше 10 мм — красным). <b>⌖ Общий угол</b> — коснуться угла, видного на нескольких сканах.</li>
+<li><b>Красная стрелка «скользит»</b> на стыке — у пары только параллельные стены (тоннель, коридор): поперёк стык точный, а вдоль ему не за что зацепиться. Нужен шар или поперечная плоскость (торец, ниша, колонна — линией-меткой на обоих сканах).</li><li><b>⚪ Шары</b> — программа находит шары заданного диаметра (FARO 139/145 мм), вписывает сферу (видно, по скольким точкам и с какой точностью) и даёт один и тот же шар на разных сканах одной буквой Ш1, Ш2… Потом «🎯 Уточнить»: стены держат поперёк, шары — вдоль. Шаров на стык нужно хотя бы 1–2, лучше 3 не на одной линии.</li><li><b>🧩 По меткам</b> — сшить по вашим буквам, невязка каждой в мм (больше 10 мм — красным). <b>⌖ Общий угол</b> — коснуться угла, видного на нескольких сканах.</li>
 <li><b>Несколько сканов:</b> мышью — как в AutoCAD: щелчок добавляет, Shift + щелчок убирает, рамка слева направо — целиком внутри, справа налево — всё задетое. На планшете — «⬚ Несколько» внизу справа. Esc — снять выбор.</li>
 <li><b>⚓</b> в списке — опорный скан, стоит на месте.</li></ul>
 <h4>3 План — стены и проёмы</h4>
-<ul><li>Справа «🔎 Найти стены», правка стены касанием, «⌐ Замкнуть углы», «⊾ К осям», «⬇ DXF». Вверху <b>／ Стена</b> — нарисовать, <b>⌫ Удалить</b>.</li></ul>
+<ul><li><b>Фон — тонкий срез</b> точек всех сканов на одной высоте (по умолчанию 1,2 м от пола, 6 см) — высота и толщина в карточке справа. В срезе сразу видно, сошлись ли стены разных сканов в одну линию.</li><li><b>⌇ Стена по точкам</b> — коснитесь стены в срезе: программа впишет прямую по точкам (сколько точек и разброс в мм — внизу), продлит вдоль стены и замкнёт угол с соседней. Так план собирается стена за стеной: решаете вы, точность — от точек.</li><li>Справа «🔎 Найти стены», правка стены касанием, «⌐ Замкнуть углы», «⊾ К осям», «⬇ DXF». Вверху <b>／ Стена</b> — нарисовать, <b>⌫ Удалить</b>.</li></ul>
 <h4>Всегда</h4>
 <ul><li>Внизу «↶ Отменить шаг / ↷ Вернуть». Колесо — масштаб, зажатое колесо — сдвиг вида, ⤢ — показать всё.</li></ul>
 </div>
@@ -531,7 +531,7 @@ const REG3D = (() => {
     // uncertainty: covariance ~ rms^2 * (J'J)^-1, worst horizontal direction (every 2nd point used -> x2)
     let unc = 0;
     if (lastM) { const cov = [1, 2].map(k => solve4(lastM, [0, 1, 2, 3].map(u => u === k ? 1 : 0))); if (cov[0] && cov[1]) { const sxx = cov[0][1], syy = cov[1][2], sxy = cov[0][2]; const lam = (sxx + syy) / 2 + Math.sqrt(((sxx - syy) / 2) ** 2 + sxy * sxy); unc = rms * Math.sqrt(Math.max(0, lam) * 2) ; } }
-    return { a, tx, ty, tz, rms, cnt, unc };
+    return { a, tx, ty, tz, rms, cnt, unc, M: lastM ? Array.from(lastM) : null };
   }
   function solve4(M, g) {
     const A = [0, 1, 2, 3].map(i => [M[i * 4], M[i * 4 + 1], M[i * 4 + 2], M[i * 4 + 3], g[i]]);
@@ -672,6 +672,7 @@ const REG3D = (() => {
 self.onmessage = e => {
   if (e.data.cmd === 'auto') return autoJob(e.data);
   if (e.data.cmd === 'refine') return refineJob(e.data);
+  if (e.data.cmd === 'spheres') return sphereJob(e.data);
   const { job, name, buf, voxel } = e.data;
   try {
     const list = E57.readE57(buf, { voxel: voxel || 0.02, maxRange: 30, onProgress: p => self.postMessage({ job, prog: p }) });
@@ -691,8 +692,12 @@ self.onmessage = e => {
 };
 
 // автосшивка: объёмные признаки (углы, коробки, мебель) + проверка видимостью + уравнивание сети
-// уточнение от нынешнего положения: точная подгонка (ICP) каждой пары соседей + уравнивание сети; далеко сдвинуть не может — только довести
-function refineJob({ job, scans, poses, pairs, fixed }) {
+// уточнение от нынешнего положения: точная подгонка (ICP) каждой пары соседей + уравнивание сети.
+// Каждый стык держит только те направления, где у пары есть плоскости (стены, пол, торцы): в тоннеле вдоль оси стык «скользит» —
+// поэтому стык взвешивается по своей матрице (что держит, а что нет), а шары (общие точки) держат то, что не держат стены.
+function chol4(A) { const L = new Float64Array(16); for (let i = 0; i < 4; i++) for (let j = 0; j <= i; j++) { let sm = A[i * 4 + j]; for (let k = 0; k < j; k++) sm -= L[i * 4 + k] * L[j * 4 + k]; if (i === j) { if (sm <= 0) return null; L[i * 4 + i] = Math.sqrt(sm); } else L[i * 4 + j] = sm / L[j * 4 + j]; } return L; }
+function eig2(a, b, c) { const t = (a + c) / 2, d = Math.sqrt(((a - c) / 2) ** 2 + b * b), l1 = t + d, l2 = t - d; const v = Math.abs(b) > 1e-12 ? [l2 - c, b] : (a <= c ? [1, 0] : [0, 1]); const n = Math.hypot(v[0], v[1]) || 1; return { lmax: l1, lmin: l2, vmin: [v[0] / n, v[1] / n] }; }
+function refineJob({ job, scans, poses, pairs, fixed, spheres }) {
   try {
     const D = []; scans.forEach((s, k) => { self.postMessage({ job, prog: 0.3 * k / scans.length, stage: 'Готовлю ' + s.name }); D.push(REG3D.prep(s.pts, s.floor, s.ceil)); });
     const E = [], bad = []; let k = 0;
@@ -703,15 +708,93 @@ function refineJob({ job, scans, poses, pairs, fixed }) {
       const da = Math.abs(Math.atan2(Math.sin(r.a - init.a), Math.cos(r.a - init.a))), dt = Math.hypot(r.tx - init.tx, r.ty - init.ty);
       if (dt > 0.5 || da > 5 * Math.PI / 180) { bad.push([i, j, 'далеко']); continue; }
       const e = REG3D.evidence(D[i], D[j], r); if (!REG3D.good(e) && !(e.ratio >= 0.6 && e.ag >= 1200)) { bad.push([i, j, 'не сходится']); continue; }
-      E.push({ i, j, a: r.a, tx: r.tx, ty: r.ty, tz: r.tz, w: Math.min(3, e.ag / 5000), rms: r.rms, ratio: e.ratio });
+      // информация стыка: J'J / σ² (точки соседние — не независимы, поэтому с запасом ×0.05)
+      const sg = Math.max(r.rms, 0.003), I = new Float64Array(16); if (r.M) for (let u = 0; u < 16; u++) I[u] = r.M[u] / (sg * sg) * 0.05;
+      const ev = eig2(I[5], I[6], I[10]), weak = ev.lmax > 0 && ev.lmin / ev.lmax < 0.02; // по одному направлению в плане стык почти не держится
+      const ang = Math.atan2(ev.vmin[1], ev.vmin[0]) + P.a; // направление «скольжения» в общих координатах
+      E.push({ i, j, a: r.a, tx: r.tx, ty: r.ty, tz: r.tz, w: Math.min(3, e.ag / 5000), rms: r.rms, ratio: e.ratio, L: weak ? null : chol4(I), weak, vs: ev.vmin, slipAng: ang, sdSlip: ev.lmin > 0 ? 1 / Math.sqrt(ev.lmin) : 9 });
     }
     self.postMessage({ job, prog: 0.95, stage: 'Уравниваю' });
-    const n = scans.length, par = [...Array(n).keys()], f = x => par[x] === x ? x : (par[x] = f(par[x])); for (const e of E) par[f(e.i)] = f(e.j);
-    const out = poses.map(p => ({ ...p })), comps = new Map(); for (let i = 0; i < n; i++) { const c = f(i); if (!comps.has(c)) comps.set(c, []); comps.get(c).push(i); }
-    for (const mem of comps.values()) { if (mem.length < 2) continue; const root = mem.includes(fixed) ? fixed : mem[0], es = E.filter(e => mem.includes(e.i));
-      const init = new Map(mem.map(i => [i, { ...poses[i] }])), R = REG3D.optimize(mem, es, root, init); for (const [i, v] of R) out[i] = v; }
-    self.postMessage({ job, done: true, res: { poses: out, edges: E, bad } });
+    // связность: стыки + общие шары
+    const n = scans.length, par = [...Array(n).keys()], f = x => par[x] === x ? x : (par[x] = f(par[x])), uni = (a, b) => { par[f(a)] = f(b); };
+    for (const e of E) uni(e.i, e.j);
+    const SPH = []; for (const g of (spheres || [])) { if (g.obs.length < 2) continue; SPH.push(g); for (let t = 1; t < g.obs.length; t++) uni(g.obs[0].k, g.obs[t].k); }
+    const out = poses.map(q => ({ ...q })), comps = new Map(); for (let i = 0; i < n; i++) { const c = f(i); if (!comps.has(c)) comps.set(c, []); comps.get(c).push(i); }
+    const wrap = a => Math.atan2(Math.sin(a), Math.cos(a)), wS = 1 / 0.002;
+    for (const mem of comps.values()) { if (mem.length < 2) continue; const root = mem.includes(fixed) ? fixed : mem[0], free = mem.filter(x => x !== root), ix = new Map(free.map((x, t) => [x, t])), m = free.length * 4;
+      const X = new Float64Array(m); for (const x of free) { const pp = poses[x], o = ix.get(x) * 4; X[o] = pp.a; X[o + 1] = pp.tx; X[o + 2] = pp.ty; X[o + 3] = pp.tz; }
+      const get = (Xv, x) => x === root ? poses[root] : { a: Xv[ix.get(x) * 4], tx: Xv[ix.get(x) * 4 + 1], ty: Xv[ix.get(x) * 4 + 2], tz: Xv[ix.get(x) * 4 + 3] };
+      const es = E.filter(e => mem.includes(e.i)), ss = SPH.filter(g => mem.includes(g.obs[0].k));
+      const res = Xv => { const r = [];
+        for (const e of es) { const q = REG3D.rel(get(Xv, e.i), get(Xv, e.j)), d = [wrap(q[0] - e.a), q[1] - e.tx, q[2] - e.ty, q[3] - e.tz];
+          if (e.L) for (let u = 0; u < 4; u++) { let sm = 0; for (let v = u; v < 4; v++) sm += e.L[v * 4 + u] * d[v]; r.push(sm); } // Lᵀ·d — стык держит только то, что держат его плоскости
+          else if (e.weak) { const nx = -e.vs[1], ny = e.vs[0]; r.push(d[0] / 0.0005, (d[1] * nx + d[2] * ny) / 0.003, d[3] / 0.003); } // тоннель: держит поворот, поперёк и высоту; вдоль — нет
+          else r.push(d[0] / 0.0005, d[1] / 0.003, d[2] / 0.003, d[3] / 0.003); }
+        for (const x of free) { const pp = get(Xv, x), p0 = poses[x]; r.push(wrap(pp.a - p0.a) / 0.05, (pp.tx - p0.tx) / 0.3, (pp.ty - p0.ty) / 0.3, (pp.tz - p0.tz) / 0.3); } // мягко держится за своё нынешнее место
+        for (const g of ss) { const W = g.obs.map(o => { const pp = get(Xv, o.k), c = Math.cos(pp.a), sn = Math.sin(pp.a); return [c * o.x - sn * o.y + pp.tx, sn * o.x + c * o.y + pp.ty, o.z + pp.tz]; });
+          for (let t = 1; t < W.length; t++) r.push((W[t][0] - W[0][0]) * wS, (W[t][1] - W[0][1]) * wS, (W[t][2] - W[0][2]) * wS); }
+        return r; };
+      for (let it = 0; it < 12; it++) {
+        const r0 = res(X), nr = r0.length, J = new Float64Array(nr * m), h = 1e-6;
+        for (let kk = 0; kk < m; kk++) { const o = X[kk]; X[kk] = o + h; const r1 = res(X); X[kk] = o; for (let qq = 0; qq < nr; qq++) J[qq * m + kk] = (r1[qq] - r0[qq]) / h; }
+        const A = new Float64Array(m * m), g = new Float64Array(m);
+        for (let qq = 0; qq < nr; qq++) for (let u = 0; u < m; u++) { const ju = J[qq * m + u]; if (!ju) continue; g[u] -= ju * r0[qq]; for (let v = 0; v < m; v++) A[u * m + v] += ju * J[qq * m + v]; }
+        for (let u = 0; u < m; u++) A[u * m + u] += 1e-6 + A[u * m + u] * 1e-6;
+        const dx = gaussW(A, g, m); if (!dx) break; let mx = 0; for (let kk = 0; kk < m; kk++) { X[kk] += dx[kk]; mx = Math.max(mx, Math.abs(dx[kk])); } if (mx < 1e-7) break; }
+      for (const x of free) out[x] = get(X, x); }
+    // невязки шаров после уравнивания
+    const sres = SPH.map(g => { const W = g.obs.map(o => { const pp = out[o.k], c = Math.cos(pp.a), sn = Math.sin(pp.a); return [c * o.x - sn * o.y + pp.tx, sn * o.x + c * o.y + pp.ty, o.z + pp.tz]; }); const M = [0, 1, 2].map(a => W.reduce((sm, w) => sm + w[a], 0) / W.length); return { lab: g.lab, max: Math.max(...W.map(w => Math.hypot(w[0] - M[0], w[1] - M[1], w[2] - M[2]))) }; });
+    self.postMessage({ job, done: true, res: { poses: out, edges: E.map(e => ({ i: e.i, j: e.j, rms: e.rms, ratio: e.ratio, weak: e.weak, slipAng: e.slipAng })), bad, sres } });
   } catch (err) { self.postMessage({ job, error: String(err && err.message || err) }); }
+}
+function gaussW(A, b, n) { const M = A.slice(), x = b.slice();
+  for (let i = 0; i < n; i++) { let p = i; for (let k = i + 1; k < n; k++) if (Math.abs(M[k * n + i]) > Math.abs(M[p * n + i])) p = k;
+    if (p !== i) { for (let j = 0; j < n; j++) { const t = M[i * n + j]; M[i * n + j] = M[p * n + j]; M[p * n + j] = t; } const t = x[i]; x[i] = x[p]; x[p] = t; }
+    const d = M[i * n + i]; if (Math.abs(d) < 1e-14) return null; for (let k = i + 1; k < n; k++) { const f = M[k * n + i] / d; if (!f) continue; for (let j = i; j < n; j++) M[k * n + j] -= f * M[i * n + j]; x[k] -= f * x[i]; } }
+  for (let i = n - 1; i >= 0; i--) { let sm = x[i]; for (let j = i + 1; j < n; j++) sm -= M[i * n + j] * x[j]; x[i] = sm / M[i * n + i]; } return x; }
+// ---------- шары: поиск сфер известного радиуса ----------
+// по каждой точке — нормаль по соседям; центр шара лежит на нормали на расстоянии R → голосование; затем точная подгонка сферы и проверки (не труба, не угол)
+function findSpheres(P, R) {
+  const C = 0.04, G = new Map(), N = P.length / 3, key = (x, y, z) => (Math.floor(x / C) + 2048) * 16777216 + (Math.floor(y / C) + 2048) * 4096 + (Math.floor(z / C) + 2048);
+  for (let i = 0; i < N; i++) { const x = P[3 * i], y = P[3 * i + 1], z = P[3 * i + 2]; if (x * x + y * y > 400) continue; const k = key(x, y, z); let a = G.get(k); if (!a) G.set(k, a = []); a.push(i); }
+  const near = (x, y, z, rad, cb) => { const r = Math.ceil(rad / C); const gx = Math.floor(x / C), gy = Math.floor(y / C), gz = Math.floor(z / C);
+    for (let dx = -r; dx <= r; dx++) for (let dy = -r; dy <= r; dy++) for (let dz = -r; dz <= r; dz++) { const a = G.get((gx + dx + 2048) * 16777216 + (gy + dy + 2048) * 4096 + (gz + dz + 2048)); if (!a) continue; for (const j of a) { const ex = P[3 * j] - x, ey = P[3 * j + 1] - y, ez = P[3 * j + 2] - z; if (ex * ex + ey * ey + ez * ez <= rad * rad) cb(j, ex, ey, ez); } } };
+  const VOTE = 0.01, votes = new Map(), vkey = (x, y, z) => Math.round(x / VOTE) * 1e8 + Math.round(y / VOTE) * 1e4 + Math.round(z / VOTE), rn = Math.min(0.05, R * 0.6);
+  for (const a of G.values()) for (const i of a) { const x = P[3 * i], y = P[3 * i + 1], z = P[3 * i + 2];
+    let n = 0, mx = 0, my = 0, mz = 0; const nb = []; near(x, y, z, rn, (j, ex, ey, ez) => { nb.push(ex, ey, ez); n++; mx += ex; my += ey; mz += ez; }); if (n < 7) continue; mx /= n; my /= n; mz /= n;
+    let a00 = 0, a01 = 0, a02 = 0, a11 = 0, a12 = 0, a22 = 0; for (let t = 0; t < nb.length; t += 3) { const u = nb[t] - mx, v = nb[t + 1] - my, w = nb[t + 2] - mz; a00 += u * u; a01 += u * v; a02 += u * w; a11 += v * v; a12 += v * w; a22 += w * w; }
+    // наименьший собственный вектор — нормаль (обратные итерации)
+    let vx = 0.3, vy = 0.5, vz = 0.8; const det = (a00 * (a11 * a22 - a12 * a12) - a01 * (a01 * a22 - a12 * a02) + a02 * (a01 * a12 - a11 * a02)); if (!(Math.abs(det) > 1e-18)) continue;
+    const inv = [(a11 * a22 - a12 * a12) / det, (a02 * a12 - a01 * a22) / det, (a01 * a12 - a02 * a11) / det, (a00 * a22 - a02 * a02) / det, (a01 * a02 - a00 * a12) / det, (a00 * a11 - a01 * a01) / det];
+    for (let it = 0; it < 8; it++) { const nx = inv[0] * vx + inv[1] * vy + inv[2] * vz, ny = inv[1] * vx + inv[3] * vy + inv[4] * vz, nz = inv[2] * vx + inv[4] * vy + inv[5] * vz, L = Math.hypot(nx, ny, nz); vx = nx / L; vy = ny / L; vz = nz / L; }
+    const tr = a00 + a11 + a22, lmin = vx * (a00 * vx + a01 * vy + a02 * vz) + vy * (a01 * vx + a11 * vy + a12 * vz) + vz * (a02 * vx + a12 * vy + a22 * vz), varn = lmin / (tr || 1);
+    if (varn < 0.004 || varn > 0.08) continue; // плоскость (стена) — не голосует; совсем «рваное» — тоже
+    if (vx * x + vy * y + vz * z > 0) { vx = -vx; vy = -vy; vz = -vz; } // нормаль — к сканеру; центр шара за поверхностью
+    const cx = x - vx * R, cy = y - vy * R, cz = z - vz * R, k = vkey(cx, cy, cz); votes.set(k, (votes.get(k) || 0) + 1); }
+  // пики голосования
+  const cells = [...votes.entries()].filter(e => e[1] >= 3).sort((a, b) => b[1] - a[1]), out = [];
+  const dec = k => { const z = ((k % 1e4) + 1e4) % 1e4; let z2 = Math.round(k - Math.round(k / 1e4) * 1e4); return null; };
+  for (const [k0, v0] of cells.slice(0, 400)) {
+    const zi = Math.round(k0 - Math.round(k0 / 1e4) * 1e4), r1 = Math.round((k0 - zi) / 1e4), yi = Math.round(r1 - Math.round(r1 / 1e4) * 1e4), xi = Math.round((r1 - yi) / 1e4);
+    let c = [xi * VOTE, yi * VOTE, zi * VOTE]; if (out.some(o => Math.hypot(o.x - c[0], o.y - c[1], o.z - c[2]) < R * 2)) continue;
+    // точная подгонка сферы радиуса R
+    let ok = false, inl = 0, rms = 0, shell = 0, inside = 0, mres = 0;
+    for (let it = 0; it < 12; it++) { const pts = []; near(c[0], c[1], c[2], R + 0.03, (j, ex, ey, ez) => pts.push(ex, ey, ez)); if (pts.length < 15) break;
+      let g0 = 0, g1 = 0, g2 = 0, H = new Float64Array(9), se = 0; inl = 0; shell = pts.length / 3; inside = 0; let sx = 0, sy = 0, sz = 0;
+      for (let t = 0; t < pts.length; t += 3) { const ex = pts[t], ey = pts[t + 1], ez = pts[t + 2], d = Math.hypot(ex, ey, ez) || 1e-9, r = d - R; if (d < R - 0.015) inside++; if (Math.abs(r) > 0.012) continue;
+        inl++; se += r * r; sx += ex / d; sy += ey / d; sz += ez / d; const J = [-ex / d, -ey / d, -ez / d]; for (let a = 0; a < 3; a++) { const ga = J[a] * r; if (a === 0) g0 += ga; else if (a === 1) g1 += ga; else g2 += ga; for (let b = 0; b < 3; b++) H[a * 3 + b] += J[a] * J[b]; } }
+      if (inl < 12) break; rms = Math.sqrt(se / inl); mres = Math.hypot(sx, sy, sz) / inl;
+      for (let a = 0; a < 3; a++) H[a * 4] += 1e-9; const d3 = H[0] * (H[4] * H[8] - H[5] * H[7]) - H[1] * (H[3] * H[8] - H[5] * H[6]) + H[2] * (H[3] * H[7] - H[4] * H[6]); if (Math.abs(d3) < 1e-12) break;
+      const sol = [0, 1, 2].map(col => { const M = H.slice(); const gg = [-g0, -g1, -g2]; for (let rr = 0; rr < 3; rr++) M[rr * 3 + col] = gg[rr]; return (M[0] * (M[4] * M[8] - M[5] * M[7]) - M[1] * (M[3] * M[8] - M[5] * M[6]) + M[2] * (M[3] * M[7] - M[4] * M[6])) / d3; });
+      c = [c[0] + sol[0], c[1] + sol[1], c[2] + sol[2]]; if (Math.hypot(...sol) < 1e-5) { ok = true; break; } ok = true; }
+    // проверки: видна заметная часть шара, точки на поверхности (не труба: в оболочке почти всё — на сфере), внутри пусто
+    if (!ok || inl < 20 || rms > 0.004 || inl / shell < 0.75 || inside > 2 || mres > 0.93) continue;
+    out.push({ x: c[0], y: c[1], z: c[2], n: inl, rms, votes: v0 }); if (out.length >= 40) break; }
+  return out;
+}
+function sphereJob({ job, scans, R }) {
+  try { const res = scans.map((s, k) => { self.postMessage({ job, prog: k / scans.length, stage: 'Ищу шары: ' + s.name }); return findSpheres(s.pts, R); }); self.postMessage({ job, done: true, res }); }
+  catch (err) { self.postMessage({ job, error: String(err && err.message || err) }); }
 }
 function autoJob({ job, scans }) {
   try {
@@ -1068,6 +1151,11 @@ function drawAsm() {
   for (const sc of S.scans) if (sc.vis && sc !== sel && !(multi && inGrp(sc.id))) drawScan(ctx, sc, V, W, H, sel ? 0.45 : 0.8);
   if (multi) for (const sc of G) if (sc !== sel && sc.vis) { drawScan(ctx, sc, V, W, H, 1); const P = scanBBoxW(sc).map(p => w2s(V, W, H, p)); ctx.save(); ctx.strokeStyle = sc.color; ctx.lineWidth = 2 * dpr(); ctx.setLineDash([8 * dpr(), 5 * dpr()]); ctx.beginPath(); P.forEach((p, i) => i ? ctx.lineTo(...p) : ctx.moveTo(...p)); ctx.closePath(); ctx.stroke(); ctx.restore(); }
   if (S.selRect) { const a = w2s(V, W, H, S.selRect[0]), b = w2s(V, W, H, S.selRect[1]); ctx.save(); ctx.strokeStyle = S.selCross ? '#16a34a' : '#2563eb'; ctx.fillStyle = S.selCross ? 'rgba(22,163,74,.10)' : 'rgba(37,99,235,.08)'; ctx.lineWidth = 1.5 * dpr(); ctx.setLineDash(S.selCross ? [6 * dpr(), 4 * dpr()] : []); ctx.fillRect(Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1])); ctx.strokeRect(Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1])); ctx.restore(); }
+  for (const e of (S.autoEdges || [])) { if (!e.weak) continue; const A = scanById(e.a), B = scanById(e.b); if (!A || !B || !A.vis || !B.vis) continue; const M = w2s(V, W, H, [(A.pose.x + B.pose.x) / 2, (A.pose.y + B.pose.y) / 2]), d = dpr(), L = 34 * d, ux = Math.cos(e.slipAng), uy = -Math.sin(e.slipAng);
+    ctx.save(); ctx.strokeStyle = '#dc2626'; ctx.fillStyle = '#dc2626'; ctx.lineWidth = 3 * d; ctx.beginPath(); ctx.moveTo(M[0] - ux * L, M[1] - uy * L); ctx.lineTo(M[0] + ux * L, M[1] + uy * L); ctx.stroke();
+    for (const sg of [1, -1]) { const tx = M[0] + sg * ux * L, ty = M[1] + sg * uy * L; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx - sg * ux * 10 * d - uy * 7 * d, ty - sg * uy * 10 * d + ux * 7 * d); ctx.lineTo(tx - sg * ux * 10 * d + uy * 7 * d, ty - sg * uy * 10 * d - ux * 7 * d); ctx.closePath(); ctx.fill(); }
+    ctx.font = `bold ${11 * d}px system-ui`; ctx.textAlign = 'center'; ctx.fillText('скользит', M[0], M[1] - 10 * d); ctx.restore(); }
+  for (const m of S.marks) { if (!m.sphere) continue; const sc = scanById(m.sid); if (!sc || !sc.vis) continue; const P = w2s(V, W, H, L2W(sc, m.a)), d = dpr(), rr = Math.max(4 * d, (m.r || 0.07) * V.s * d); ctx.save(); ctx.strokeStyle = labColor(m.lab); ctx.lineWidth = 2 * d; ctx.beginPath(); ctx.arc(P[0], P[1], rr, 0, 7); ctx.stroke(); ctx.fillStyle = labColor(m.lab); ctx.font = `bold ${11 * d}px system-ui`; ctx.textAlign = 'left'; ctx.fillText(m.lab, P[0] + rr + 3 * d, P[1] - 3 * d); ctx.restore(); }
   if (sel && sel.vis) { drawScan(ctx, sel, V, W, H, 1); const bb = scanBBoxW(sel), P = bb.map(p => w2s(V, W, H, p)); ctx.save(); ctx.strokeStyle = sel.color; ctx.lineWidth = 2 * dpr(); ctx.setLineDash([8 * dpr(), 5 * dpr()]); ctx.beginPath(); P.forEach((p, i) => i ? ctx.lineTo(...p) : ctx.moveTo(...p)); ctx.closePath(); ctx.stroke(); ctx.setLineDash([]);
     const k = knob(sel), K = w2s(V, W, H, k.p), C = w2s(V, W, H, k.c); ctx.beginPath(); ctx.moveTo(...C); ctx.lineTo(...K); ctx.stroke(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(K[0], K[1], 14 * dpr(), 0, 7); ctx.fill(); ctx.stroke(); ctx.fillStyle = sel.color; ctx.font = `bold ${16 * dpr()}px system-ui`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('↻', K[0], K[1] + 1); ctx.restore(); }
   for (const sc of S.scans) if (sc.vis) { const o = w2s(V, W, H, [sc.pose.x, sc.pose.y]); ctx.fillStyle = sc.color; ctx.beginPath(); ctx.moveTo(o[0], o[1] - 7 * dpr()); ctx.lineTo(o[0] + 6 * dpr(), o[1] + 5 * dpr()); ctx.lineTo(o[0] - 6 * dpr(), o[1] + 5 * dpr()); ctx.fill(); ctx.font = `${11 * dpr()}px system-ui`; ctx.fillText(sc.name, o[0] + 9 * dpr(), o[1] + 4 * dpr()); }
@@ -1298,7 +1386,7 @@ async function openProjectFile(f) { let j; try { j = JSON.parse(await f.text());
 
 // ---------- вид ----------
 function setView(v) { const reset = S.view !== v && S.tool !== 'hand'; if (reset) { S.tool = 'hand'; stat('Обзор: тянуть — сдвиг вида, колесо — масштаб.'); } S.view = v; if (v !== 'plan') S.planSel = null; renderAll(); if ((v === 'asm' || v === 'plan') && !S.asmFitted) { S.asmFitted = true; fitAsm(); if (v === 'plan') drawPlan(); } }
-function setTool(t) { const cl = x => x === 'brush' || x === 'keep', was = S.tool; S.tool = t; renderBar(); if (cl(t) !== cl(was)) renderList(); stat({ hand: 'Обзор: тянуть — сдвиг вида, два пальца — масштаб. В «Сборке»: тянуть скан — сдвиг, ↻ или два пальца на скане — поворот, правая кнопка мыши — поворот.', line: 'Линия: проведите вдоль стены или края на скане — программа подгонит линию по точкам. Затем выберите букву: на соседнем скане та же стена — та же буква.', point: 'Точка: коснитесь угла, центра колонны, стояка — и выберите букву. Линии точнее точек.', erase: 'Удалить метку: коснитесь её.', corner: 'Общий угол: в «Сборке» коснитесь угла, видного на нескольких сканах, — общая точка встанет на каждом. На рамке — точка в угол этого скана.', brush: 'Стереть: проведите кистью по мебели, дверям, людям. Размер кисти — слева в «Чистке».', keep: 'Нужное: набросок по стене (продлится сам) или касание — колонна, угол. «Только нужное» скрывает остальное.' }[t]); }
+function setTool(t) { const cl = x => x === 'brush' || x === 'keep', was = S.tool; S.tool = t; renderBar(); if (cl(t) !== cl(was)) renderList(); stat({ hand: 'Обзор: тянуть — сдвиг вида, два пальца — масштаб. В «Сборке»: тянуть скан — сдвиг, ↻ или два пальца на скане — поворот, правая кнопка мыши — поворот.', line: 'Линия: проведите вдоль стены или края на скане — программа подгонит линию по точкам. Затем выберите букву: на соседнем скане та же стена — та же буква.', point: 'Точка: коснитесь угла, центра колонны, стояка — и выберите букву. Линии точнее точек.', erase: 'Удалить метку: коснитесь её.', corner: 'Общий угол: в «Сборке» коснитесь угла, видного на нескольких сканах, — общая точка встанет на каждом. На рамке — точка в угол этого скана.', wfit: 'Стена по точкам: коснитесь стены в срезе — программа впишет прямую по точкам (видно, по скольким и с каким разбросом), продлит вдоль стены и замкнёт угол с соседней. Высота и толщина среза — в карточке справа.', brush: 'Стереть: проведите кистью по мебели, дверям, людям. Размер кисти — слева в «Чистке».', keep: 'Нужное: набросок по стене (продлится сам) или касание — колонна, угол. «Только нужное» скрывает остальное.' }[t]); }
 
 window.addEventListener('resize', () => { if (S.view === 'grid') { sizeTiles(); redraw(); } else { const cv = $('#asm') || $('#plan'); if (cv) { sizeCanvas(cv); redraw(); } } });
 document.addEventListener('keydown', e => { if (e.target.closest('input')) return; if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }
@@ -1309,7 +1397,7 @@ document.addEventListener('DOMContentLoaded', async () => { layoutTop();
   $('#bAdd').onclick = () => $('#fileIn').click(); $('#fileIn').onchange = e => { const f = e.target.files; if (f && f.length) loadFiles(f); e.target.value = ''; };
   $$('[data-view]').forEach(b => b.onclick = () => setView(b.dataset.view)); $$('[data-tool]').forEach(b => b.onclick = () => setTool(S.tool === b.dataset.tool ? 'hand' : b.dataset.tool));
   $$('[data-cols]').forEach(b => b.onclick = () => { S.cols = +b.dataset.cols; S.scans.forEach(s => s.tile = null); renderAll(); saveSoon(); });
-  $('#bTW').onclick = () => { S.tileWorld = !S.tileWorld; S.scans.forEach(x => x.tile = null); renderAll(); stat(S.tileWorld ? 'Рамки повёрнуты как в сборке: одна и та же стена на соседних сканах смотрит в одну сторону.' : 'Рамки — каждый скан как снят.'); }; $('#bStitch').onclick = stitch; $('#bAuto').onclick = autoStitch; $('#bRefine').onclick = refineStitch; $('#fUndo').onclick = undo; $('#fRedo').onclick = redo; $('#fDel').onclick = delSelected; $('#bFit').onclick = () => { if (S.view === 'asm' || S.view === 'plan') fitAsm(); else { S.scans.forEach(fitTile); redraw(); } };
+  $('#bTW').onclick = () => { S.tileWorld = !S.tileWorld; S.scans.forEach(x => x.tile = null); renderAll(); stat(S.tileWorld ? 'Рамки повёрнуты как в сборке: одна и та же стена на соседних сканах смотрит в одну сторону.' : 'Рамки — каждый скан как снят.'); }; $('#bStitch').onclick = stitch; $('#bAuto').onclick = autoStitch; $('#bRefine').onclick = refineStitch; $('#bSph').onclick = spheresDialog; $('#fUndo').onclick = undo; $('#fRedo').onclick = redo; $('#fDel').onclick = delSelected; $('#bFit').onclick = () => { if (S.view === 'asm' || S.view === 'plan') fitAsm(); else { S.scans.forEach(fitTile); redraw(); } };
   $('#bMulti').onclick = () => { S.multi = !S.multi; renderBar(); stat(S.multi ? '⬚ Несколько: касание по скану — добавить или убрать; обведите рамкой по пустому месту — выбрать все внутри. Тяните любой выбранный — едут все. Выйти — ещё раз «⬚ Несколько».' : 'Обычный выбор: касание — один скан.'); }; $('#bR1').onclick = () => rotSel(1); $('#bR01').onclick = () => rotSel(0.1); $('#bRm01').onclick = () => rotSel(-0.1); $('#bRm1').onclick = () => rotSel(-1); $('#bR90').onclick = () => rotSel(90);
   $('#bSave').onclick = saveProjectFile; $('#bOpen').onclick = () => $('#projIn').click(); $('#projIn').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) openProjectFile(f); };
   $('#bNew').onclick = pjNew; $('#bCloud').onclick = cloudDialog; $('#bAllProj').onclick = pjMenu; $('#bAdd2').onclick = () => $('#fileIn').click();
@@ -1429,7 +1517,8 @@ function closeCorners(silent) { const W = PL().walls; let n = 0; if (!silent) pu
 function drawPlan() {
   const cv = $('#plan'); if (!cv || S.view !== 'plan') return; const W = cv.width, H = cv.height, ctx = cv.getContext('2d'); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
   const V = S.asmV, d = dpr(), toS = p => w2s(V, W, H, p);
-  if (S.planBg !== false) for (const sc of S.scans) if (sc.vis) drawScan(ctx, sc, V, W, H, 0.45);
+  if (S.planBg === 'scans') { for (const sc of S.scans) if (sc.vis) drawScan(ctx, sc, V, W, H, 0.45); }
+  else if (S.planBg !== false) drawSlice(ctx, V, W, H);
   const sel = S.planSel;
   for (const w of PL().walls) { const A = toS(w.a), B = toS(w.b), isSel = sel && sel.w === w.id; const ops = PL().ops.filter(o => o.w === w.id).sort((p, q) => p.t0 - q.t0), u = wDir(w);
     ctx.strokeStyle = isSel ? '#2563eb' : '#111'; ctx.lineWidth = (isSel ? 4 : 3) * d; ctx.lineCap = 'round';
@@ -1452,12 +1541,59 @@ function drawOp(ctx, w, o, toS, isSel) { const u = wDir(w), n = [-u[1], u[0]], d
   else { ctx.setLineDash([3 * d, 4 * d]); ctx.beginPath(); ctx.moveTo(...SA); ctx.lineTo(...SB); ctx.stroke(); ctx.setLineDash([]); }
   const M = toS(mul(addv(A, B), 0.5)); ctx.font = `${11 * d}px system-ui`; ctx.fillStyle = isSel ? '#2563eb' : '#0f8a4b'; ctx.textAlign = 'center'; ctx.fillText(nf(Lw, 3), M[0], M[1] + 16 * d); ctx.restore(); }
 
+// --- тонкий срез: точки всех сканов на одной высоте (от пола), без прореживания — по нему видно, сошлись ли стены, и по нему вписываются стены ---
+S.slice = S.slice || { h: 1.2, t: 0.06 };
+function sliceKey() { return JSON.stringify([S.slice, S.scans.filter(s => s.vis).map(s => [s.id, s.pose.x, s.pose.y, s.pose.a, (s.erase || []).length])]); }
+function slicePts() {
+  const k = sliceKey(); if (S._slice && S._slice.k === k) return S._slice; const L = S.scans.filter(s => s.vis), xs = [], col = [];
+  for (const s of L) { const P = s.pts, z0 = s.floor + S.slice.h - S.slice.t / 2, z1 = s.floor + S.slice.h + S.slice.t / 2, c = Math.cos(s.pose.a), sn = Math.sin(s.pose.a), cg = s.cg, er = cg && cg.er; let n = 0;
+    for (let i = 0; i < P.length; i += 3) { const z = P[i + 2]; if (z < z0 || z > z1) continue; const x = P[i], y = P[i + 1]; if (x * x + y * y > 400) continue;
+      if (er) { const u = Math.floor((x - cg.x0) / cg.res), v = Math.floor((cg.y1 - y) / cg.res); if (u >= 0 && v >= 0 && u < cg.w && v < cg.h && er[v * cg.w + u]) continue; }
+      xs.push(c * x - sn * y + s.pose.x, sn * x + c * y + s.pose.y); n++; } col.push([s.color, n]); }
+  S._slice = { k, P: new Float32Array(xs), col }; return S._slice;
+}
+function drawSlice(ctx, V, W, H) {
+  const sl = slicePts(), P = sl.P, d = dpr(), n = P.length / 2, view = n > 600000 ? Math.ceil(n / 600000) : 1, sz = Math.max(1, Math.min(3, 0.012 * V.s * d));
+  let i = 0; for (const [c, cnt] of sl.col) { ctx.fillStyle = c; ctx.globalAlpha = 0.75; const end = i + cnt; for (; i < end; i += view) { const q = w2s(V, W, H, [P[2 * i], P[2 * i + 1]]); if (q[0] < -2 || q[1] < -2 || q[0] > W + 2 || q[1] > H + 2) continue; ctx.fillRect(q[0] - sz / 2, q[1] - sz / 2, sz, sz); } i = end; }
+  ctx.globalAlpha = 1;
+}
+// --- стена по точкам: касание — вписать прямую в точки среза рядом, продлить вдоль стены, замкнуть угол с соседней стеной ---
+function wallByPoints(w0) {
+  const P = slicePts().P, n = P.length / 2; if (n < 50) { uiAlert('В срезе мало точек. Поменяйте высоту среза в карточке справа.'); return; }
+  const loc = []; for (let i = 0; i < n; i++) { const dx = P[2 * i] - w0[0], dy = P[2 * i + 1] - w0[1]; if (dx * dx + dy * dy < 0.16) loc.push(i); }
+  if (loc.length < 20) { stat('Рядом с касанием мало точек среза — коснитесь ближе к стене.'); return; }
+  // RANSAC: прямая с наибольшим числом точек в пределах 1 см, проходящая рядом с касанием
+  let best = null; for (let it = 0; it < 400; it++) { const a = loc[(Math.random() * loc.length) | 0], b = loc[(Math.random() * loc.length) | 0]; if (a === b) continue;
+    const ax = P[2 * a], ay = P[2 * a + 1], ux0 = P[2 * b] - ax, uy0 = P[2 * b + 1] - ay, L = Math.hypot(ux0, uy0); if (L < 0.08) continue; const ux = ux0 / L, uy = uy0 / L;
+    if (Math.abs((w0[0] - ax) * -uy + (w0[1] - ay) * ux) > 0.2) continue; let cnt = 0; for (const i of loc) if (Math.abs((P[2 * i] - ax) * -uy + (P[2 * i + 1] - ay) * ux) < 0.01) cnt++;
+    if (!best || cnt > best.cnt) best = { cnt, ax, ay, ux, uy }; }
+  if (!best || best.cnt < 15) { stat('Не нашлось прямой стены рядом с касанием.'); return; }
+  let { ax, ay, ux, uy } = best, sel = [], rms = 0;
+  for (let round = 0; round < 3; round++) { // вдоль всей стены: точки в 1,5 см от прямой, без разрывов больше 25 см от места касания
+    const cand = []; for (let i = 0; i < n; i++) { const dx = P[2 * i] - ax, dy = P[2 * i + 1] - ay; if (Math.abs(dx * -uy + dy * ux) < 0.015) cand.push([dx * ux + dy * uy, i]); }
+    cand.sort((p, q) => p[0] - q[0]); const t0 = (w0[0] - ax) * ux + (w0[1] - ay) * uy; let k0 = 0; for (let k = 0; k < cand.length; k++) if (Math.abs(cand[k][0] - t0) < Math.abs(cand[k0][0] - t0)) k0 = k;
+    let lo = k0, hi = k0; while (lo > 0 && cand[lo][0] - cand[lo - 1][0] < 0.25) lo--; while (hi < cand.length - 1 && cand[hi + 1][0] - cand[hi][0] < 0.25) hi++;
+    sel = cand.slice(lo, hi + 1).map(c => c[1]); if (sel.length < 15) { stat('Слишком короткий кусок стены.'); return; }
+    let mx = 0, my = 0; for (const i of sel) { mx += P[2 * i]; my += P[2 * i + 1]; } mx /= sel.length; my /= sel.length; let sxx = 0, sxy = 0, syy = 0; for (const i of sel) { const a = P[2 * i] - mx, b = P[2 * i + 1] - my; sxx += a * a; sxy += a * b; syy += b * b; }
+    const th = 0.5 * Math.atan2(2 * sxy, sxx - syy); ux = Math.cos(th); uy = Math.sin(th); ax = mx; ay = my; let se = 0; for (const i of sel) { const r = (P[2 * i] - ax) * -uy + (P[2 * i + 1] - ay) * ux; se += r * r; } rms = Math.sqrt(se / sel.length); }
+  let tmin = 1e9, tmax = -1e9; for (const i of sel) { const t = (P[2 * i] - ax) * ux + (P[2 * i + 1] - ay) * uy; tmin = Math.min(tmin, t); tmax = Math.max(tmax, t); }
+  pushUndo(); const w = { id: PL().nextW++, a: [ax + ux * tmin, ay + uy * tmin], b: [ax + ux * tmax, ay + uy * tmax] }; PL().walls.push(w);
+  // угол: если конец рядом с соседней стеной (до 40 см) и она идёт под углом — обе доводятся до пересечения
+  let joined = 0; for (const end of ['a', 'b']) { let bestJ = null; for (const o of PL().walls) { if (o === w) continue; const v = wDir(o), cr = ux * v[1] - uy * v[0]; if (Math.abs(cr) < Math.sin(20 * Math.PI / 180)) continue;
+      const den = ux * v[1] - uy * v[0], dx = o.a[0] - w.a[0], dy = o.a[1] - w.a[1], t = (dx * v[1] - dy * v[0]) / den, X = [w.a[0] + ux * t, w.a[1] + uy * t]; if (len(sub(X, w[end])) > 0.4) continue;
+      const oe = len(sub(o.a, X)) < len(sub(o.b, X)) ? 'a' : 'b', ts = dot(sub(X, o.a), v); if (len(sub(o[oe], X)) > 0.4 && (ts < -0.05 || ts > wLen(o) + 0.05)) continue;
+      const dd = len(sub(X, w[end])); if (!bestJ || dd < bestJ.dd) bestJ = { o, oe, X, dd, near: len(sub(o[oe], X)) <= 0.4 }; }
+    if (bestJ) { w[end] = bestJ.X; if (bestJ.near) bestJ.o[bestJ.oe] = bestJ.X.slice(); joined++; } }
+  S.planSel = { w: w.id }; drawPlan(); saveSoon();
+  stat(`Стена по ${sel.length} точкам среза, разброс ±${Math.max(1, Math.round(rms * 1000))} мм, длина ${nf(wLen(w), 3)} м${joined ? `, углов замкнуто: ${joined}` : ''}. Касайтесь следующей стены.`);
+}
 // --- карточка выбранного: длина числом, проёмы, действия ---
 function renderPlanCard() {
   let el = $('#pcard'); const sel = S.planSel; if (!el) { el = document.createElement('div'); el.id = 'pcard'; $('#main').appendChild(el); }
-  if (!sel) { el.innerHTML = `<div class="pc-h">План: стен ${PL().walls.length}, проёмов ${PL().ops.length}</div><div class="pc-r"><button id="pcBuild" class="pri">${PL().walls.length ? '⟳ Найти стены заново' : '🔎 Найти стены по сканам'}</button></div><div class="pc-r"><button id="pcClose">⌐ Замкнуть углы</button><button id="pcSq">⊾ К осям</button><button id="pcBg">${S.planBg === false ? '◌ Показать сканы' : '◉ Скрыть сканы'}</button></div><div class="pc-r"><button id="pcDxf">⬇ DXF</button></div><div class="pc-s">Касание стены — выбрать. ／ Стена (вверху) — нарисовать стену. Оранжевые точки — незамкнутые углы.</div>`;
+  if (!sel) { el.innerHTML = `<div class="pc-h">План: стен ${PL().walls.length}, проёмов ${PL().ops.length}</div><div class="pc-r"><button id="pcBuild" class="pri">${PL().walls.length ? '⟳ Найти стены заново' : '🔎 Найти стены по сканам'}</button></div><div class="pc-r"><button id="pcClose">⌐ Замкнуть углы</button><button id="pcSq">⊾ К осям</button></div><div class="pc-r"><label>Фон:</label><button data-bg="slice" class="${S.planBg !== false && S.planBg !== 'scans' ? 'on' : ''}">Срез</button><button data-bg="scans" class="${S.planBg === 'scans' ? 'on' : ''}">Сканы</button><button data-bg="off" class="${S.planBg === false ? 'on' : ''}">Нет</button></div><div class="pc-r"><label>Срез на высоте</label><input id="slH" inputmode="decimal" value="${nf(S.slice.h, 2)}"><label>м, толщина</label><input id="slT" inputmode="decimal" style="width:60px" value="${Math.round(S.slice.t * 100)}"><label>см</label></div><div class="pc-r"><button id="pcDxf">⬇ DXF</button></div><div class="pc-s">⌇ Стена по точкам (вверху) — коснитесь стены в срезе: прямая впишется по точкам, угол с соседней замкнётся. Касание стены — выбрать. Оранжевые точки — незамкнутые углы.</div>`;
     $('#pcBuild').onclick = async () => { if (PL().walls.length && !(await uiDialog({ title: 'Найти стены заново?', text: 'Текущие стены и правки заменятся найденными. Вернуть — «↶».', ok: 'Найти', cancel: 'Отмена' }))) return; buildWalls(); };
-    $('#pcClose').onclick = () => closeCorners(false); $('#pcSq').onclick = squareAll; $('#pcBg').onclick = () => { S.planBg = S.planBg === false; drawPlan(); }; $('#pcDxf').onclick = exportDXF; return; }
+    $('#pcClose').onclick = () => closeCorners(false); $('#pcSq').onclick = squareAll; el.querySelectorAll('[data-bg]').forEach(b => b.onclick = () => { S.planBg = b.dataset.bg === 'off' ? false : b.dataset.bg; drawPlan(); });
+    const slc = () => { const h = parseFloat($('#slH').value.replace(',', '.')), t = parseFloat($('#slT').value.replace(',', '.')) / 100; if (h > 0 && h < 6) S.slice.h = h; if (t >= 0.01 && t <= 0.5) S.slice.t = t; S._slice = null; drawPlan(); }; $('#slH').onchange = slc; $('#slT').onchange = slc; $('#pcDxf').onclick = exportDXF; return; }
   const w = wById(sel.w); if (!w) { S.planSel = null; return renderPlanCard(); }
   if (sel.o) { const o = PL().ops.find(q => q.id === sel.o); if (!o) { S.planSel = { w: w.id }; return renderPlanCard(); }
     el.innerHTML = `<div class="pc-h">Проём на стене ${nf(wLen(w), 3)} м</div>
@@ -1509,13 +1645,14 @@ function bindPlan(cv) {
     if (P.size === 2) { const [a, b] = [...P.values()], mid = { clientX: (a.x + b.x) / 2, clientY: (a.y + b.y) / 2 }; S.pdraw = null; g = { kind: 'pinch', d0: Math.hypot(b.x - a.x, b.y - a.y), v0: { ...S.asmV }, wm0: toW(mid) }; return; }
     if (P.size > 2) return; const w = toW(e);
     if (S.tool === 'line') { const s0 = snapPt(w) || w; g = { kind: 'draw', a: s0 }; S.pdraw = { a: s0, b: s0 }; return; }
+    if (S.tool === 'wfit') { g = { kind: 'pan', x: e.clientX, y: e.clientY, v0: { ...S.asmV }, tap: true, wfit: w }; return; }
     const h = hit(e);
     if (S.tool === 'erase' && h) { pushUndo(); if (h.kind === 'op') PL().ops = PL().ops.filter(o => o !== h.o); else if (h.w) { PL().walls = PL().walls.filter(q => q !== h.w); PL().ops = PL().ops.filter(o => o.w !== h.w.id); } S.planSel = null; drawPlan(); saveSoon(); g = null; return; }
     if (h && h.kind === 'end') { pushUndo(); g = { kind: 'end', w: h.w, end: h.end, u: wDir(h.w), p0: h.w[h.end].slice(), free: e.button === 2 || e.altKey }; return; }
     if (h && h.kind === 'opEnd') { pushUndo(); g = { kind: 'opEnd', o: h.o, w: h.w, k: h.k }; return; }
     if (h && h.kind === 'op') { S.planSel = { w: h.w.id, o: h.o.id }; pushUndo(); g = { kind: 'opMove', o: h.o, w: h.w, w0: w, t0: h.o.t0, t1: h.o.t1 }; drawPlan(); return; }
     if (h && h.kind === 'wall') { const was = S.planSel && S.planSel.w === h.w.id && !S.planSel.o; S.planSel = { w: h.w.id }; pushUndo(); g = { kind: 'wall', w: h.w, w0: w, a0: h.w.a.slice(), b0: h.w.b.slice(), moved: false, was }; drawPlan(); return; }
-    g = { kind: 'pan', x: e.clientX, y: e.clientY, v0: { ...S.asmV }, tap: true }; };
+    g = { kind: 'pan', x: e.clientX, y: e.clientY, v0: { ...S.asmV }, tap: true, wfit: S.tool === 'wfit' ? w : null }; };
   cv.onpointermove = e => { if (!P.has(e.pointerId)) return; P.set(e.pointerId, { x: e.clientX, y: e.clientY }); if (!g) return; const v = S.asmV;
     if (g.kind === 'pinch' && P.size >= 2) { const [a, b] = [...P.values()], mid = { clientX: (a.x + b.x) / 2, clientY: (a.y + b.y) / 2 }; v.s = g.v0.s * Math.hypot(b.x - a.x, b.y - a.y) / g.d0; v.cx = g.v0.cx; v.cy = g.v0.cy; const wm = toW(mid); v.cx += g.wm0[0] - wm[0]; v.cy += g.wm0[1] - wm[1]; drawPlan(); return; }
     if (g.kind === 'pan') { v.cx = g.v0.cx - (e.clientX - g.x) / v.s; v.cy = g.v0.cy + (e.clientY - g.y) / v.s; if (Math.hypot(e.clientX - g.x, e.clientY - g.y) > 6) g.tap = false; drawPlan(); return; }
@@ -1529,6 +1666,7 @@ function bindPlan(cv) {
     if (g.kind === 'opEnd') { const u = wDir(g.w), t = Math.max(0, Math.min(wLen(g.w), dot(sub(w, g.w.a), u))); if (g.k === 't0') g.o.t0 = Math.min(t, g.o.t1 - 0.05); else g.o.t1 = Math.max(t, g.o.t0 + 0.05); drawPlan(); return; } };
   const end = e => { P.delete(e.pointerId); if (!g) return; if (g.kind === 'pinch' && P.size) return; const was = g; g = null;
     if (was.kind === 'draw') { const D = S.pdraw; S.pdraw = null; if (D && len(sub(D.b, D.a)) > 0.1) { pushUndo(); const w = { id: PL().nextW++, a: D.a, b: D.b }; PL().walls.push(w); S.planSel = { w: w.id }; saveSoon(); } drawPlan(); return; }
+    if (was.kind === 'pan' && was.tap && was.wfit) { wallByPoints(was.wfit); return; }
     if (was.kind === 'pan' && was.tap) { S.planSel = null; drawPlan(); return; }
     if (was.kind === 'wall' && !was.moved) { S.undo.pop(); drawPlan(); return; }
     saveSoon(); drawPlan(); };
@@ -1629,9 +1767,40 @@ async function autoStitch() {
   S.asmFitted = false; analyze(); setView('asm'); fitAsm(); saveSoon();
   const H = S.hints; stat(`Автосшивка: в общей группе ${main.length} из ${list.length} сканов${groups.length > 1 ? `, отдельно — ${list.length - main.length}` : ''}. ${H.length ? 'Подсказки, где помочь, — слева в списке.' : 'Все стыки сходятся.'}`);
 }
+// --- шары: найти на всех сканах, одинаковые шары — одной буквой (по нынешнему положению сканов) ---
+function runSpheres(list, R) { return new Promise((res, rej) => { const w = getWorker(), job = Math.random(); const on = e => { const d = e.data; if (d.job !== job) return; if (d.prog != null && !d.done) { busy(`${d.stage || 'Ищу шары'}… ${Math.round(d.prog * 100)}%`); return; } w.removeEventListener('message', on); if (d.error) rej(new Error(d.error)); else res(d.res); }; w.addEventListener('message', on);
+  w.postMessage({ cmd: 'spheres', job, R, scans: list.map(s => ({ name: s.name, pts: s.pts.slice() })) }); }); }
+function sphereMatch(found) {
+  const par = found.map((_, i) => i), f = x => par[x] === x ? x : (par[x] = f(par[x])), byScan = new Map(); found.forEach((x, i) => { if (!byScan.has(x.sc)) byScan.set(x.sc, []); byScan.get(x.sc).push(i); });
+  const scs = [...byScan.keys()];
+  for (let a = 0; a < scs.length; a++) for (let b = a + 1; b < scs.length; b++) { const A = byScan.get(scs[a]), B = byScan.get(scs[b]), cand = [];
+    for (const i of A) for (const j of B) { const d = [found[j].W[0] - found[i].W[0], found[j].W[1] - found[i].W[1], found[j].W[2] - found[i].W[2]]; if (Math.hypot(d[0], d[1]) < 0.6 && Math.abs(d[2]) < 0.15) cand.push({ i, j, d }); }
+    if (!cand.length) continue; let best = null; // общий сдвиг: тот, с которым согласно больше всего пар
+    for (const c of cand) { const ok = cand.filter(o => Math.hypot(o.d[0] - c.d[0], o.d[1] - c.d[1], o.d[2] - c.d[2]) < 0.04); if (!best || ok.length > best.length) best = ok; }
+    const usedI = new Set(), usedJ = new Set(); for (const o of best) { if (usedI.has(o.i) || usedJ.has(o.j)) continue; usedI.add(o.i); usedJ.add(o.j); par[f(o.i)] = f(o.j); } }
+  const G = new Map(); found.forEach((x, i) => { const r = f(i); if (!G.has(r)) G.set(r, []); G.get(r).push(x); });
+  const out = []; for (const g of G.values()) { const seen = new Set(), keep = []; for (const x of g.sort((p, q) => q.q.n - p.q.n)) { if (seen.has(x.sc)) out.push([x]); else { seen.add(x.sc); keep.push(x); } } out.push(keep); } return out;
+}
+async function spheresDialog() {
+  const list = S.scans.filter(s => s.vis); if (!list.length) { uiAlert('Нет видимых сканов.'); return; }
+  let D = +(localStorage.getItem('skan_sphD') || 145) || 145;
+  const v = await uiDialog({ title: '⚪ Найти шары', text: `Программа найдёт на каждом скане шары указанного диаметра, точно впишет сферу и поставит её центр точкой. Один и тот же шар на соседних сканах получит одну букву (Ш1, Ш2…) — по тому, как сканы стоят сейчас, поэтому сначала автосшивка или примерно поставьте руками. Потом «🎯 Уточнить» — шары будут держать то, что не держат стены (вдоль тоннеля). Диаметр шара, мм (FARO обычно 139 или 145):`, input: String(D), ok: 'Найти', cancel: 'Отмена' }); if (v == null) return;
+  D = parseFloat(String(v).replace(',', '.')); if (!(D > 40 && D < 400)) { uiAlert('Диаметр — от 40 до 400 мм.'); return; } try { localStorage.setItem('skan_sphD', D); } catch (e) { }
+  let res; try { res = await runSpheres(list, D / 2000); } catch (e) { busy(''); uiAlert('Поиск шаров не удался: ' + e.message); return; } busy('');
+  pushUndo(); const ids = new Set(list.map(s => s.id)); S.marks = S.marks.filter(m => !(m.sphere && ids.has(m.sid))); // прежние шары этих сканов — заново
+  const found = []; res.forEach((arr, k) => { const sc = list[k]; for (const q of arr) { const W = L2W(sc, [q.x, q.y]); found.push({ sc, q, W: [W[0], W[1], q.z - sc.floor] }); } });
+  // какой шар на соседнем скане — тот же: по взаимному расположению шаров (сдвиг между сканами общий для всех их общих шаров),
+  // поэтому сканы могут стоять неточно — до ~60 см; с одного скана в группе — не больше одного шара
+  const groups = sphereMatch(found);
+  let nn = 0; const usedL = new Set(S.marks.map(m => m.lab)); const nextSph = () => { while (usedL.has('Ш' + (++nn))); usedL.add('Ш' + nn); return 'Ш' + nn; };
+  let shared = 0; for (const g of groups) { const lab = nextSph(); if (g.length > 1) shared++; for (const f of g) S.marks.push({ id: S.nextMark++, sid: f.sc.id, kind: 'point', a: [f.q.x, f.q.y], z: f.q.z, lab, sphere: true, r: D / 2000, fit: { n: f.q.n, rms: f.q.rms } }); }
+  S.lastSolve = null; renderAll(); redraw(); saveSoon();
+  stat(found.length ? `Найдено шаров: ${found.length} на ${res.filter(a => a.length).length} сканах; общих для нескольких сканов: ${shared}. Буквы Ш1, Ш2… Лишний — удалите «⌫ Метка». Дальше «🎯 Уточнить».` : `Шаров диаметра ${D} мм не найдено. Проверьте диаметр или что шары попали в скан не дальше ~20 м.`);
+}
 // --- уточнить: от того, как сканы стоят сейчас (после автосшивки и ручной подгонки) ---
 function runRefine(list, poses, pairs, fixed) { return new Promise((res, rej) => { const w = getWorker(), job = Math.random(); const on = e => { const d = e.data; if (d.job !== job) return; if (d.prog != null && !d.done) { busy(`${d.stage || 'Уточняю'}… ${Math.round(d.prog * 100)}%`); return; } w.removeEventListener('message', on); if (d.error) rej(new Error(d.error)); else res(d.res); }; w.addEventListener('message', on);
-  w.postMessage({ cmd: 'refine', job, scans: list.map(s => ({ name: s.name, floor: s.floor, ceil: s.ceil, pts: s.pts.slice() })), poses, pairs, fixed }); }); }
+  w.postMessage({ cmd: 'refine', job, scans: list.map(s => ({ name: s.name, floor: s.floor, ceil: s.ceil, pts: s.pts.slice() })), poses, pairs, fixed, spheres: sphereGroups(list) }); }); }
+function sphereGroups(list) { const by = {}; for (const m of S.marks) { if (!m.sphere) continue; const k = list.findIndex(s => s.id === m.sid); if (k < 0) continue; (by[m.lab] = by[m.lab] || []).push({ k, x: m.a[0], y: m.a[1], z: m.z }); } return Object.entries(by).map(([lab, obs]) => ({ lab, obs })); }
 async function refineStitch() {
   const list = S.scans.filter(s => s.vis).sort(scanOrder); if (list.length < 2) { uiAlert('Для уточнения нужно хотя бы два видимых скана.'); return; }
   // пары — сканы, чьи области перекрываются (по нынешнему положению)
@@ -1644,11 +1813,12 @@ async function refineStitch() {
   pushUndo(); let R; try { R = await runRefine(list, poses, pairs, fixed); } catch (e) { busy(''); uiAlert('Уточнение не удалось: ' + e.message); return; } busy('');
   let mx = 0, mxName = '', moved = 0;
   R.poses.forEach((p, i) => { const s = list[i], d = Math.hypot(p.tx - s.pose.x, p.ty - s.pose.y); if (d > 0.001 || Math.abs(p.a - s.pose.a) > 1e-5) moved++; if (d > mx) { mx = d; mxName = s.name; } s.pose = { x: p.tx, y: p.ty, a: normA(p.a) }; });
-  S.autoEdges = R.edges.map(e => ({ a: list[e.i].id, b: list[e.j].id, ratio: e.ratio, rms: e.rms })); S.lastSolve = null;
+  S.autoEdges = R.edges.map(e => { const a = list[e.i], b = list[e.j], sh = S.marks.filter(m => m.sphere && m.sid === a.id && S.marks.some(q => q.sphere && q.sid === b.id && q.lab === m.lab)).length; return { a: a.id, b: b.id, ratio: e.ratio, rms: e.rms, weak: e.weak && sh < 1, slipAng: e.slipAng, sph: sh }; }); S.lastSolve = null;
   const rms = R.edges.length ? R.edges.map(e => e.rms).sort((a, b) => a - b)[Math.floor(R.edges.length / 2)] : 0;
   analyze(); renderAll(); drawAsm(); saveSoon();
   const far = R.bad.filter(b => b[1] === 'далеко' || b[2] === 'далеко');
-  stat(`Уточнено: стыков подогнано ${R.edges.length} из ${pairs.length}, сдвинуто сканов ${moved}, самый большой сдвиг ${Math.round(mx * 1000)} мм (${mxName}). Типичное расхождение по стыку ${Math.round(rms * 1000)} мм.${R.bad.length ? ` Не подогнаны: ${R.bad.map(b => list[b[0]].name + '–' + list[b[1]].name + ' (' + b[2] + ')').slice(0, 6).join(', ')}${R.bad.length > 6 ? '…' : ''}.` : ''}`);
+  const slip = S.autoEdges.filter(e => e.weak).length, sb = (R.sres || []).filter(q => q.max > 0.01);
+  stat(`${slip ? `⚠ Стыков, которые держатся только поперёк (вдоль могут «проскальзывать»): ${slip} — красные стрелки на сборке; нужен шар или поперечная стена. ` : ''}${(R.sres || []).length ? `Шаров в расчёте: ${R.sres.length}${sb.length ? `, расходятся больше 1 см: ${sb.map(q => q.lab).join(', ')}` : ', все сошлись до 1 см'}. ` : ''}Уточнено: стыков подогнано ${R.edges.length} из ${pairs.length}, сдвинуто сканов ${moved}, самый большой сдвиг ${Math.round(mx * 1000)} мм (${mxName}). Типичное расхождение по стыку ${Math.round(rms * 1000)} мм.${R.bad.length ? ` Не подогнаны: ${R.bad.map(b => list[b[0]].name + '–' + list[b[1]].name + ' (' + b[2] + ')').slice(0, 6).join(', ')}${R.bad.length > 6 ? '…' : ''}.` : ''}`);
 }
 // --- проверка стыков: стены соседних сканов должны лечь друг на друга ---
 function wallSample(s, maxN = 6000) { const r = s.rast, P = s.pts, z0 = s.floor + s.band[0], z1 = s.floor + s.band[1], out = []; if (!r || !r.F) return out; const step = Math.max(1, Math.floor((s.nBand || 1) / maxN)); let k = 0;
@@ -1672,6 +1842,8 @@ function analyze() {
     const r1 = pairCheck(A, B, smp.get(A.id), smp.get(B.id)), r2 = pairCheck(B, A, smp.get(B.id), smp.get(A.id)), n = r1.n + r2.n; if (n < 400) continue;
     const okF = (r1.ok * r1.n + r2.ok * r2.n) / n, offF = (r1.off * r1.n + r2.off * r2.n) / n, typ = Math.max(r1.typ, r2.typ);
     if (offF > 0.25 && offF > okF * 0.6) { if (B.placed && !B.anchor && B.auto && !B.auto.root) B.placed = false; H.push({ kind: 'pair', s: A.id, s2: B.id, sev: offF > 0.45 ? 3 : 2, t: `Стык «${A.name}» — «${B.name}»: стены расходятся примерно на ${Math.round(typ * 100)} см — поставьте 2 общие линии на этой паре.`, okF, offF }); } }
+  // стыки, которые держатся только поперёк (тоннель, коридор): нужен шар или поперечная плоскость
+  for (const e of (S.autoEdges || [])) { if (!e.weak) continue; const A = scanById(e.a), B = scanById(e.b); if (!A || !B) continue; H.push({ kind: 'pair', s: A.id, s2: B.id, sev: 3, t: `Стык «${A.name}» — «${B.name}» держится только поперёк: вдоль стен ему не за что зацепиться (одни параллельные стены). Нужен шар (⚪ Шары) или поперечная плоскость — торец, ниша, колонна — отметьте её линией на обоих сканах.` }); }
   // метки с большой невязкой
   const R = S.lastSolve; if (R) for (const l of R.labs) if (l.max > 0.01) H.push({ kind: 'mark', lab: l.lab, sev: 2, t: `Метка «${l.lab}»: невязка ${Math.round(l.max * 1000)} мм — похоже, одной буквой отмечены разные стены. Коснитесь её и поправьте или удалите.` });
   H.sort((a, b) => b.sev - a.sev); S.hints = H; renderList(); return H;
