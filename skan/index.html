@@ -19,6 +19,8 @@ button:disabled{opacity:.4}button.on{background:#dbe7ff;border-color:#9bb7f5}but
 #ubar{position:fixed;left:332px;bottom:42px;display:flex;gap:4px;background:rgba(22,32,44,.9);padding:6px;border-radius:12px;z-index:6}#ubar button{background:#243142;color:#fff;border-color:#344357;font-size:15px;padding:9px 14px}#ubar button:disabled{opacity:.35}
 @media (max-width:900px){#ubar{left:272px}}@media (max-width:640px){#ubar{left:12px}}
 #mcard2{position:fixed;left:50%;transform:translateX(-50%);bottom:96px;width:min(380px,calc(100% - 24px));background:#fff;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.2);padding:10px;z-index:20}
+@media (max-width:1180px){#rotbar{bottom:100px!important;flex-wrap:wrap;justify-content:flex-end;max-width:calc(100% - 24px)}}
+#rotbar button.on{background:#e3a21a!important;color:#16202c!important}.si.grp{border-color:var(--acc);background:#f2f6ff}.si .gchk{padding:1px 6px}
 #rotbar{position:fixed;right:12px;bottom:42px;display:flex;gap:4px;background:rgba(22,32,44,.9);padding:6px;border-radius:12px;z-index:4}#rotbar button{background:#243142;color:#fff;border-color:#344357}
 #asm,#plan{width:100%;height:100%;display:block;touch-action:none;background:#fff}
 #pcard{position:absolute;right:12px;top:12px;width:min(330px,calc(100% - 24px));background:#fff;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:10px;z-index:3}.pc-h{font-weight:700;margin-bottom:6px}.pc-r{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin:5px 0}.pc-r label{color:var(--mute);font-size:13px}.pc-r input{width:90px;font:inherit;font-size:16px;padding:6px 8px;border:1px solid var(--line);border-radius:8px}.pc-s{color:var(--mute);font-size:12px;margin-top:6px}button.dang{color:#c81e1e}.pc-anc button{font-size:12px;padding:5px 8px}
@@ -54,9 +56,9 @@ canvas.band{width:100%;height:32px;display:block;border-radius:6px;touch-action:
 </div>
 <div id="side"><div id="list"></div></div>
 <div id="main"></div>
-<div id="rotbar" title="Повернуть выбранный скан"><button id="bR1">⟲ 1°</button><button id="bR01">⟲ 0,1°</button><button id="bRm01">⟳ 0,1°</button><button id="bRm1">⟳ 1°</button><button id="bR90">⟲ 90°</button></div>
+<div id="rotbar" title="Повернуть выбранный скан"><button id="bMulti" title="Выбрать несколько сканов: касание — добавить/убрать, рамка по пустому месту — выбрать все внутри">⬚ Несколько</button><button id="bR1">⟲ 1°</button><button id="bR01">⟲ 0,1°</button><button id="bRm01">⟳ 0,1°</button><button id="bRm1">⟳ 1°</button><button id="bR90">⟲ 90°</button></div>
 <div id="ubar"><button id="fUndo" disabled>↶ Отменить шаг</button><button id="fRedo" disabled>↷ Вернуть</button><button id="fDel">🗑 Удалить выбранное</button></div>
-<div id="foot"><span id="status"></span><span id="saved"></span><span id="ver">Скан 2.5 · © d1sco, 2026</span></div>
+<div id="foot"><span id="status"></span><span id="saved"></span><span id="ver">Скан 2.6 · © d1sco, 2026</span></div>
 <div id="busy" hidden><span>…</span></div>
 <input type="file" id="fileIn" multiple accept=".e57" hidden><input type="file" id="projIn" hidden>
 <div id="help" hidden><div class="lh"><h3>Как сшивать</h3><button id="helpX">✕</button></div>
@@ -74,7 +76,7 @@ canvas.band{width:100%;height:32px;display:block;border-radius:6px;touch-action:
 <li><b>📐 План</b> — когда сканы сшиты: «🔎 Найти стены» строит линии стен и проёмы по всем сканам. Править: касание стены — выбрать; тянуть стену — сдвиг параллельно (углы остаются замкнутыми); тянуть кружок на конце — длина (липнет к соседним стенам); длину можно ввести числом — «начало на месте / от середины / конец на месте» (соседние стены переезжают, комната становится шире или уже). «🎯 По точкам» — подогнать стену по точкам сканов, «⊾ К оси» — выпрямить, «＋ Проём» — дверь, окно или проём: тянуть его, края — ширина, ширина и привязка числом. ／ Линия — нарисовать стену (липнет к углам, около 0°/90° выпрямляется). Оранжевые точки — незамкнутые углы, «⌐ Замкнуть углы». «⬇ DXF» — для камералки (мм, слои).</li>
 <li><b>⌖ Общий угол</b> — в «Сборке» коснитесь угла, который виден на нескольких сканах: программа найдёт этот угол на каждом скане (пересечение двух стен) и поставит общую точку одной буквой. Потом «🧩 Сшить». На рамке скана — точка ставится в найденный угол этого скана.</li>
 <li><b>🧹 Стереть</b> — кисть (10/25/50 см): проведите по мебели, дверям, людям — эти точки уходят отовсюду: из вида, подгонки линий, поиска стен. <b>✏ Нужное</b> — набросок по стене (кусок продлится сам вдоль стены) или касание (колонна, угол); галочка «Только нужное» оставляет на сканах лишь отмеченное. «Вернуть стёртое», «Сбросить нужное» — для выбранного скана или всех.</li>
-<li><b>↶ ↷</b> — отмена и возврат любого шага. <b>💾 Файл</b> — сохранить метки и положения файлом (без точек), <b>📂</b> — открыть его.</li>
+<li><b>Несколько сканов сразу.</b> В «Сборке» нажмите <b>⬚ Несколько</b> (внизу справа): касание по скану — добавить или убрать, рамка пальцем по пустому месту — выбрать все сканы внутри. Тяните любой выбранный — едут все; кружок ↻, два пальца или кнопки поворота — поворачивается вся группа вокруг общего центра. На компьютере — Shift или Ctrl + щелчок, Shift + рамка. В списке слева — ☐ у каждого скана. Касание по пустому месту или Esc — снять выбор.</li><li><b>↶ ↷</b> — отмена и возврат любого шага. <b>💾 Файл</b> — сохранить метки и положения файлом (без точек), <b>📂</b> — открыть его.</li>
 </ol></div>
 <script id="e57src" type="text/plain">
 // ---- e57.js ----
@@ -1027,8 +1029,10 @@ function drawTile(sc) {
 function scaleBar(ctx, V, W, H) { const mpp = 1 / (V.s * dpr()); let L = 1; for (const c of [0.1, 0.2, 0.5, 1, 2, 5, 10]) if (c / mpp < 140 * dpr()) L = c; const px = L / mpp; ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.strokeStyle = '#111'; ctx.lineWidth = 2 * dpr(); const x = 12 * dpr(), y = H - 14 * dpr(); ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + px, y); ctx.moveTo(x, y - 5 * dpr()); ctx.lineTo(x, y + 5 * dpr()); ctx.moveTo(x + px, y - 5 * dpr()); ctx.lineTo(x + px, y + 5 * dpr()); ctx.stroke(); ctx.fillStyle = '#111'; ctx.font = `${11 * dpr()}px system-ui`; ctx.fillText(L < 1 ? Math.round(L * 100) + ' см' : L + ' м', x + px + 6 * dpr(), y + 4 * dpr()); ctx.restore(); }
 function drawAsm() {
   const cv = $('#asm'); if (!cv || S.view !== 'asm') return; const W = cv.width, H = cv.height, ctx = cv.getContext('2d'); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
-  const V = S.asmV, sel = scanById(S.sel);
-  for (const sc of S.scans) if (sc.vis && sc !== sel) drawScan(ctx, sc, V, W, H, sel ? 0.45 : 0.8);
+  const V = S.asmV, sel = scanById(S.sel), G = grpScans(), multi = G.length > 1;
+  for (const sc of S.scans) if (sc.vis && sc !== sel && !(multi && inGrp(sc.id))) drawScan(ctx, sc, V, W, H, sel ? 0.45 : 0.8);
+  if (multi) for (const sc of G) if (sc !== sel && sc.vis) { drawScan(ctx, sc, V, W, H, 1); const P = scanBBoxW(sc).map(p => w2s(V, W, H, p)); ctx.save(); ctx.strokeStyle = sc.color; ctx.lineWidth = 2 * dpr(); ctx.setLineDash([8 * dpr(), 5 * dpr()]); ctx.beginPath(); P.forEach((p, i) => i ? ctx.lineTo(...p) : ctx.moveTo(...p)); ctx.closePath(); ctx.stroke(); ctx.restore(); }
+  if (S.selRect) { const a = w2s(V, W, H, S.selRect[0]), b = w2s(V, W, H, S.selRect[1]); ctx.save(); ctx.strokeStyle = '#2563eb'; ctx.fillStyle = 'rgba(37,99,235,.08)'; ctx.lineWidth = 1.5 * dpr(); ctx.setLineDash([6 * dpr(), 4 * dpr()]); ctx.fillRect(Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1])); ctx.strokeRect(Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1])); ctx.restore(); }
   if (sel && sel.vis) { drawScan(ctx, sel, V, W, H, 1); const bb = scanBBoxW(sel), P = bb.map(p => w2s(V, W, H, p)); ctx.save(); ctx.strokeStyle = sel.color; ctx.lineWidth = 2 * dpr(); ctx.setLineDash([8 * dpr(), 5 * dpr()]); ctx.beginPath(); P.forEach((p, i) => i ? ctx.lineTo(...p) : ctx.moveTo(...p)); ctx.closePath(); ctx.stroke(); ctx.setLineDash([]);
     const k = knob(sel), K = w2s(V, W, H, k.p), C = w2s(V, W, H, k.c); ctx.beginPath(); ctx.moveTo(...C); ctx.lineTo(...K); ctx.stroke(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(K[0], K[1], 14 * dpr(), 0, 7); ctx.fill(); ctx.stroke(); ctx.fillStyle = sel.color; ctx.font = `bold ${16 * dpr()}px system-ui`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('↻', K[0], K[1] + 1); ctx.restore(); }
   for (const sc of S.scans) if (sc.vis) { const o = w2s(V, W, H, [sc.pose.x, sc.pose.y]); ctx.fillStyle = sc.color; ctx.beginPath(); ctx.moveTo(o[0], o[1] - 7 * dpr()); ctx.lineTo(o[0] + 6 * dpr(), o[1] + 5 * dpr()); ctx.lineTo(o[0] - 6 * dpr(), o[1] + 5 * dpr()); ctx.fill(); ctx.font = `${11 * dpr()}px system-ui`; ctx.fillText(sc.name, o[0] + 9 * dpr(), o[1] + 4 * dpr()); }
@@ -1040,9 +1044,9 @@ function drawAsm() {
 }
 function scanBBoxW(sc) { const [x0, y0, x1, y1] = sc.core; return [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].map(p => L2W(sc, p)); }
 function bandCenter(sc) { return L2W(sc, [0, 0]); }
-function knob(sc) { const c = bandCenter(sc), R = Math.max(1.5, 60 / S.asmV.s); return { c, p: [c[0], c[1] + R] }; }
+function knob(sc) { const G = grpScans(), c = G.length > 1 && inGrp(sc.id) ? grpCenter(G) : bandCenter(sc), R = Math.max(1.5, 60 / S.asmV.s); return { c, p: [c[0], c[1] + R] }; }
 function renderAll() { renderList(); renderMain(); renderBar(); }
-function renderBar() { $('#rotbar').hidden = S.view !== 'asm';
+function renderBar() { $('#rotbar').hidden = S.view !== 'asm'; { const bm = $('#bMulti'); if (bm) bm.classList.toggle('on', !!S.multi); }
   $$('[data-view]').forEach(b => b.classList.toggle('on', b.dataset.view === S.view)); $$('[data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === S.tool));
   $('#bUndo').disabled = !S.undo.length; $('#bRedo').disabled = !S.redo.length; $('#fUndo').disabled = !S.undo.length; $('#fRedo').disabled = !S.redo.length; $$('[data-cols]').forEach(b => b.classList.toggle('on', +b.dataset.cols === S.cols)); const tw = $('#bTW'); if (tw) tw.classList.toggle('on', !!S.tileWorld); $('#colsBox').hidden = S.view !== 'grid';
 }
@@ -1074,8 +1078,8 @@ function renderList() {
   const H = S.hints || [];
   el.innerHTML = (S.scans.length ? cleanPanel() : '') + (S.scans.length > 1 ? `<div class="hints"><div class="lh"><b>${H.length ? '💡 Где помочь (' + H.length + ')' : (S.scans.some(s => s.auto) || S.lastSolve ? '✓ Стыки сходятся' : '🤖 Автосшивка')}</b></div>${H.slice(0, 12).map((h, i) => `<button class="hint s${h.sev}" data-hint="${i}">${escH(h.t)}</button>`).join('')}<div class="row" style="display:flex;gap:5px;flex-wrap:wrap;margin-top:4px"><button id="hAuto">🤖 Сшить автоматически</button><button id="hCheck">🔍 Проверить стыки</button><button id="hPlan">📐 Пробный план</button></div></div>` : '') +
     `<div class="lh"><b>Сканы (${S.scans.length})</b><button id="allVis">👁 Все</button></div>` + S.scans.map(s => { const d = dofOf(s.id), H = s.ceil - s.floor;
-    return `<div class="si ${S.sel === s.id ? 'sel' : ''}" data-sid="${s.id}"><div class="sr"><i style="background:${s.color}"></i><b>${escH(s.name)}</b>
-      <button data-vis="${s.id}" class="${s.vis ? 'on' : ''}" title="Показывать">${s.vis ? '👁' : '◌'}</button><button data-anc="${s.id}" class="${s.anchor || s.placed ? 'on' : ''}" title="${s.placed ? 'Сшит автоматикой и стоит на месте. Нажать — освободить: встанет по меткам' : 'Опорный: стоит на месте при сшивке'}">${s.placed && !s.anchor ? '🔒' : '⚓'}</button></div>
+    return `<div class="si ${S.sel === s.id ? 'sel' : ''} ${inGrp(s.id) && S.sel !== s.id ? 'grp' : ''}" data-sid="${s.id}"><div class="sr"><i style="background:${s.color}"></i><b>${escH(s.name)}</b>
+      <button data-g="${s.id}" class="gchk ${inGrp(s.id) && grpScans().length > 1 ? 'on' : ''}" title="Добавить в группу: несколько сканов двигаются вместе">${inGrp(s.id) && grpScans().length > 1 ? '☑' : '☐'}</button><button data-vis="${s.id}" class="${s.vis ? 'on' : ''}" title="Показывать">${s.vis ? '👁' : '◌'}</button><button data-anc="${s.id}" class="${s.anchor || s.placed ? 'on' : ''}" title="${s.placed ? 'Сшит автоматикой и стоит на месте. Нажать — освободить: встанет по меткам' : 'Опорный: стоит на месте при сшивке'}">${s.placed && !s.anchor ? '🔒' : '⚓'}</button></div>
       <div class="sm">${s.auto ? (s.auto.group > 0 ? '<span class="bad">авто: не пристыкован</span> · ' : s.auto.root ? '<span class="ok">авто: основа</span> · ' : `<span class="${s.auto.fit != null && s.auto.fit < 0.35 || s.auto.links === 1 ? 'wa' : 'ok'}">авто: связей ${s.auto.links || 0}${s.auto.fit != null ? ', ' + Math.round(s.auto.fit * 100) + '%' : ''}</span> · `) : ''}${s.anchor ? '<b>опорный</b>' : S.marks.some(m => m.sid === s.id) ? (d.ok ? '<span class="ok">метки: ' + d.n + ' — хватает</span>' : '<span class="wa">' + escH(d.need) + '</span>') : '<span class="mu">меток нет</span>'} · высота ${nf(H, 2)} м</div>
       <canvas class="band" data-band="${s.id}" width="560" height="64"></canvas>
       <div class="bt"><span>полоса ${nf(s.band[0], 2)}–${nf(s.band[1], 2)} м от пола</span><button data-bp="lo" data-s="${s.id}">Низ</button><button data-bp="mid" data-s="${s.id}">Середина</button><button data-bp="hi" data-s="${s.id}">Верх</button><button data-bp="all" data-s="${s.id}">Всё</button></div></div>`; }).join('')
@@ -1084,7 +1088,8 @@ function renderList() {
   $$('[data-hint]').forEach(b => b.onclick = () => hintGo(H[+b.dataset.hint]));
   const ha = $('#hAuto'); if (ha) ha.onclick = autoStitch; const hc = $('#hCheck'); if (hc) hc.onclick = () => { const r = analyze(); stat(r.length ? `Найдено мест, где помочь: ${r.length}. Касание подсказки — открыть нужную пару сканов.` : 'Стыки сходятся: стены соседних сканов совпадают.'); }; const hp = $('#hPlan'); if (hp) hp.onclick = trialPlan;
   $('#allVis') && ($('#allVis').onclick = () => { S.scans.forEach(s => s.vis = true); S.cols = Math.max(S.cols, 2); renderAll(); saveSoon(); });
-  $$('.si').forEach(d => d.onclick = e => { if (e.target.closest('button') || e.target.closest('canvas')) return; S.sel = +d.dataset.sid; renderAll(); });
+  $$('.si').forEach(d => d.onclick = e => { if (e.target.closest('button') || e.target.closest('canvas')) return; if (e.ctrlKey || e.metaKey || e.shiftKey || S.multi) grpToggle(+d.dataset.sid); else { S.sel = +d.dataset.sid; grpClear(); } renderAll(); });
+  $$('[data-g]').forEach(b => b.onclick = () => { grpToggle(+b.dataset.g); renderAll(); });
   $$('[data-vis]').forEach(b => b.onclick = () => { const s = scanById(+b.dataset.vis); s.vis = !s.vis; renderAll(); saveSoon(); });
   $$('[data-anc]').forEach(b => b.onclick = () => { pushUndo(); const s = scanById(+b.dataset.anc); if (s.placed && !s.anchor) { s.placed = false; renderAll(); saveSoon(); stat(`«${s.name}» освобождён — при «🧩 Сшить» встанет по меткам.`); return; } s.anchor = !s.anchor; renderAll(); saveSoon(); stat(s.anchor ? `«${s.name}» опорный — при сшивке стоит на месте, остальные встают к нему.` : `«${s.name}» больше не опорный.`); });
   $$('[data-bp]').forEach(b => b.onclick = () => { const s = scanById(+b.dataset.s), H = s.ceil - s.floor; pushUndo(); s.band = b.dataset.bp === 'lo' ? [0.05, Math.min(1.2, H)] : b.dataset.bp === 'hi' ? [Math.max(0.05, H - 1.0), H - 0.03] : b.dataset.bp === 'mid' ? [Math.max(0.05, H * 0.3), Math.min(H - 0.05, H * 0.75)] : [0.05, H - 0.03]; s.band = s.band.map(v => +v.toFixed(2)); prepScan(s); renderAll(); saveSoon(); });
@@ -1123,7 +1128,7 @@ function bindCanvas(cv, ctxInfo) {
       const [a, b] = [...P.values()], mid = { clientX: (a.x + b.x) / 2, clientY: (a.y + b.y) / 2 }, wm = toW(mid);
       const sc = ctxInfo.kind === 'asm' && S.tool === 'hand' && S.sel ? scanById(S.sel) : null, onSel = sc && scanAt(wm) === sc;
       if (g && g.kind === 'draw') S.drawing = null;
-      g = { kind: onSel ? 'twist' : 'pinch', a0: Math.atan2(b.y - a.y, b.x - a.x), d0: Math.hypot(b.x - a.x, b.y - a.y), m0: mid, v0: { ...V() }, pose0: sc ? { ...sc.pose } : null, sc, wm0: wm };
+      const hw = ctxInfo.kind === 'asm' ? scanAt(wm) : null, onG = ctxInfo.kind === 'asm' && S.tool === 'hand' && grpScans().length > 1 && hw && inGrp(hw.id); g = { kind: onSel || onG ? 'twist' : 'pinch', a0: Math.atan2(b.y - a.y, b.x - a.x), d0: Math.hypot(b.x - a.x, b.y - a.y), m0: mid, v0: { ...V() }, pose0: sc ? { ...sc.pose } : null, sc, wm0: wm, grp: onG ? grpScans().map(q => ({ sc: q, pose0: { ...q.pose } })) : null }; if (onG && !onSel) pushUndo();
       if (onSel) pushUndo(); return; }
     if (P.size > 2) return;
     const w = toW(e);
@@ -1144,10 +1149,12 @@ function bindCanvas(cv, ctxInfo) {
         const hit = markAt(sc, cv, e, ctxInfo); if (hit) { S.markSel = hit.id; S.sel = sc.id; pushUndo(); g = { kind: 'mMove', m: hit, sc, w0: local(sc, w), a0: hit.a.slice(), b0: hit.b ? hit.b.slice() : null, moved: false }; redraw(); renderMarkCard(); return; } } }
     if (ctxInfo.kind === 'asm') {
       const sel = S.sel && scanById(S.sel);
-      if (sel) { const k = knob(sel), K = w2s(S.asmV, cv.width, cv.height, k.p), r = cv.getBoundingClientRect(), sx = (e.clientX - r.left) * dpr(), sy = (e.clientY - r.top) * dpr(); if (Math.hypot(sx - K[0], sy - K[1]) < 22 * dpr()) { pushUndo(); g = { kind: 'knob', sc: sel, c: k.c, a0: Math.atan2(w[1] - k.c[1], w[0] - k.c[0]), pose0: { ...sel.pose } }; return; } }
-      const hit = scanAt(w);
-      if (hit) { if (S.sel !== hit.id && !right) { S.sel = hit.id; renderList(); }
-        pushUndo(); const sc = scanById(S.sel); g = right ? { kind: 'rot', sc, c: w, a0: null, pose0: { ...sc.pose }, x: e.clientX } : { kind: 'move', sc, w0: w, pose0: { ...sc.pose } }; drawAsm(); return; }
+      if (sel) { const k = knob(sel), K = w2s(S.asmV, cv.width, cv.height, k.p), r = cv.getBoundingClientRect(), sx = (e.clientX - r.left) * dpr(), sy = (e.clientY - r.top) * dpr(); if (Math.hypot(sx - K[0], sy - K[1]) < 22 * dpr()) { pushUndo(); g = { kind: 'knob', sc: sel, c: k.c, a0: Math.atan2(w[1] - k.c[1], w[0] - k.c[0]), pose0: { ...sel.pose }, grp: grpScans().map(q => ({ sc: q, pose0: { ...q.pose } })) }; return; } }
+      const hit = scanAt(w), addKey = e.ctrlKey || e.metaKey || e.shiftKey;
+      if (hit && (S.multi || addKey) && !right) { g = { kind: 'gtap', hit, w0: w, x: e.clientX, y: e.clientY }; return; } // касание — добавить/убрать; повёл — двигать группу
+      if (!hit && (S.multi || e.shiftKey) && !right) { g = { kind: 'rect', w0: w, x: e.clientX, y: e.clientY }; S.selRect = [w, w]; return; }
+      if (hit) { if (!inGrp(hit.id)) { S.sel = hit.id; grpClear(); renderList(); }
+        pushUndo(); const sc = hit, grp = grpScans().map(q => ({ sc: q, pose0: { ...q.pose } })); g = right ? { kind: 'rot', sc, c: w, a0: null, pose0: { ...sc.pose }, x: e.clientX, grp } : { kind: 'move', sc, w0: w, pose0: { ...sc.pose }, grp }; drawAsm(); return; }
       g = { kind: 'pan', x: e.clientX, y: e.clientY, v0: { ...V() }, tap: true }; return;
     }
     g = { kind: 'pan', x: e.clientX, y: e.clientY, v0: { ...V() } };
@@ -1158,16 +1165,18 @@ function bindCanvas(cv, ctxInfo) {
     if ((g.kind === 'pinch' || g.kind === 'twist') && P.size >= 2) { const [a, b] = [...P.values()], mid = { clientX: (a.x + b.x) / 2, clientY: (a.y + b.y) / 2 };
       if (g.kind === 'pinch') { const k = Math.hypot(b.x - a.x, b.y - a.y) / g.d0; v.s = g.v0.s * k; v.cx = g.v0.cx; v.cy = g.v0.cy; const wm = toW(mid); v.cx += g.wm0[0] - wm[0]; v.cy += g.wm0[1] - wm[1]; redrawOne(); return; }
       const da = -(Math.atan2(b.y - a.y, b.x - a.x) - g.a0), wm = toW(mid); const sc = g.sc, p0 = g.pose0; // поворот вокруг середины пальцев
-      const rel = rot([p0.x - g.wm0[0], p0.y - g.wm0[1]], da); sc.pose = { x: wm[0] + rel[0], y: wm[1] + rel[1], a: normA(p0.a + da) }; drawAsm(); return; }
+      if (g.grp) { for (const q of g.grp) { const r2 = rot([q.pose0.x - g.wm0[0], q.pose0.y - g.wm0[1]], da); q.sc.pose = { x: wm[0] + r2[0], y: wm[1] + r2[1], a: normA(q.pose0.a + da) }; } drawAsm(); return; } const rel = rot([p0.x - g.wm0[0], p0.y - g.wm0[1]], da); sc.pose = { x: wm[0] + rel[0], y: wm[1] + rel[1], a: normA(p0.a + da) }; drawAsm(); return; }
     if (g.kind === 'pan') { const k = v.s; v.cx = g.v0.cx - (e.clientX - g.x) / k; v.cy = g.v0.cy + (e.clientY - g.y) / k; if (Math.hypot(e.clientX - g.x, e.clientY - g.y) > 6) g.tap = false; redrawOne(); return; }
     const w = toW(e);
     if (g.kind && g.kind.startsWith('c_')) { cleanMove(CC, g, w, e); redrawOne(); return; }
     if (g.kind === 'draw') { const sc = scanById(g.sid); S.drawing.b = S.tool === 'point' ? S.drawing.a : local(sc, w); redrawOne(); return; }
     if (g.kind === 'mEnd') { const l = local(g.sc, w); g.m[g.end] = l; g.m.edited = true; redrawOne(); return; }
     if (g.kind === 'mMove') { const l = local(g.sc, w), dx = l[0] - g.w0[0], dy = l[1] - g.w0[1]; if (Math.hypot(dx, dy) * V().s > 4) g.moved = true; if (!g.moved) return; g.m.a = [g.a0[0] + dx, g.a0[1] + dy]; if (g.b0) g.m.b = [g.b0[0] + dx, g.b0[1] + dy]; g.m.edited = true; redrawOne(); return; }
-    if (g.kind === 'move') { g.sc.pose = { ...g.pose0, x: g.pose0.x + w[0] - g.w0[0], y: g.pose0.y + w[1] - g.w0[1] }; drawAsm(); return; }
-    if (g.kind === 'knob') { const a = Math.atan2(w[1] - g.c[1], w[0] - g.c[0]); let da = a - g.a0; if (e.shiftKey) da = Math.round(da / (Math.PI / 180)) * Math.PI / 180; setRot(g.sc, g.pose0, g.c, da); drawAsm(); return; }
-    if (g.kind === 'rot') { const da = -(e.clientX - g.x) * 0.004 * (e.ctrlKey ? 0.1 : 1); setRot(g.sc, g.pose0, g.c, da); drawAsm(); return; }
+    if (g.kind === 'gtap') { if (Math.hypot(e.clientX - g.x, e.clientY - g.y) < 6) return; if (!inGrp(g.hit.id)) { grpToggle(g.hit.id); renderList(); } pushUndo(); g = { kind: 'move', sc: g.hit, w0: g.w0, pose0: { ...g.hit.pose }, grp: grpScans().map(q => ({ sc: q, pose0: { ...q.pose } })) }; }
+    if (g.kind === 'rect') { S.selRect = [g.w0, w]; drawAsm(); return; }
+    if (g.kind === 'move') { const dx = w[0] - g.w0[0], dy = w[1] - g.w0[1]; if (g.grp && g.grp.length > 1) for (const q of g.grp) q.sc.pose = { ...q.pose0, x: q.pose0.x + dx, y: q.pose0.y + dy }; else g.sc.pose = { ...g.pose0, x: g.pose0.x + dx, y: g.pose0.y + dy }; drawAsm(); return; }
+    if (g.kind === 'knob') { const a = Math.atan2(w[1] - g.c[1], w[0] - g.c[0]); let da = a - g.a0; if (e.shiftKey) da = Math.round(da / (Math.PI / 180)) * Math.PI / 180; if (g.grp && g.grp.length > 1) for (const q of g.grp) setRot(q.sc, q.pose0, g.c, da); else setRot(g.sc, g.pose0, g.c, da); drawAsm(); return; }
+    if (g.kind === 'rot') { const da = -(e.clientX - g.x) * 0.004 * (e.ctrlKey ? 0.1 : 1); if (g.grp && g.grp.length > 1) for (const q of g.grp) setRot(q.sc, q.pose0, g.c, da); else setRot(g.sc, g.pose0, g.c, da); drawAsm(); return; }
   };
   const end = e => {
     P.delete(e.pointerId); if (!g) return;
@@ -1176,11 +1185,20 @@ function bindCanvas(cv, ctxInfo) {
     if (was.kind && was.kind.startsWith('c_')) { cleanEnd(CC, was, e); return; }
     if (was.kind === 'draw') { const D = S.drawing; S.drawing = null; finishMark(was.sid, D.a, S.tool === 'point' ? null : D.b, e.clientX, e.clientY); return; }
     if (was.kind === 'mEnd' || was.kind === 'mMove') { if (was.kind === 'mMove' && !was.moved) { S.undo.pop(); renderMarkCard(); return; } const m = was.m; if (m.kind === 'line' && m.snap !== false) { const f = fitLine(was.sc, m.a, m.b); if (f) { m.a = f.a; m.b = f.b; m.fit = { n: f.n, rms: f.rms }; } else m.fit = null; } S.lastSolve = null; redraw(); renderList(); renderMarkCard(); saveSoon(); return; }
-    if (was.kind === 'pan' && was.tap) { if (S.markSel) { S.markSel = null; redraw(); renderMarkCard(); } if (ctxInfo.kind === 'asm') { S.sel = null; renderList(); drawAsm(); } return; }
+    if (was.kind === 'gtap') { grpToggle(was.hit.id); renderList(); drawAsm(); return; }
+    if (was.kind === 'rect') { const r = S.selRect; S.selRect = null; if (r && Math.hypot(e.clientX - was.x, e.clientY - was.y) > 8) { const x0 = Math.min(r[0][0], r[1][0]), x1 = Math.max(r[0][0], r[1][0]), y0 = Math.min(r[0][1], r[1][1]), y1 = Math.max(r[0][1], r[1][1]); for (const q of S.scans) { if (!q.vis) continue; const c = bandCenter(q); if (c[0] >= x0 && c[0] <= x1 && c[1] >= y0 && c[1] <= y1 && !inGrp(q.id)) grpToggle(q.id); } grpStat(); } else { S.sel = null; grpClear(); stat('Выбор снят.'); } renderList(); drawAsm(); return; }
+    if (was.kind === 'pan' && was.tap) { grpClear(); if (S.markSel) { S.markSel = null; redraw(); renderMarkCard(); } if (ctxInfo.kind === 'asm') { S.sel = null; renderList(); drawAsm(); } return; }
     if (was.kind === 'move' || was.kind === 'knob' || was.kind === 'rot' || was.kind === 'twist') { S.lastSolve = null; saveSoon(); renderList(); }
   };
   cv.onpointerup = end; cv.onpointercancel = end;
 }
+// ---------- несколько сканов сразу: S.sel + S.grp двигаются и поворачиваются вместе ----------
+function grpScans() { const ids = [...new Set([S.sel, ...(S.grp || [])].filter(Boolean))]; return ids.map(scanById).filter(Boolean); }
+const inGrp = id => id === S.sel || (S.grp || []).includes(id);
+function grpCenter(L) { const c = L.map(bandCenter); return [c.reduce((a, q) => a + q[0], 0) / c.length, c.reduce((a, q) => a + q[1], 0) / c.length]; }
+function grpToggle(id) { S.grp = S.grp || []; if (!S.sel) { S.sel = id; } else if (id === S.sel) { const nx = S.grp.shift(); S.sel = nx || null; } else if (S.grp.includes(id)) S.grp = S.grp.filter(x => x !== id); else S.grp.push(id); grpStat(); }
+function grpClear() { S.grp = []; }
+function grpStat() { const n = grpScans().length; stat(n > 1 ? `Выбрано сканов: ${n}. Тяните любой из них — едут все; ↻ или кнопки поворота — поворот всей группы.` : n ? 'Выбран один скан. В режиме «⬚ Несколько» касанием добавьте ещё, или обведите рамкой по пустому месту.' : 'Ничего не выбрано.'); }
 function setRot(sc, p0, c, da) { const rel = rot([p0.x - c[0], p0.y - c[1]], da); sc.pose = { x: c[0] + rel[0], y: c[1] + rel[1], a: normA(p0.a + da) }; }
 function markAt(sc, cv, e, ctxInfo) { const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) * dpr(), y = (e.clientY - r.top) * dpr(); const V = ctxInfo.kind === 'asm' ? S.asmV : sc.tile; const toS = p => w2s(V, cv.width, cv.height, ctxInfo.kind === 'asm' ? L2W(sc, p) : rot(p, tileRot(sc))); let best = null, bd = 16 * dpr();
   for (const m of S.marks) { if (m.sid !== sc.id) continue; const A = toS(m.a), B = m.b ? toS(m.b) : A, dx = B[0] - A[0], dy = B[1] - A[1], L = dx * dx + dy * dy || 1e-9; let t = ((x - A[0]) * dx + (y - A[1]) * dy) / L; t = Math.max(0, Math.min(1, t)); const d = Math.hypot(A[0] + t * dx - x, A[1] + t * dy - y); if (d < bd) { bd = d; best = m; } } return best; }
@@ -1219,7 +1237,7 @@ function renderMarkCard() {
   $('#mkOk').onclick = () => { S.markSel = null; redraw(); renderMarkCard(); };
 }
 function refreshTileHead(sid) { const t = $(`#tile-${sid} .th span`); if (t) t.innerHTML = S.marks.filter(m => m.sid === sid).map(m => `<em style="background:${labColor(m.lab)}">${escH(m.lab)}</em>`).join(''); }
-function rotSel(deg) { const s = scanById(S.sel); if (!s) { stat('Выберите скан (касание по нему в «Сборке» или в списке).'); return; } pushUndo(); setRot(s, { ...s.pose }, bandCenter(s), deg * Math.PI / 180); S.lastSolve = null; drawAsm(); saveSoon(); }
+function rotSel(deg) { const G = grpScans(); if (!G.length) { stat('Выберите скан (касание по нему в «Сборке» или в списке).'); return; } pushUndo(); const c = G.length > 1 ? grpCenter(G) : bandCenter(G[0]); for (const s of G) setRot(s, { ...s.pose }, c, deg * Math.PI / 180); S.lastSolve = null; drawAsm(); saveSoon(); }
 
 // ---------- проект файлом ----------
 function saveProjectFile() { const j = stateObj(); j.app = 'skan'; const blob = new Blob([JSON.stringify(j)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = ((pjCur() && pjCur().name) || 'Сшивка_' + new Date().toISOString().slice(0, 10)).replace(/[\\/:*?"<>|]/g, '_') + '.skan.json'; document.body.appendChild(a); a.click(); a.remove(); stat('Файл проекта сохранён (без точек: при открытии на другом устройстве загрузите те же E57 — метки и положения встанут по именам сканов).'); }
@@ -1234,7 +1252,7 @@ function setTool(t) { S.tool = t; renderBar(); stat({ hand: 'Обзор: тян�
 
 window.addEventListener('resize', () => { if (S.view === 'grid') { sizeTiles(); redraw(); } else { const cv = $('#asm') || $('#plan'); if (cv) { sizeCanvas(cv); redraw(); } } });
 document.addEventListener('keydown', e => { if (e.target.closest('input')) return; if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }
-  else if (S.view === 'asm' && S.sel && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'q', 'e', 'й', 'у'].includes(e.key)) { const s = scanById(S.sel), st = e.shiftKey ? 0.1 : 0.01; pushUndo(); if (e.key === 'ArrowLeft') s.pose.x -= st; if (e.key === 'ArrowRight') s.pose.x += st; if (e.key === 'ArrowUp') s.pose.y += st; if (e.key === 'ArrowDown') s.pose.y -= st; if (e.key === 'q' || e.key === 'й') setRot(s, { ...s.pose }, bandCenter(s), (e.shiftKey ? 1 : 0.1) * Math.PI / 180); if (e.key === 'e' || e.key === 'у') setRot(s, { ...s.pose }, bandCenter(s), -(e.shiftKey ? 1 : 0.1) * Math.PI / 180); e.preventDefault(); drawAsm(); saveSoon(); } });
+  else if (S.view === 'asm' && S.sel && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'q', 'e', 'й', 'у'].includes(e.key)) { const G = grpScans(), st = e.shiftKey ? 0.1 : 0.01, c = G.length > 1 ? grpCenter(G) : bandCenter(G[0]); pushUndo(); for (const s of G) { if (e.key === 'ArrowLeft') s.pose.x -= st; if (e.key === 'ArrowRight') s.pose.x += st; if (e.key === 'ArrowUp') s.pose.y += st; if (e.key === 'ArrowDown') s.pose.y -= st; if (e.key === 'q' || e.key === 'й') setRot(s, { ...s.pose }, c, (e.shiftKey ? 1 : 0.1) * Math.PI / 180); if (e.key === 'e' || e.key === 'у') setRot(s, { ...s.pose }, c, -(e.shiftKey ? 1 : 0.1) * Math.PI / 180); } e.preventDefault(); drawAsm(); saveSoon(); } else if (e.key === 'Escape' && S.view === 'asm') { grpClear(); S.multi = false; renderBar(); renderList(); drawAsm(); } });
 function layoutTop() { const h = $('#top').offsetHeight; for (const id of ['side', 'main']) $('#' + id).style.top = h + 'px'; $('#help').style.top = (h + 8) + 'px'; }
 window.addEventListener('resize', layoutTop);
 document.addEventListener('DOMContentLoaded', async () => { layoutTop();
@@ -1242,7 +1260,7 @@ document.addEventListener('DOMContentLoaded', async () => { layoutTop();
   $$('[data-view]').forEach(b => b.onclick = () => setView(b.dataset.view)); $$('[data-tool]').forEach(b => b.onclick = () => setTool(b.dataset.tool));
   $$('[data-cols]').forEach(b => b.onclick = () => { S.cols = +b.dataset.cols; S.scans.forEach(s => s.tile = null); renderAll(); saveSoon(); });
   $('#bTW').onclick = () => { S.tileWorld = !S.tileWorld; S.scans.forEach(x => x.tile = null); renderAll(); stat(S.tileWorld ? 'Рамки повёрнуты как в сборке: одна и та же стена на соседних сканах смотрит в одну сторону.' : 'Рамки — каждый скан как снят.'); }; $('#bStitch').onclick = stitch; $('#bAuto').onclick = autoStitch; $('#bUndo').onclick = undo; $('#bRedo').onclick = redo; $('#fUndo').onclick = undo; $('#fRedo').onclick = redo; $('#fDel').onclick = delSelected; $('#bFit').onclick = () => { if (S.view === 'asm' || S.view === 'plan') fitAsm(); else { S.scans.forEach(fitTile); redraw(); } };
-  $('#bR1').onclick = () => rotSel(1); $('#bR01').onclick = () => rotSel(0.1); $('#bRm01').onclick = () => rotSel(-0.1); $('#bRm1').onclick = () => rotSel(-1); $('#bR90').onclick = () => rotSel(90);
+  $('#bMulti').onclick = () => { S.multi = !S.multi; renderBar(); stat(S.multi ? '⬚ Несколько: касание по скану — добавить или убрать; обведите рамкой по пустому месту — выбрать все внутри. Тяните любой выбранный — едут все. Выйти — ещё раз «⬚ Несколько».' : 'Обычный выбор: касание — один скан.'); }; $('#bR1').onclick = () => rotSel(1); $('#bR01').onclick = () => rotSel(0.1); $('#bRm01').onclick = () => rotSel(-0.1); $('#bRm1').onclick = () => rotSel(-1); $('#bR90').onclick = () => rotSel(90);
   $('#bSave').onclick = saveProjectFile; $('#bOpen').onclick = () => $('#projIn').click(); $('#projIn').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) openProjectFile(f); };
   $('#bNew').onclick = pjNew; $('#bProj').onclick = pjMenu;
   $('#bHelp').onclick = () => $('#help').hidden = !$('#help').hidden; $('#helpX').onclick = () => $('#help').hidden = true;
