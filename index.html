@@ -285,7 +285,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 7.0 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 7.1 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -3934,6 +3934,9 @@ function pDown(ev) {
   TP.tap = null; TP.pan = null;
   const [a, b] = [...TP.pts.values()]; const r = cv.getBoundingClientRect();
   const mx = (a[0] + b[0]) / 2 - r.left, my = (a[1] + b[1]) / 2 - r.top;
+  // два пальца на выделенном — поворот (и перенос) выделенного; иначе — масштаб и сдвиг вида
+  if (S.step === 'tape' && T.selSet && !T.calMode && inSel(S2W(a[0] - r.left, a[1] - r.top)) && inSel(S2W(b[0] - r.left, b[1] - r.top))) { const wm = S2W(mx, my);
+    if (startSelRot(wm)) { const g = T.rotSel; g.c = wm; g.twist = true; g.sa0 = Math.atan2(b[1] - a[1], b[0] - a[0]); TP.twist = true; TP.pinch = null; stat('Поворот двумя пальцами: вращайте — поворачивается выделенное, ведите — сдвигается. Около 0° и 90° липнет.'); draw(); return; } }
   TP.pinch = { d0: Math.hypot(a[0] - b[0], a[1] - b[1]) || 1, s0: S.view.s, w0: S2W(mx, my) };
 }
 function pMove(ev) {
@@ -3942,6 +3945,8 @@ function pMove(ev) {
   if (!TP.pts.has(ev.pointerId)) return;
   TP.pts.set(ev.pointerId, [ev.clientX, ev.clientY]);
   const r = cv.getBoundingClientRect();
+  if (TP.twist && T.rotSel && TP.pts.size >= 2) { const [a, b] = [...TP.pts.values()], g = T.rotSel; const da = -(Math.atan2(b[1] - a[1], b[0] - a[0]) - g.sa0); // на экране y вниз — в чертеже вверх
+    moveSelRot(null, da, S2W((a[0] + b[0]) / 2 - r.left, (a[1] + b[1]) / 2 - r.top)); return; }
   if (TP.pinch && TP.pts.size >= 2) {
     const [a, b] = [...TP.pts.values()]; const d = Math.hypot(a[0] - b[0], a[1] - b[1]);
     const mx = (a[0] + b[0]) / 2 - r.left, my = (a[1] + b[1]) / 2 - r.top;
@@ -3980,6 +3985,7 @@ function pEnd(ev) {
     onMove(fakeEv(t0.ev, t0.x, t0.y)); onDown(fakeEv(t0.ev, t0.x, t0.y)); onUp(fakeEv(t0.ev, t0.x, t0.y)); }
   } else if (TP.toolDrag && TP.pts.size === 0) { TP.toolDrag = false; onUp(fakeEv(ev)); }
   if (TP.pts.size < 2) TP.pinch = null;
+  if (TP.twist && TP.pts.size < 2) { TP.twist = false; if (T.rotSel) endSelRot(); TP.tap = null; TP.toolDrag = false; }
   if (TP.pts.size === 1) { const [p] = [...TP.pts.values()]; TP.pan = { px: p[0], py: p[1], cx: S.view.cx, cy: S.view.cy }; }
   if (TP.pts.size === 0) { TP.pan = null; TP.tap = null; }
   renderTouchBar();
@@ -5364,13 +5370,13 @@ function selRotHit(sx, sy) { const r = selRotHandle(); if (!r) return false; con
 function startSelRot(w0) { const r = selRotHandle(); if (!r) return false; const b = selBBox(), pad = 26 / S.view.s, inB = q => q && q[0] >= b[0] - pad && q[0] <= b[2] + pad && q[1] >= b[1] - pad && q[1] <= b[3] + pad; tPush(); T.selRect = null;
   T.rotSel = { c: r.c, a0: Math.atan2(w0[1] - r.c[1], w0[0] - r.c[0]), pts: M.pts.filter(p => T.selSet.has(p.id)).map(p => ({ p, q: PX(p) })), marks: (M.marks || []).filter(m => inB(m.p)).map(m => ({ m, p: m.p.slice(), dir: m.dir })), notes: (M.notes || []).filter(n => inB(n.at)).map(n => ({ n, at: n.at.slice(), tip: n.tip ? n.tip.slice() : null })), rooms: M.rooms.filter(R => R.lp && R.ids.every(id => T.selSet.has(id))).map(R => ({ R, lp: R.lp.slice() })), all: T.selSet.size === M.pts.length, ax: M.axis, da: 0 };
   stat('Поворот: ведите вокруг центра. Около 0° и 90° — липнет, шаг 0,1°.'); return true; }
-function moveSelRot(w) { const g = T.rotSel; let da = Math.atan2(w[1] - g.c[1], w[0] - g.c[0]) - g.a0; da = Math.atan2(Math.sin(da), Math.cos(da)); let deg = da * 180 / Math.PI;
+function moveSelRot(w, da0, cNow) { const g = T.rotSel; let da = da0 != null ? da0 : Math.atan2(w[1] - g.c[1], w[0] - g.c[0]) - g.a0; da = Math.atan2(Math.sin(da), Math.cos(da)); let deg = da * 180 / Math.PI;
   for (const k of [-180, -90, 0, 90, 180]) if (Math.abs(deg - k) < 0.7) deg = k; deg = Math.round(deg * 10) / 10; da = deg * Math.PI / 180; g.da = da;
-  const cs = Math.cos(da), sn = Math.sin(da), c = g.c, R = (x, y) => [c[0] + (x - c[0]) * cs - (y - c[1]) * sn, c[1] + (x - c[0]) * sn + (y - c[1]) * cs];
+  const cs = Math.cos(da), sn = Math.sin(da), c = g.c, c2 = cNow || c, R = (x, y) => [c2[0] + (x - c[0]) * cs - (y - c[1]) * sn, c2[1] + (x - c[0]) * sn + (y - c[1]) * cs];
   for (const o of g.pts) { const [x, y] = R(o.q[0], o.q[1]); o.p.x0 = x; o.p.y0 = y; o.p.x = x; o.p.y = y; }
   for (const o of g.marks) { o.m.p = R(...o.p); if (o.dir != null) o.m.dir = o.dir + da; } for (const o of g.notes) { o.n.at = R(...o.at); if (o.tip) o.n.tip = R(...o.tip); } for (const o of g.rooms) o.R.lp = R(...o.lp);
   if (g.all && g.ax != null) M.axis = g.ax + da; stat(`Поворот ${deg > 0 ? '⟲' : deg < 0 ? '⟳' : ''} ${String(Math.abs(deg)).replace('.', ',')}°`); draw(); }
-function endSelRot() { const g = T.rotSel; T.rotSel = null; adjust(); asSoon(); renderTape(); draw(); if (T.selSet) showSelBox(); const deg = Math.round(g.da * 1800 / Math.PI) / 10; stat(deg ? `Повёрнуто на ${String(Math.abs(deg)).replace('.', ',')}° ${deg > 0 ? 'против' : 'по'} часовой.` : 'Без поворота.'); }
+function endSelRot() { const g = T.rotSel; T.rotSel = null; adjust(); asSoon(); renderTape(); draw(); if (T.selSet) showSelBox(); const deg = Math.round(g.da * 1800 / Math.PI) / 10; stat(deg ? `${g.twist ? 'Двумя пальцами: п' : 'П'}овёрнуто на ${String(Math.abs(deg)).replace('.', ',')}° ${deg > 0 ? 'против' : 'по'} часовой.` : 'Без поворота.'); }
 function startSelDrag(w0) { const b = selBBox(), pad = 26 / S.view.s, inB = q => q[0] >= b[0] - pad && q[0] <= b[2] + pad && q[1] >= b[1] - pad && q[1] <= b[3] + pad;
   tPush(); T.dragSel = { w0: w0.slice(), rect: T.selRect ? T.selRect.slice() : null, pts: M.pts.filter(p => T.selSet.has(p.id)).map(ptPos), marks: (M.marks || []).filter(m => inB(m.p)).map(m => ({ m, p: m.p.slice() })), notes: (M.notes || []).filter(n => inB(n.at)).map(n => ({ n, at: n.at.slice(), tip: n.tip ? n.tip.slice() : null })) };
   stat(`Двигаю выделенное: точек ${T.dragSel.pts.length}. Отпустите — встанет на место.`); }
