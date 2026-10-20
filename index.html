@@ -285,7 +285,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 6.7 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 6.8 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -4801,6 +4801,9 @@ function tapeMenu(w, cx, cy) {
   } else if (h.obj) {
     const o = h.obj; title = objLabel(o);
     if (o.type === 'fig') { items.push(['◉ Другая фигура…', async () => { const k = await chooseFig(o.kind); if (k && k !== o.kind) { tPush(); const was = FIGS[o.kind] || {}; o.kind = k; o.text = null; if (FIGS[k].sq && !was.sq) { const m1 = distMeas(o.ids[0], o.ids[1]), m2 = distMeas(o.ids[1], o.ids[2]); if (m2) M.meas = M.meas.filter(x => x !== m2); if (m1) M.meas.push({ id: M.nextMeas++, type: 'dist', a: o.ids[1], b: o.ids[2], v: m1.v, on: true, eq: true }); } if (!FIGS[k].sq) M.meas.forEach(m => { if (m.eq && o.ids.includes(m.a)) delete m.eq; }); adjust(); renderTape(); draw(); } }]);
+      items.push(['✥ Передвинуть', () => moveMode({ fig: o })]); items.push(['↻ Повернуть на 90°', () => figRotate(o)]);
+      if (o.kind === 'stairm') { items.push(['⇅ Развернуть направление подъёма', () => { tPush(); o.rev = !o.rev; renderTape(); draw(); }]);
+        items.push(['№ Число ступеней…', async () => { const v = await uiAsk('Число ступеней (пусто — по длине марша):', o.steps ? String(o.steps) : ''); if (v == null) return; tPush(); const n = parseInt(v, 10); o.steps = n >= 2 && n <= 60 ? n : null; renderTape(); draw(); }]); }
       items.push([o.hideLabel ? 'Aa Показать подпись' : 'Aa Скрыть подпись (для рядов одинаковых колонн)', () => { tPush(); o.hideLabel = !o.hideLabel; renderTape(); draw(); }]); }
     else items.push(['✎ Тип объекта…', async () => { const t = await chooseObjType(o.type); if (t) { tPush(); o.type = t; o.text = null; await askObjParams(o); renderTape(); draw(); } }]);
     if (o.type === 'stair') items.push(['№ Число ступеней…', async () => { tPush(); await askObjParams(o); renderTape(); draw(); }]);
@@ -4952,6 +4955,7 @@ const FIGS = {
   drain: { name: 'Трап', ic: '⊡', sq: true, def: 0.15, s1: 'сторона', tag: 'Трап' },
   vent: { name: 'Вентшахта / короб', ic: '⊠', fill: 'x', def: [0.6, 0.4], s1: 'сторона 1', s2: 'сторона 2', tag: 'ВШ' },
   equip: { name: 'Оборудование / шкаф', ic: '◩', fill: 'diag', def: [0.8, 0.4], s1: 'длина', s2: 'глубина', tag: 'Обор.' },
+  stairm: { name: 'Лестница металлическая', ic: '☷', fill: 'stair', def: [2.0, 0.8], s1: 'длина марша', s2: 'ширина', tag: 'Мет. лестн.' },
   pillar: { name: 'Опора / тумба круглая', ic: '◯', round: true, sq: true, fill: 'cross', def: 0.3, s1: 'диаметр', tag: '' }
 };
 const isFig4 = o => !!o && (o.type === 'hatch' || o.type === 'fig');
@@ -4976,9 +4980,16 @@ function figGeom(o, poly) {
   else if (F.fill === 'x') { add(p0, p2, 0.18); add(p1, p3, 0.18); }
   else if (F.fill === 'diag') add(p0, p2, 0.18);
   else if (F.fill === 'cross') { add([c[0] - u[0] * a / 2, c[1] - u[1] * a / 2], [c[0] + u[0] * a / 2, c[1] + u[1] * a / 2], 0.13); add([c[0] - v[0] * b / 2, c[1] - v[1] * b / 2], [c[0] + v[0] * b / 2, c[1] + v[1] * b / 2], 0.13); }
+  let arrow = null; const dots = [];
+  if (F.fill === 'stair') { // марш: ступени поперёк длины, стрелка — направление подъёма (точка — начало)
+    const N = Math.max(2, o.steps || Math.max(3, Math.round(a / 0.25))), at = (s0, t) => [p0[0] + u[0] * s0 + v[0] * t, p0[1] + u[1] * s0 + v[1] * t];
+    for (let k = 1; k < N; k++) add(at(a * k / N, 0), at(a * k / N, b), 0.18);
+    let s1 = a * 0.08, s2 = a * 0.92; if (o.rev) [s1, s2] = [s2, s1]; const q0 = at(s1, b / 2), q1 = at(s2, b / 2); add(q0, q1, 0.25); arrow = [q0, q1];
+    const h = Math.min(0.35, a * 0.12, b * 0.3), d = o.rev ? -1 : 1, bk = [q1[0] - u[0] * h * d, q1[1] - u[1] * h * d];
+    add(q1, [bk[0] + v[0] * h * 0.45, bk[1] + v[1] * h * 0.45], 0.25); add(q1, [bk[0] - v[0] * h * 0.45, bk[1] - v[1] * h * 0.45], 0.25); dots.push(q0); }
   if (o.kind === 'drain') { const r = Math.min(a, b) * 0.3; for (let i = 0; i < 24; i++) { const t1 = i * Math.PI / 12, t2 = (i + 1) * Math.PI / 12; add([c[0] + Math.cos(t1) * r, c[1] + Math.sin(t1) * r], [c[0] + Math.cos(t2) * r, c[1] + Math.sin(t2) * r], 0.13); } }
   const s = figLabel(o), up = figLabelUp(o), lp = up ? [c[0], Math.max(...shp.map(q => q[1])) + 0.2] : [c[0], Math.min(...shp.map(q => q[1])) - 0.38];
-  return { lines: L, dots: [], arrow: null, label: s ? { p: lp, s } : null, poly: shp, u, n: v, depth: b, fig: F };
+  return { lines: L, dots, arrow, label: s ? { p: lp, s } : null, poly: shp, u, n: v, depth: b, fig: F };
 }
 function figLabelUp(o) { // подпись — с той стороны фигуры, где дальше до стены
   try { const P = o.ids.map(id => PX(ptById(id))), ys = P.map(q => q[1]), cx = P.reduce((s0, q) => s0 + q[0], 0) / 4;
@@ -5483,14 +5494,20 @@ function startMoveDrag(w0) { // «✥ Передвинуть»: объект е�
   if (o.mark) { T.dragMark = { m: o.mark, off: [o.mark.p[0] - w0[0], o.mark.p[1] - w0[1]] }; T.sel = { mark: o.mark }; }
   else if (o.note) { T.dragNote = { n: o.note, off: [o.note.at[0] - w0[0], o.note.at[1] - w0[1]] }; T.sel = { note: o.note }; }
   else if (o.pt) { const q = PX(o.pt); T.dragPt = o.pt; T.dragOff = [q[0] - w0[0], q[1] - w0[1]]; T.sel = { pt: o.pt }; }
+  else if (o.fig) { const n = figUntie(o.fig); T.dragSel = { w0: w0.slice(), rect: null, pts: o.fig.ids.map(ptById).filter(Boolean).map(ptPos), marks: [], notes: [] }; T.sel = { obj: o.fig }; if (n) stat('Привязки фигуры к стенам сняты — после переноса привяжите заново.'); }
   else { T.undo.pop(); return false; }
   return true; }
 function startActDrag(w0) { // палец лёг на активную точку (конец обхода, начало промера) и повёл — двигаем её
   const aid = actPtId(); if (aid == null) return false; const q = nearestPoint(w0, 16); if (!q || q.id !== aid) return false;
   tPush(); const P0 = PX(q); T.dragPt = q; T.dragOff = [P0[0] - w0[0], P0[1] - w0[1]]; walkChipOff(); if (navigator.vibrate) navigator.vibrate(10);
   stat(`Поправляю ${pname(q.id)} — отпустите, где нужно. Обход продолжится от неё.`); return true; }
-function moveMode(o) { T.moveObj = o; closeTapeMenu(); setTimeout(() => { if (T.moveObj !== o) return; T.sel = o.mark ? { mark: o.mark } : o.note ? { note: o.note } : o.pt ? { pt: o.pt } : null; draw(); renderTouchBar(); }, 0);
+function moveMode(o) { T.moveObj = o; closeTapeMenu(); setTimeout(() => { if (T.moveObj !== o) return; T.sel = o.mark ? { mark: o.mark } : o.note ? { note: o.note } : o.pt ? { pt: o.pt } : o.fig ? { obj: o.fig } : null; draw(); renderTouchBar(); }, 0);
   stat('Тащите пальцем — объект едет за ним (палец можно ставить рядом, не закрывая его). Готово — коснитесь чертежа или «✓ Готово» внизу.'); }
+function figUntie(o) { const ids = new Set(o.ids), n0 = M.meas.length; M.meas = M.meas.filter(m => !(m.type === 'tie' && (ids.has(m.c) || ids.has(m.d)))); const n = n0 - M.meas.length;
+  if (n) { for (const p of o.ids.map(ptById).filter(Boolean)) { const q = PX(p); p.x0 = q[0]; p.y0 = q[1]; } adjust(); } return n; }
+function figRotate(o, ang = Math.PI / 2) { tPush(); figUntie(o); const P = o.ids.map(ptById).filter(Boolean), Q = P.map(PX), c = [Q.reduce((a, q) => a + q[0], 0) / Q.length, Q.reduce((a, q) => a + q[1], 0) / Q.length], ca = Math.cos(ang), sa = Math.sin(ang);
+  P.forEach((p, i) => { const dx = Q[i][0] - c[0], dy = Q[i][1] - c[1]; p.x0 = c[0] + dx * ca - dy * sa; p.y0 = c[1] + dx * sa + dy * ca; if (p.x != null) { p.x = p.x0; p.y = p.y0; } });
+  adjust(); renderTape(); draw(); }
 function moveDone() { if (!T.moveObj) return; T.moveObj = null; T.sel = null; asSoon(); draw(); renderTouchBar(); stat('Готово.'); }
 function preTapSnap() { return { t: performance.now(), undoLen: T.undo.length, chainRef: T.chain, chainIdx: T.chain ? M.chains.indexOf(T.chain) : -1, chainCopy: T.chain ? T.chain.slice() : null, mA: T.mA, pending: T.pending, jumpFrom: T.jumpFrom }; }
 function revertTap(pre) { // двойное касание: первое касание ничего не должно было сделать — откатываем
