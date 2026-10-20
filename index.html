@@ -285,7 +285,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 6.8 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 6.9 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -4284,7 +4284,7 @@ const asDel = () => asDelK('last');
 function hasWork() { return !!(M.pts.length || M.meas.length || U.img); }
 function workSummary() {
   const a = [];
-  if (M.pts.length) a.push(`точек ${M.pts.length}, замеров ${M.meas.filter(m => m.type === 'dist' || m.type === 'thick').length}`);
+  if (M.pts.length) a.push(`точек ${M.pts.length}, замеров ${M.meas.filter(m => (m.type === 'dist' && !m.auto) || m.type === 'thick').length}`);
   if (M.rooms.length) a.push(`помещений ${M.rooms.length}`);
   if (U.img) a.push('подложка ' + (U.name || 'БТИ'));
   return a.join(', ') || 'пусто';
@@ -4753,9 +4753,9 @@ function tapeMenu(w, cx, cy) {
   const mv = m => m ? fm(m.v) + ' м' : '';
   let title, items = [];
   const remeasure = m => ['↻ Перемерить', () => { tPush(); M.meas = M.meas.filter(x => x !== m); adjust(); makePending({ type: m.type, a: m.a, b: m.b, c: m.c, d: m.d, re: true, prom: m.prom }); stat('Сделайте замер заново: ' + pendLabel(T.pending)); }];
-  const edit = m => ['✎ Изменить число…', () => { uiAsk('Новое значение (м или мм):', nf(m.v, 3)).then(s => { const v = parseManual(s || ''); if (v) { tPush(); m.v = v; adjust(); renderTape(); } }); }];
+  const edit = m => ['✎ Изменить число…', () => { uiAsk('Новое значение (м или мм):', nf(m.v, 3)).then(s => { const v = parseManual(s || ''); if (v) { tPush(); m.v = v; delete m.auto; delete m.from; adjust(); renderTape(); } }); }];
   const toggle = m => [m.on === false ? '☑ Учитывать замер' : '☐ Не учитывать (выключить)', () => { tPush(); m.on = m.on === false; adjust(); renderTape(); }];
-  const delM = m => ['🗑 Удалить замер', () => { tPush(); M.meas = M.meas.filter(x => x !== m); adjust(); renderTape(); stat('Замер удалён'); }, 'danger'];
+  const delM = m => ['🗑 Удалить замер', () => { tPush(); if (m.auto) M.oppOff = (M.oppOff || []).concat([m.a < m.b ? m.a + '-' + m.b : m.b + '-' + m.a]); M.meas = M.meas.filter(x => x !== m); adjust(); renderTape(); stat('Замер удалён'); }, 'danger'];
   if (h.pt) {
     const id = h.pt.id, nm = M.meas.filter(m => m.type !== 'line' && [m.a, m.b, m.c, m.d].includes(id)).length;
     title = `Точка ${pname(id)}` + (nm ? ` · замеров: ${nm}` : '');
@@ -5191,7 +5191,7 @@ function clipPaste() {
   stat(`Вставлено: точек ${b.pts.length}, замеров ${b.meas.length}. Перетащите пальцем за рамку на нужное место; «↶ Отменить» — убрать.`);
 }
 function selectPts(ids, keepRect) { T.selSet = ids.length ? new Set(ids) : null; if (!T.selSet || !keepRect) T.selRect = null; draw(); showSelBox(); renderTouchBar(); }
-function selMeas() { const S0 = T.selSet; return M.meas.filter(m => (m.type === 'dist' || m.type === 'thick' || m.type === 'tie') && m.on !== false && [m.a, m.b, m.c, m.d].filter(v => v !== undefined).every(id => S0.has(id))); }
+function selMeas() { const S0 = T.selSet; return M.meas.filter(m => (m.type === 'dist' || m.type === 'thick' || m.type === 'tie') && m.on !== false && !m.auto && [m.a, m.b, m.c, m.d].filter(v => v !== undefined).every(id => S0.has(id))); }
 function angIssues() { // углы, принятые прямыми, но замеры тянут их в сторону → линейная неувязка
   const out = []; for (const g of (T.result && T.result.angles) || []) { if (g.deg == null || !T.selSet.has(g.b)) continue; const t = Math.round(g.deg / 90) * 90; const dv = Math.abs(g.deg - t); if (dv < 0.05 || dv > (M.orthoTol || 15) || t % 360 === 0 || t === 180) continue; const pt = ptById(g.b); if (pt && pt.free) continue;
     const B = ptById(g.b), A = ptById(g.a), C = ptById(g.c); const L = Math.min(Math.hypot(A.x - B.x, A.y - B.y), Math.hypot(C.x - B.x, C.y - B.y)); out.push({ b: g.b, deg: g.deg, lin: dv * Math.PI / 180 * L }); }
@@ -5467,7 +5467,11 @@ function walkTo(p, w, e) { // провести стену от конца обх
       M.rooms.push(R);
       makePending({ type: 'dist', a: prev, b: p.id, after: () => stat(`Помещение ${R.num} замкнуто. Добавьте диагональ (инструмент «Замер») для контроля углов.`) });
     } else { ch.push(p.id); makePending({ type: 'dist', a: prev, b: p.id }); }
-    adjust(); renderTape(); draw();
+    adjust();
+    if (closing) { const R = M.rooms[M.rooms.length - 1], dup = M.meas.filter(m => m.auto && R.ids.includes(m.a) && R.ids.includes(m.b));
+      if (T.pending && T.pending.got == null && dup.some(m => (m.a === T.pending.a && m.b === T.pending.b) || (m.a === T.pending.b && m.b === T.pending.a))) { T.pending.opt = true; T.pending.hint = 'взята по противоположной стороне — можно перемерить для контроля или идти дальше'; }
+      if (dup.length) stat(`Помещение ${R.num} замкнуто. Без замера: ${dup.map(m => pname(m.a) + '–' + pname(m.b) + ' = ' + fm(m.v)).join(', ')} (по противоположным сторонам). Перемерить — замер этой стены заменит число.`); }
+    renderTape(); draw();
 }
 
 // ---------- обход без лишних переключений: продолжить от любой точки, сразу поправить точку, двойное касание — правка ----------
@@ -5532,9 +5536,9 @@ function addPoint(w) { const p = { id: M.nextId++, x0: w[0], y0: w[1] }; M.pts.p
 function nearestPoint(w, px = 7) { let best = null, bd = px * HITK() / S.view.s; for (const p of M.pts) { const [x, y] = PX(p); const d = Math.hypot(x - w[0], y - w[1]); if (d < bd) { bd = d; best = p; } } return best; }
 function nearestEdge(w, px = 8) { let best = null, bd = px * HITK() / S.view.s, bt = 0; for (const e of M.edges) { const a = PX(ptById(e.a)), b = PX(ptById(e.b)); const [d, t] = distSeg(w, a, b); if (d < bd) { bd = d; best = e; bt = t; } } return best ? { e: best, t: bt } : null; }
 const hasEdge = (a, b) => M.edges.find(e => (e.a === a && e.b === b) || (e.a === b && e.b === a));
-function distMeas(a, b) { return M.meas.find(m => m.type === 'dist' && m.v != null && ((m.a === a && m.b === b) || (m.a === b && m.b === a))); }
+function distMeas(a, b) { const L = M.meas.filter(m => m.type === 'dist' && m.v != null && ((m.a === a && m.b === b) || (m.a === b && m.b === a))); return L.find(m => !m.auto) || L[0]; }
 function drawnLen(m) { const A = ptById(m.a), B = ptById(m.b); return A && B ? Math.hypot(B.x0 - A.x0, B.y0 - A.y0) : 0; }
-function scaleRatio() { const r = M.meas.filter(m => m.type === 'dist' && m.on !== false && !m.lab && m.v > 0.3).map(m => m.v / drawnLen(m)).filter(v => isFinite(v) && v > 0).sort((a, b) => a - b); return r.length ? { k: r[Math.floor(r.length / 2)], n: r.length } : null; }
+function scaleRatio() { const r = M.meas.filter(m => m.type === 'dist' && m.on !== false && !m.lab && !m.auto && m.v > 0.3).map(m => m.v / drawnLen(m)).filter(v => isFinite(v) && v > 0).sort((a, b) => a - b); return r.length ? { k: r[Math.floor(r.length / 2)], n: r.length } : null; }
 function fitScale(k) { // масштабировать подложку и точки так, чтобы чертёж совпал с замерами
   if (!(k > 0) || Math.abs(k - 1) < 1e-4) return; tPush();
   const xs = M.pts.map(p => [p.x0, p.y0]); const c = xs.length ? [xs.reduce((s, q) => s + q[0], 0) / xs.length, xs.reduce((s, q) => s + q[1], 0) / xs.length] : [0, 0];
@@ -5549,7 +5553,29 @@ async function offerScaleFit() {
   M.scaleAsked = true;
   if (await uiDialog({ title: 'Масштаб чертежа не совпадает с замером', text: `Замер рулеткой ${r.k > 1 ? 'длиннее' : 'короче'}, чем та же линия на подложке, в ${nf(r.k > 1 ? r.k : 1 / r.k, 2)} раза — подложка открыта не в том масштабе. Подогнать масштаб подложки под замеры? Тогда отрисовка совпадёт с чертежом. (Потом — кнопка «Масштаб по замерам».)`, ok: 'Подогнать', cancel: 'Не сейчас' })) fitScale(r.k);
 }
-function adjust() { try { figSync(); } catch (e) { } try { T.result = TAPE.solve(M); } catch (e) { console.error(e); } }
+// прямоугольное помещение (4 угла около 90°): неизмеренная сторона берёт замер противоположной (m.auto = 'opp')
+function autoOpp() {
+  const ek = (a, b) => a < b ? a + '-' + b : b + '-' + a, same = (m, a, b) => (m.a === a && m.b === b) || (m.a === b && m.b === a);
+  const off = new Set(M.oppOff || []), want = new Map();
+  const anyReal = (a, b) => M.meas.some(m => m.type === 'dist' && !m.auto && m.v != null && same(m, a, b));
+  const real = (a, b) => M.meas.find(m => m.type === 'dist' && !m.auto && m.v != null && m.on !== false && same(m, a, b));
+  if (M.ortho !== false) for (const R of M.rooms || []) {
+    const ids = R.ids; if (!ids || ids.length !== 4) continue;
+    const P = ids.map(id => ptById(id)); if (P.some(p => !p || p.free || p.gpsPt)) continue;
+    if (M.meas.some(m => m.type === 'angle' && m.on !== false && ids.includes(m.b))) continue;
+    const tol = (M.orthoTol || 15) * Math.PI / 180; let ok = true;
+    for (let j = 0; j < 4 && ok; j++) { const a = PX(P[(j + 3) % 4]), b = PX(P[j]), c = PX(P[(j + 1) % 4]), u = [a[0] - b[0], a[1] - b[1]], v = [c[0] - b[0], c[1] - b[1]];
+      const L = Math.hypot(...u) * Math.hypot(...v); if (!(L > 0)) { ok = false; break; }
+      const ang = Math.acos(Math.max(-1, Math.min(1, (u[0] * v[0] + u[1] * v[1]) / L))); if (Math.abs(ang - Math.PI / 2) > tol) ok = false; }
+    if (!ok) continue;
+    for (let j = 0; j < 4; j++) { const a = ids[j], b = ids[(j + 1) % 4], c = ids[(j + 2) % 4], d = ids[(j + 3) % 4];
+      if (!hasEdge(a, b) || anyReal(a, b) || off.has(ek(a, b))) continue;
+      const src = real(c, d); if (src) want.set(ek(a, b), { a, b, v: src.v, from: src.id }); }
+  }
+  M.meas = M.meas.filter(m => !m.auto || want.has(ek(m.a, m.b)));
+  for (const [k, w] of want) { const ex = M.meas.find(m => m.auto && ek(m.a, m.b) === k); if (ex) { ex.v = w.v; ex.from = w.from; } else M.meas.push({ id: M.nextMeas++, type: 'dist', a: w.a, b: w.b, v: w.v, on: true, auto: 'opp', from: w.from }); }
+}
+function adjust() { try { figSync(); } catch (e) { } try { autoOpp(); } catch (e) { console.error(e); } try { T.result = TAPE.solve(M); } catch (e) { console.error(e); } }
 
 // ---------- underlay ----------
 async function loadUnderlay(file) {
@@ -5800,6 +5826,9 @@ function tapeDown(e, w) {
   if (t === 'select') { if (!tapeMenu(w, e.clientX, e.clientY)) { T.sel = null; renderTape(); } return; }
   if (t === 'erase') { const n0 = T.undo.length; eraseAt(w); if (T.undo.length !== n0) { const back = T.erasePrev && T.erasePrev !== 'erase' ? T.erasePrev : 'walk'; setTapeTool(back); stat('Удалено — ластик выключился (чтобы случайное касание ничего не стёрло). Ещё удалить — снова «🗑 Удалить». Ошиблись — «↶ Отменить».'); } return; }
   if (t === 'gps') { gpsTap(w, e); return; }
+  if (T.pending && T.pending.got == null && T.pending.opt) skipPending(); // сторона уже взята по противоположной — замер по желанию
+  if (T.pending && T.pending.got == null && t === 'walk' && T.chain && T.chain.length >= 3 && !e.altKey) { const q = nearestPoint(w); const pd = T.pending, last = T.chain[T.chain.length - 1];
+    if (q && q.id === T.chain[0] && pd.type === 'dist' && (pd.a === last || pd.b === last)) skipPending(); } // касание первой точки — замкнуть, стену без замера достроит противоположная
   if (T.pending && T.pending.got == null && t !== 'online' && !walkJumpOk(w, e)) { stat('Сначала выполните замер ' + pendLabel(T.pending) + ' (или Esc — пропустить). Продолжить от другой точки — коснитесь её.'); return; }
   if (t === 'walk') {
     let p = e.altKey ? null : nearestPoint(w);
@@ -6088,7 +6117,7 @@ function drawTape() {
     const sel = T.sel && T.sel.edge === e;
     const rnd = e.obj && (() => { const ob = (M.objs || []).find(x => x.id === e.obj); return ob && ob.type === 'fig' && (FIGS[ob.kind] || {}).round; })();
     if (rnd && !sel) { ctx.strokeStyle = 'rgba(91,58,168,.28)'; ctx.lineWidth = 1 * dpr; ctx.setLineDash([3 * dpr, 3 * dpr]); ctx.beginPath(); ctx.moveTo(...sa); ctx.lineTo(...sb); ctx.stroke(); ctx.setLineDash([]); continue; }
-    ctx.strokeStyle = sel ? '#1f6feb' : e.obj ? '#5b3aa8' : e.open ? '#12a35a' : (m ? '#111' : '#9aa3b2'); ctx.lineWidth = (e.obj ? 1.5 : e.open ? 5 : m ? 3 : 2) * dpr;
+    ctx.strokeStyle = sel ? '#1f6feb' : e.obj ? '#5b3aa8' : e.open ? '#12a35a' : (m ? (m.auto ? '#5b6577' : '#111') : '#9aa3b2'); ctx.lineWidth = (e.obj ? 1.5 : e.open ? 5 : m ? (m.auto ? 2.5 : 3) : 2) * dpr;
     if (!m && !e.open) ctx.setLineDash([7 * dpr, 5 * dpr]);
     if (e.open && e.kind) { ctx.strokeStyle = sel ? '#1f6feb' : '#9aa3b2'; ctx.lineWidth = 1 * dpr; ctx.setLineDash([4 * dpr, 3 * dpr]); }
     ctx.beginPath(); ctx.moveTo(...sa); ctx.lineTo(...sb); ctx.stroke(); ctx.setLineDash([]);
@@ -6097,7 +6126,7 @@ function drawTape() {
     if (L * S.view.s > 35 && !(e.obj && A.soft)) {
       ctx.save(); ctx.translate((sa[0] + sb[0]) / 2, (sa[1] + sb[1]) / 2); let r = Math.atan2(sb[1] - sa[1], sb[0] - sa[0]); if (r > Math.PI / 2) r -= Math.PI; if (r < -Math.PI / 2) r += Math.PI; ctx.rotate(r);
       ctx.textAlign = 'center'; ctx.font = `bold ${12 * dpr * stK(m)}px Golos Text, Segoe UI`;
-      if (m) { const bad = !M.cond && Math.abs(m.res || 0) > 0.005; ctx.fillStyle = bad ? '#c4372f' : stC(m, '#111'); ctx.fillText(fm(m.v) + (bad ? ` (${m.res > 0 ? '+' : ''}${Math.round(m.res * 1000)} мм)` : ''), 0, -7 * dpr * Math.max(1, stK(m))); }
+      if (m) { const bad = !M.cond && !m.auto && Math.abs(m.res || 0) > 0.005; ctx.fillStyle = bad ? '#c4372f' : m.auto ? '#5b6577' : stC(m, '#111'); ctx.fillText((m.auto ? '=' : '') + fm(m.v) + (bad ? ` (${m.res > 0 ? '+' : ''}${Math.round(m.res * 1000)} мм)` : ''), 0, -7 * dpr * Math.max(1, stK(m))); }
       else if (!(A.gpsPt && B.gpsPt)) { ctx.fillStyle = '#9aa3b2'; ctx.font = `${11 * dpr}px Golos Text, Segoe UI`; ctx.fillText('≈' + fm(L), 0, -7 * dpr); }
       ctx.restore();
     }
