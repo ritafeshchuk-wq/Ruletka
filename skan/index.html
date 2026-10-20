@@ -52,13 +52,13 @@ canvas.band{width:100%;height:32px;display:block;border-radius:6px;touch-action:
   <div class="grp"><button data-tool="hand">✋ Обзор</button><button data-tool="line">／ Линия</button><button data-tool="point">• Точка</button><button data-tool="erase">🗑 Метка</button></div><span class="sep"></span><div class="grp"><button data-tool="corner">⌖ Общий угол</button><button data-tool="brush">🧹 Стереть</button><button data-tool="keep">✏ Нужное</button></div><span class="sep"></span>
   <button id="bAuto">🤖 Авто</button><button id="bStitch" class="pri">🧩 Сшить</button><button id="bUndo">↶</button><button id="bRedo">↷</button><button id="bFit">⤢</button>
   <span id="colsBox" class="grp"><span class="sep"></span><button data-cols="1">1</button><button data-cols="2">2</button><button data-cols="3">3</button><button data-cols="4">4</button><button id="bTW" title="Повернуть рамки как в сборке">↻ как в сборке</button></span><span class="sep"></span>
-  <button id="bSave">💾 Файл</button><button id="bOpen">📂</button><button id="bNew">＋ Новый проект</button><button id="bHelp">Справка</button>
+  <button id="bCloud" title="Облако точек сшитых сканов — в AutoCAD (DXF) или ReCap/CloudCompare (XYZ)">☁ Облако</button><button id="bSave">💾 Файл</button><button id="bOpen">📂</button><button id="bNew">＋ Новый проект</button><button id="bHelp">Справка</button>
 </div>
 <div id="side"><div id="list"></div></div>
 <div id="main"></div>
 <div id="rotbar" title="Повернуть выбранный скан"><button id="bMulti" title="Выбрать несколько сканов: касание — добавить/убрать, рамка по пустому месту — выбрать все внутри">⬚ Несколько</button><button id="bR1">⟲ 1°</button><button id="bR01">⟲ 0,1°</button><button id="bRm01">⟳ 0,1°</button><button id="bRm1">⟳ 1°</button><button id="bR90">⟲ 90°</button></div>
 <div id="ubar"><button id="fUndo" disabled>↶ Отменить шаг</button><button id="fRedo" disabled>↷ Вернуть</button><button id="fDel">🗑 Удалить выбранное</button></div>
-<div id="foot"><span id="status"></span><span id="saved"></span><span id="ver">Скан 2.7 · © d1sco, 2026</span></div>
+<div id="foot"><span id="status"></span><span id="saved"></span><span id="ver">Скан 2.8 · © d1sco, 2026</span></div>
 <div id="busy" hidden><span>…</span></div>
 <input type="file" id="fileIn" multiple accept=".e57" hidden><input type="file" id="projIn" hidden>
 <div id="help" hidden><div class="lh"><h3>Как сшивать</h3><button id="helpX">✕</button></div>
@@ -76,7 +76,7 @@ canvas.band{width:100%;height:32px;display:block;border-radius:6px;touch-action:
 <li><b>📐 План</b> — когда сканы сшиты: «🔎 Найти стены» строит линии стен и проёмы по всем сканам. Править: касание стены — выбрать; тянуть стену — сдвиг параллельно (углы остаются замкнутыми); тянуть кружок на конце — длина (липнет к соседним стенам); длину можно ввести числом — «начало на месте / от середины / конец на месте» (соседние стены переезжают, комната становится шире или уже). «🎯 По точкам» — подогнать стену по точкам сканов, «⊾ К оси» — выпрямить, «＋ Проём» — дверь, окно или проём: тянуть его, края — ширина, ширина и привязка числом. ／ Линия — нарисовать стену (липнет к углам, около 0°/90° выпрямляется). Оранжевые точки — незамкнутые углы, «⌐ Замкнуть углы». «⬇ DXF» — для камералки (мм, слои).</li>
 <li><b>⌖ Общий угол</b> — в «Сборке» коснитесь угла, который виден на нескольких сканах: программа найдёт этот угол на каждом скане (пересечение двух стен) и поставит общую точку одной буквой. Потом «🧩 Сшить». На рамке скана — точка ставится в найденный угол этого скана.</li>
 <li><b>🧹 Стереть</b> — кисть (10/25/50 см): проведите по мебели, дверям, людям — эти точки уходят отовсюду: из вида, подгонки линий, поиска стен. <b>✏ Нужное</b> — набросок по стене (кусок продлится сам вдоль стены) или касание (колонна, угол); галочка «Только нужное» оставляет на сканах лишь отмеченное. «Вернуть стёртое», «Сбросить нужное» — для выбранного скана или всех.</li>
-<li><b>Несколько сканов сразу.</b> В «Сборке» нажмите <b>⬚ Несколько</b> (внизу справа): касание по скану — добавить или убрать, рамка пальцем по пустому месту — выбрать все сканы внутри. Тяните любой выбранный — едут все; кружок ↻, два пальца или кнопки поворота — поворачивается вся группа вокруг общего центра. <b>Мышью — как в AutoCAD:</b> щелчок по скану добавляет его к выбору (Shift + щелчок — убрать), рамка левой кнопкой по пустому месту: слева направо (синяя) — сканы целиком внутри, справа налево (зелёная пунктирная) — всё, что задела; Shift + рамка — убрать из выбора. Тяните выбранный — едут все, правая кнопка — поворот. Зажатое колесо — сдвиг вида, колесо — масштаб. В списке слева — ☐ у каждого скана. Касание по пустому месту или Esc — снять выбор.</li><li><b>↶ ↷</b> — отмена и возврат любого шага. <b>💾 Файл</b> — сохранить метки и положения файлом (без точек), <b>📂</b> — открыть его.</li>
+<li><b>Несколько сканов сразу.</b> В «Сборке» нажмите <b>⬚ Несколько</b> (внизу справа): касание по скану — добавить или убрать, рамка пальцем по пустому месту — выбрать все сканы внутри. Тяните любой выбранный — едут все; кружок ↻, два пальца или кнопки поворота — поворачивается вся группа вокруг общего центра. <b>Мышью — как в AutoCAD:</b> щелчок по скану добавляет его к выбору (Shift + щелчок — убрать), рамка левой кнопкой по пустому месту: слева направо (синяя) — сканы целиком внутри, справа налево (зелёная пунктирная) — всё, что задела; Shift + рамка — убрать из выбора. Тяните выбранный — едут все, правая кнопка — поворот. Зажатое колесо — сдвиг вида, колесо — масштаб. В списке слева — ☐ у каждого скана. Касание по пустому месту или Esc — снять выбор.</li><li><b>🎯 Уточнить</b> (слева, в блоке автосшивки) — после автосшивки и вашей ручной подгонки: программа берёт сканы там, где они стоят, точно подгоняет каждый стык по точкам и уравнивает сеть. Далеко не переставляет (до ~30 см) — если скан совсем не на месте, сначала подвиньте его. Нажимать можно сколько угодно раз. А «Сшить автоматически» считает всё заново, с нуля.</li><li><b>☁ Облако</b> — облако точек сшитых сканов: DXF для AutoCAD (точки, каждый скан — свой слой) или XYZ для ReCap / CloudCompare (потом в AutoCAD через POINTCLOUDATTACH — так тянет и миллионы точек). Высота — от пола, мм.</li><li><b>↶ ↷</b> — отмена и возврат любого шага. <b>💾 Файл</b> — сохранить метки и положения файлом (без точек), <b>📂</b> — открыть его.</li>
 </ol></div>
 <script id="e57src" type="text/plain">
 // ---- e57.js ----
@@ -652,13 +652,14 @@ const REG3D = (() => {
     }
     return out;
   }
-  return { prep, pair, registerAll, evidence, icp, _: { match, ransac, rel } };
+  return { prep, pair, registerAll, evidence, icp, optimize, good, rel, _: { match, ransac, rel } };
 })();
 
 </script>
 <script id="wsrc" type="text/plain">// фоновое чтение E57: прореживание, пол/потолок, гистограмма высот
 self.onmessage = e => {
   if (e.data.cmd === 'auto') return autoJob(e.data);
+  if (e.data.cmd === 'refine') return refineJob(e.data);
   const { job, name, buf, voxel } = e.data;
   try {
     const list = E57.readE57(buf, { voxel: voxel || 0.02, maxRange: 30, onProgress: p => self.postMessage({ job, prog: p }) });
@@ -678,6 +679,28 @@ self.onmessage = e => {
 };
 
 // автосшивка: объёмные признаки (углы, коробки, мебель) + проверка видимостью + уравнивание сети
+// уточнение от нынешнего положения: точная подгонка (ICP) каждой пары соседей + уравнивание сети; далеко сдвинуть не может — только довести
+function refineJob({ job, scans, poses, pairs, fixed }) {
+  try {
+    const D = []; scans.forEach((s, k) => { self.postMessage({ job, prog: 0.3 * k / scans.length, stage: 'Готовлю ' + s.name }); D.push(REG3D.prep(s.pts, s.floor, s.ceil)); });
+    const E = [], bad = []; let k = 0;
+    for (const [i, j] of pairs) {
+      self.postMessage({ job, prog: 0.3 + 0.6 * (k++) / pairs.length, stage: 'Подгоняю стыки' });
+      const P = poses[i], Q = poses[j], q = REG3D.rel(P, Q), init = { a: q[0], tx: q[1], ty: q[2], tz: q[3] };
+      const r = REG3D.icp(D[i], D[j], init); if (!r) { bad.push([i, j, 'мало общего']); continue; }
+      const da = Math.abs(Math.atan2(Math.sin(r.a - init.a), Math.cos(r.a - init.a))), dt = Math.hypot(r.tx - init.tx, r.ty - init.ty);
+      if (dt > 0.5 || da > 5 * Math.PI / 180) { bad.push([i, j, 'далеко']); continue; }
+      const e = REG3D.evidence(D[i], D[j], r); if (!REG3D.good(e) && !(e.ratio >= 0.6 && e.ag >= 1200)) { bad.push([i, j, 'не сходится']); continue; }
+      E.push({ i, j, a: r.a, tx: r.tx, ty: r.ty, tz: r.tz, w: Math.min(3, e.ag / 5000), rms: r.rms, ratio: e.ratio });
+    }
+    self.postMessage({ job, prog: 0.95, stage: 'Уравниваю' });
+    const n = scans.length, par = [...Array(n).keys()], f = x => par[x] === x ? x : (par[x] = f(par[x])); for (const e of E) par[f(e.i)] = f(e.j);
+    const out = poses.map(p => ({ ...p })), comps = new Map(); for (let i = 0; i < n; i++) { const c = f(i); if (!comps.has(c)) comps.set(c, []); comps.get(c).push(i); }
+    for (const mem of comps.values()) { if (mem.length < 2) continue; const root = mem.includes(fixed) ? fixed : mem[0], es = E.filter(e => mem.includes(e.i));
+      const init = new Map(mem.map(i => [i, { ...poses[i] }])), R = REG3D.optimize(mem, es, root, init); for (const [i, v] of R) out[i] = v; }
+    self.postMessage({ job, done: true, res: { poses: out, edges: E, bad } });
+  } catch (err) { self.postMessage({ job, error: String(err && err.message || err) }); }
+}
 function autoJob({ job, scans }) {
   try {
     const D = []; scans.forEach((s, k) => { self.postMessage({ job, prog: 0.15 * k / scans.length, stage: 'Готовлю ' + s.name }); D.push(REG3D.prep(s.pts, s.floor, s.ceil)); });
@@ -719,7 +742,7 @@ function prepScan(sc) {
   // чистка: стёртое не участвует нигде; при «Только нужное» на виду и в стенах — только отмеченное
   const MK = cleanMasks(sc, x0, y1, w, h, res), cellOf = i => Math.floor((y1 - P[i + 1]) / res) * w + Math.floor((P[i] - x0) / res);
   const idxAll = MK.er ? idx.filter(i => !MK.er[cellOf(i)]) : idx, idxShow = MK.kp ? idxAll.filter(i => MK.kp[cellOf(i)]) : idxAll;
-  sc.use = new Uint8Array(P.length / 3); for (const i of idxShow) sc.use[i / 3] = 1;
+  sc.use = new Uint8Array(P.length / 3); for (const i of idxShow) sc.use[i / 3] = 1; sc.cg = { x0, y1, w, h, res, er: MK.er || null };
   // «стенность» ячейки: на скольких высотах в ней есть точки. Стена — на всех, стол или пол — на одной
   const zH = z1 - z0, NB = Math.max(4, Math.min(32, Math.round(zH / 0.06))), bh = zH / NB;
   const cnt = new Uint16Array(w * h), mask = new Uint32Array(w * h);
@@ -1076,7 +1099,7 @@ function redraw() { if (S.view === 'grid') S.scans.forEach(s => s.vis && drawTil
 function renderList() {
   const el = $('#list'); const R = S.lastSolve;
   const H = S.hints || [];
-  el.innerHTML = (S.scans.length ? cleanPanel() : '') + (S.scans.length > 1 ? `<div class="hints"><div class="lh"><b>${H.length ? '💡 Где помочь (' + H.length + ')' : (S.scans.some(s => s.auto) || S.lastSolve ? '✓ Стыки сходятся' : '🤖 Автосшивка')}</b></div>${H.slice(0, 12).map((h, i) => `<button class="hint s${h.sev}" data-hint="${i}">${escH(h.t)}</button>`).join('')}<div class="row" style="display:flex;gap:5px;flex-wrap:wrap;margin-top:4px"><button id="hAuto">🤖 Сшить автоматически</button><button id="hCheck">🔍 Проверить стыки</button><button id="hPlan">📐 Пробный план</button></div></div>` : '') +
+  el.innerHTML = (S.scans.length ? cleanPanel() : '') + (S.scans.length > 1 ? `<div class="hints"><div class="lh"><b>${H.length ? '💡 Где помочь (' + H.length + ')' : (S.scans.some(s => s.auto) || S.lastSolve ? '✓ Стыки сходятся' : '🤖 Автосшивка')}</b></div>${H.slice(0, 12).map((h, i) => `<button class="hint s${h.sev}" data-hint="${i}">${escH(h.t)}</button>`).join('')}<div class="row" style="display:flex;gap:5px;flex-wrap:wrap;margin-top:4px"><button id="hAuto">🤖 Сшить автоматически</button><button id="hRefine" title="Точно подогнать от нынешнего положения: после автосшивки и ручной правки">🎯 Уточнить</button><button id="hCheck">🔍 Проверить стыки</button><button id="hPlan">📐 Пробный план</button></div></div>` : '') +
     `<div class="lh"><b>Сканы (${S.scans.length})</b><button id="allVis">👁 Все</button></div>` + S.scans.map(s => { const d = dofOf(s.id), H = s.ceil - s.floor;
     return `<div class="si ${S.sel === s.id ? 'sel' : ''} ${inGrp(s.id) && S.sel !== s.id ? 'grp' : ''}" data-sid="${s.id}"><div class="sr"><i style="background:${s.color}"></i><b>${escH(s.name)}</b>
       <button data-g="${s.id}" class="gchk ${inGrp(s.id) && grpScans().length > 1 ? 'on' : ''}" title="Добавить в группу: несколько сканов двигаются вместе">${inGrp(s.id) && grpScans().length > 1 ? '☑' : '☐'}</button><button data-vis="${s.id}" class="${s.vis ? 'on' : ''}" title="Показывать">${s.vis ? '👁' : '◌'}</button><button data-anc="${s.id}" class="${s.anchor || s.placed ? 'on' : ''}" title="${s.placed ? 'Сшит автоматикой и стоит на месте. Нажать — освободить: встанет по меткам' : 'Опорный: стоит на месте при сшивке'}">${s.placed && !s.anchor ? '🔒' : '⚓'}</button></div>
@@ -1086,7 +1109,7 @@ function renderList() {
     + (R && R.labs.length ? `<div class="lh"><b>Невязки по меткам</b></div><div class="res">${R.labs.map(l => `<span data-hl="${escH(l.lab)}" class="${l.max > 0.01 ? 'bad' : l.max > 0.004 ? 'wa' : 'ok'}" style="--lc:${labColor(l.lab)}"><em>${escH(l.lab)}</em> ${Math.round(l.max * 1000)} мм</span>`).join('')}</div>` : '');
   S.scans.forEach(s => drawBand(s));
   $$('[data-hint]').forEach(b => b.onclick = () => hintGo(H[+b.dataset.hint]));
-  const ha = $('#hAuto'); if (ha) ha.onclick = autoStitch; const hc = $('#hCheck'); if (hc) hc.onclick = () => { const r = analyze(); stat(r.length ? `Найдено мест, где помочь: ${r.length}. Касание подсказки — открыть нужную пару сканов.` : 'Стыки сходятся: стены соседних сканов совпадают.'); }; const hp = $('#hPlan'); if (hp) hp.onclick = trialPlan;
+  const ha = $('#hAuto'); if (ha) ha.onclick = autoStitch; const hr = $('#hRefine'); if (hr) hr.onclick = refineStitch; const hc = $('#hCheck'); if (hc) hc.onclick = () => { const r = analyze(); stat(r.length ? `Найдено мест, где помочь: ${r.length}. Касание подсказки — открыть нужную пару сканов.` : 'Стыки сходятся: стены соседних сканов совпадают.'); }; const hp = $('#hPlan'); if (hp) hp.onclick = trialPlan;
   $('#allVis') && ($('#allVis').onclick = () => { S.scans.forEach(s => s.vis = true); S.cols = Math.max(S.cols, 2); renderAll(); saveSoon(); });
   $$('.si').forEach(d => d.onclick = e => { if (e.target.closest('button') || e.target.closest('canvas')) return; if (e.ctrlKey || e.metaKey || e.shiftKey || S.multi) grpToggle(+d.dataset.sid); else { S.sel = +d.dataset.sid; grpClear(); } renderAll(); });
   $$('[data-g]').forEach(b => b.onclick = () => { grpToggle(+b.dataset.g); renderAll(); });
@@ -1276,7 +1299,7 @@ document.addEventListener('DOMContentLoaded', async () => { layoutTop();
   $('#bTW').onclick = () => { S.tileWorld = !S.tileWorld; S.scans.forEach(x => x.tile = null); renderAll(); stat(S.tileWorld ? 'Рамки повёрнуты как в сборке: одна и та же стена на соседних сканах смотрит в одну сторону.' : 'Рамки — каждый скан как снят.'); }; $('#bStitch').onclick = stitch; $('#bAuto').onclick = autoStitch; $('#bUndo').onclick = undo; $('#bRedo').onclick = redo; $('#fUndo').onclick = undo; $('#fRedo').onclick = redo; $('#fDel').onclick = delSelected; $('#bFit').onclick = () => { if (S.view === 'asm' || S.view === 'plan') fitAsm(); else { S.scans.forEach(fitTile); redraw(); } };
   $('#bMulti').onclick = () => { S.multi = !S.multi; renderBar(); stat(S.multi ? '⬚ Несколько: касание по скану — добавить или убрать; обведите рамкой по пустому месту — выбрать все внутри. Тяните любой выбранный — едут все. Выйти — ещё раз «⬚ Несколько».' : 'Обычный выбор: касание — один скан.'); }; $('#bR1').onclick = () => rotSel(1); $('#bR01').onclick = () => rotSel(0.1); $('#bRm01').onclick = () => rotSel(-0.1); $('#bRm1').onclick = () => rotSel(-1); $('#bR90').onclick = () => rotSel(90);
   $('#bSave').onclick = saveProjectFile; $('#bOpen').onclick = () => $('#projIn').click(); $('#projIn').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) openProjectFile(f); };
-  $('#bNew').onclick = pjNew; $('#bProj').onclick = pjMenu;
+  $('#bNew').onclick = pjNew; $('#bCloud').onclick = cloudDialog; $('#bProj').onclick = pjMenu;
   $('#bHelp').onclick = () => $('#help').hidden = !$('#help').hidden; $('#helpX').onclick = () => $('#help').hidden = true;
   const main = $('#main'); main.ondragover = e => e.preventDefault(); main.ondrop = e => { e.preventDefault(); if (e.dataTransfer.files.length) loadFiles(e.dataTransfer.files); };
   await pjLoad(); renderAll(); await restore(); setTool('hand');
@@ -1521,13 +1544,57 @@ function exportDXF() {
   stat('DXF сохранён: слои STENY, PROEMY, RAZMERY, SKANY; единицы — мм.');
 }
 
+// --- облако точек: все видимые сканы в общих координатах, высота — от пола ---
+async function cloudDialog() {
+  const vis = S.scans.filter(s => s.vis); if (!vis.length) { uiAlert('Нет видимых сканов.'); return; }
+  const G = grpScans(), L0 = G.length ? G.filter(s => s.vis) : vis;
+  const ov = document.createElement('div'); ov.className = 'dlg';
+  ov.innerHTML = `<div class="dlg-b"><div class="lh"><div class="dlg-t">☁ Облако точек</div><button data-x>✕</button></div>
+  <div class="dlg-x">Сканы в сшитом положении, каждый скан — свой слой и цвет. Высота — от пола, единицы — мм (как в DXF плана). Стёртое кистью не попадает.</div>
+  <div class="pc-r"><label>Что:</label><button data-w="all" class="on">Все видимые (${vis.length})</button>${G.length && G.length < vis.length ? `<button data-w="sel">Выбранные (${L0.length})</button>` : ''}</div>
+  <div class="pc-r"><label>Шаг точек:</label><button data-d="0.10">10 см</button><button data-d="0.05" class="on">5 см</button><button data-d="0.02">2 см (все)</button></div>
+  <div class="pc-r"><label>Формат:</label><button data-f="dxf" class="on">DXF — AutoCAD</button><button data-f="xyz">XYZ — ReCap / CloudCompare</button></div>
+  <div class="dlg-x" id="cInfo"></div><div class="row r"><button class="pri" data-go>Скачать</button></div></div>`;
+  document.body.appendChild(ov); let who = 'all', dens = 0.05, fmt = 'dxf';
+  const info = () => { const L = who === 'sel' ? L0 : vis, n = L.reduce((a, s) => a + s.pts.length / 3, 0), k = Math.min(1, (0.02 / dens) ** 2 * 1.5), est = Math.round(n * k);
+    $('#cInfo').textContent = `Примерно ${est.toLocaleString('ru')} точек, файл ≈ ${Math.max(1, Math.round(est * (fmt === 'dxf' ? 62 : 26) / 1048576))} МБ.` + (fmt === 'dxf' && est > 1500000 ? ' Для AutoCAD это много — возьмите шаг крупнее или XYZ через ReCap.' : ''); };
+  const seg = (attr, set) => ov.querySelectorAll(`[${attr}]`).forEach(b => b.onclick = () => { ov.querySelectorAll(`[${attr}]`).forEach(x => x.classList.toggle('on', x === b)); set(b.getAttribute(attr)); info(); });
+  seg('data-w', v => who = v); seg('data-d', v => dens = +v); seg('data-f', v => fmt = v); info();
+  ov.querySelector('[data-x]').onclick = () => ov.remove();
+  ov.querySelector('[data-go]').onclick = async () => { ov.remove(); await exportCloud(who === 'sel' ? L0 : vis, dens, fmt); };
+}
+async function exportCloud(L, dens, fmt) {
+  busy('Собираю облако…'); await new Promise(r => setTimeout(r, 30));
+  const k = 1000, parts = [], buf = []; let n = 0, bl = 0; const push = t => { buf.push(t); bl += t.length; if (bl > 4e6) { parts.push(buf.join('')); buf.length = 0; bl = 0; } };
+  const hex = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  const aci = h => { const [r, g, b] = hex(h), mx = Math.max(r, g, b), mn = Math.min(r, g, b); if (mx - mn < 30) return 8; let H = 0; if (mx === r) H = ((g - b) / (mx - mn)) % 6; else if (mx === g) H = (b - r) / (mx - mn) + 2; else H = (r - g) / (mx - mn) + 4; H = (H * 60 + 360) % 360; return 10 + Math.round(H / 10) % 24 * 10; };
+  const lay = s => ('SCAN_' + String(s.name).replace(/[^0-9A-Za-zА-Яа-яЁё_-]/g, '_')).slice(0, 60);
+  if (fmt === 'dxf') { push('0\r\nSECTION\r\n2\r\nHEADER\r\n9\r\n$ACADVER\r\n1\r\nAC1009\r\n9\r\n$DWGCODEPAGE\r\n3\r\nANSI_1251\r\n9\r\n$INSUNITS\r\n70\r\n4\r\n9\r\n$PDMODE\r\n70\r\n0\r\n0\r\nENDSEC\r\n0\r\nSECTION\r\n2\r\nTABLES\r\n0\r\nTABLE\r\n2\r\nLAYER\r\n70\r\n' + L.length + '\r\n');
+    for (const s of L) push(`0\r\nLAYER\r\n2\r\n${lay(s)}\r\n70\r\n0\r\n62\r\n${aci(s.color)}\r\n6\r\nCONTINUOUS\r\n`); push('0\r\nENDTAB\r\n0\r\nENDSEC\r\n0\r\nSECTION\r\n2\r\nENTITIES\r\n'); }
+  for (const s of L) {
+    const P = s.pts, c = Math.cos(s.pose.a), sn = Math.sin(s.pose.a), cg = s.cg, er = cg && cg.er, seen = dens > 0.025 ? new Set() : null, ly = lay(s), [cr, cgc, cb] = hex(s.color);
+    for (let i = 0; i < P.length; i += 3) { const x = P[i], y = P[i + 1], z = P[i + 2] - s.floor;
+      if (er) { const u = Math.floor((x - cg.x0) / cg.res), v = Math.floor((cg.y1 - y) / cg.res); if (u >= 0 && v >= 0 && u < cg.w && v < cg.h && er[v * cg.w + u]) continue; }
+      const X = c * x - sn * y + s.pose.x, Y = sn * x + c * y + s.pose.y;
+      if (seen) { const key = Math.floor(X / dens) * 73856093 ^ Math.floor(Y / dens) * 19349663 ^ Math.floor(z / dens) * 83492791; if (seen.has(key)) continue; seen.add(key); }
+      n++;
+      if (fmt === 'dxf') push(`0\r\nPOINT\r\n8\r\n${ly}\r\n10\r\n${(X * k).toFixed(0)}\r\n20\r\n${(Y * k).toFixed(0)}\r\n30\r\n${(z * k).toFixed(0)}\r\n`);
+      else push(`${X.toFixed(3)} ${Y.toFixed(3)} ${z.toFixed(3)} ${cr} ${cgc} ${cb}\n`); }
+    busy(`Собираю облако… ${s.name}: ${n.toLocaleString('ru')} точек`); await new Promise(r => setTimeout(r, 0)); }
+  if (fmt === 'dxf') push('0\r\nENDSEC\r\n0\r\nEOF\r\n'); if (buf.length) parts.push(buf.join(''));
+  const enc = fmt === 'dxf' ? parts.map(t => { const o = new Uint8Array(t.length); for (let i = 0; i < t.length; i++) { const ch = t.charCodeAt(i); o[i] = ch < 128 ? ch : (CP1251[ch] || 63); } return o; }) : parts;
+  const blob = new Blob(enc, { type: fmt === 'dxf' ? 'application/dxf' : 'text/plain' }), a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = (((pjCur() && pjCur().name) || 'Облако').replace(/[\\/:*?"<>|]/g, '_')) + '_облако.' + fmt; document.body.appendChild(a); a.click(); a.remove(); busy('');
+  stat(`Облако сохранено: ${n.toLocaleString('ru')} точек, ${(blob.size / 1048576).toFixed(1).replace('.', ',')} МБ. ${fmt === 'dxf' ? 'В AutoCAD: откройте файл, «Вид → 3D» (орбита Shift + колесо). Если точки не видно — команда PDMODE 0 и РЕГЕН.' : 'ReCap: «Импорт» этого файла → .rcp; в AutoCAD — POINTCLOUDATTACH.'}`);
+}
+
 // ===================== АВТОСШИВКА, разбор стыков и подсказки =====================
 function runAuto(scans) { return new Promise((res, rej) => { const w = getWorker(), job = Math.random(); const on = e => { const d = e.data; if (d.job !== job) return; if (d.prog != null && !d.done) { busy(`${d.stage || 'Сшиваю'}… ${Math.round(d.prog * 100)}%`); return; } w.removeEventListener('message', on); if (d.error) rej(new Error(d.error)); else res(d.res); }; w.addEventListener('message', on);
   w.postMessage({ cmd: 'auto', job, scans: scans.map(s => ({ name: s.name, floor: s.floor, ceil: s.ceil, pts: s.pts.slice() })) }); }); }
 const scanOrder = (a, b) => { const na = +(String(a.name).match(/\d+/g) || [0]).pop(), nb = +(String(b.name).match(/\d+/g) || [0]).pop(); return na - nb || String(a.name).localeCompare(String(b.name)); };
 async function autoStitch() {
   const list = S.scans.slice().sort(scanOrder); if (list.length < 2) { uiAlert('Для сшивки нужно хотя бы два скана.'); return; }
-  if (!(await uiDialog({ title: 'Сшить автоматически?', text: `Программа сама найдёт общие места на соседних сканах (углы, коробки, мебель), проверит каждый стык видимостью и уравняет всю сеть. Сканов: ${list.length}, это займёт примерно ${Math.max(1, Math.round(list.length * 0.4))} мин. Метки, которые вы уже поставили, останутся. Вернуть как было — «↶ Отменить шаг».`, ok: 'Сшить', cancel: 'Отмена' }))) return;
+  if (!(await uiDialog({ title: 'Сшить автоматически?', text: `Программа сама найдёт общие места на соседних сканах (углы, коробки, мебель), проверит каждый стык видимостью и уравняет всю сеть. Сканов: ${list.length}, это займёт примерно ${Math.max(1, Math.round(list.length * 0.4))} мин. Метки, которые вы уже поставили, останутся. Автосшивка всё считает заново: если вы уже подгоняли сканы руками — лучше «🎯 Уточнить», она начнёт от вашего положения. Вернуть как было — «↶ Отменить шаг».`, ok: 'Сшить', cancel: 'Отмена' }))) return;
   pushUndo(); let R;
   try { R = await runAuto(list); } catch (e) { busy(''); uiAlert('Автосшивка не удалась: ' + e.message); return; }
   busy('');
@@ -1546,6 +1613,27 @@ async function autoStitch() {
   S.autoEdges = R.edges.map(e => ({ a: list[e.i].id, b: list[e.j].id, ratio: e.ratio, rms: e.rms }));
   S.asmFitted = false; analyze(); setView('asm'); fitAsm(); saveSoon();
   const H = S.hints; stat(`Автосшивка: в общей группе ${main.length} из ${list.length} сканов${groups.length > 1 ? `, отдельно — ${list.length - main.length}` : ''}. ${H.length ? 'Подсказки, где помочь, — слева в списке.' : 'Все стыки сходятся.'}`);
+}
+// --- уточнить: от того, как сканы стоят сейчас (после автосшивки и ручной подгонки) ---
+function runRefine(list, poses, pairs, fixed) { return new Promise((res, rej) => { const w = getWorker(), job = Math.random(); const on = e => { const d = e.data; if (d.job !== job) return; if (d.prog != null && !d.done) { busy(`${d.stage || 'Уточняю'}… ${Math.round(d.prog * 100)}%`); return; } w.removeEventListener('message', on); if (d.error) rej(new Error(d.error)); else res(d.res); }; w.addEventListener('message', on);
+  w.postMessage({ cmd: 'refine', job, scans: list.map(s => ({ name: s.name, floor: s.floor, ceil: s.ceil, pts: s.pts.slice() })), poses, pairs, fixed }); }); }
+async function refineStitch() {
+  const list = S.scans.filter(s => s.vis).sort(scanOrder); if (list.length < 2) { uiAlert('Для уточнения нужно хотя бы два видимых скана.'); return; }
+  // пары — сканы, чьи области перекрываются (по нынешнему положению)
+  const box = s => { const B = scanBBoxW(s), xs = B.map(p => p[0]), ys = B.map(p => p[1]); return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]; };
+  const bx = list.map(box), pairs = [];
+  for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) { const a = bx[i], b = bx[j], ox = Math.min(a[2], b[2]) - Math.max(a[0], b[0]), oy = Math.min(a[3], b[3]) - Math.max(a[1], b[1]); if (ox > 0.5 && oy > 0.5 && Math.hypot(list[i].pose.x - list[j].pose.x, list[i].pose.y - list[j].pose.y) < 14) pairs.push([i, j]); }
+  if (!pairs.length) { uiAlert('Сканы не перекрываются — уточнять нечего. Сначала поставьте их примерно на место (автосшивкой или вручную).'); return; }
+  if (!(await uiDialog({ title: 'Уточнить сшивку?', text: `Программа возьмёт сканы там, где они стоят сейчас (после автосшивки и вашей подгонки), точно подгонит каждый стык по точкам и уравняет всю сеть. Далеко сканы не переставляет: если скан стоит не на месте больше чем на ~30 см, сначала подвиньте его ближе. Опорный скан стоит на месте. Пар соседей: ${pairs.length}. Вернуть как было — «↶ Отменить шаг».`, ok: 'Уточнить', cancel: 'Отмена' }))) return;
+  const fixed = Math.max(0, list.findIndex(s => s.anchor)), poses = list.map(s => ({ a: s.pose.a, tx: s.pose.x, ty: s.pose.y, tz: -s.floor }));
+  pushUndo(); let R; try { R = await runRefine(list, poses, pairs, fixed); } catch (e) { busy(''); uiAlert('Уточнение не удалось: ' + e.message); return; } busy('');
+  let mx = 0, mxName = '', moved = 0;
+  R.poses.forEach((p, i) => { const s = list[i], d = Math.hypot(p.tx - s.pose.x, p.ty - s.pose.y); if (d > 0.001 || Math.abs(p.a - s.pose.a) > 1e-5) moved++; if (d > mx) { mx = d; mxName = s.name; } s.pose = { x: p.tx, y: p.ty, a: normA(p.a) }; });
+  S.autoEdges = R.edges.map(e => ({ a: list[e.i].id, b: list[e.j].id, ratio: e.ratio, rms: e.rms })); S.lastSolve = null;
+  const rms = R.edges.length ? R.edges.map(e => e.rms).sort((a, b) => a - b)[Math.floor(R.edges.length / 2)] : 0;
+  analyze(); renderAll(); drawAsm(); saveSoon();
+  const far = R.bad.filter(b => b[1] === 'далеко' || b[2] === 'далеко');
+  stat(`Уточнено: стыков подогнано ${R.edges.length} из ${pairs.length}, сдвинуто сканов ${moved}, самый большой сдвиг ${Math.round(mx * 1000)} мм (${mxName}). Типичное расхождение по стыку ${Math.round(rms * 1000)} мм.${R.bad.length ? ` Не подогнаны: ${R.bad.map(b => list[b[0]].name + '–' + list[b[1]].name + ' (' + b[2] + ')').slice(0, 6).join(', ')}${R.bad.length > 6 ? '…' : ''}.` : ''}`);
 }
 // --- проверка стыков: стены соседних сканов должны лечь друг на друга ---
 function wallSample(s, maxN = 6000) { const r = s.rast, P = s.pts, z0 = s.floor + s.band[0], z1 = s.floor + s.band[1], out = []; if (!r || !r.F) return out; const step = Math.max(1, Math.floor((s.nBand || 1) / maxN)); let k = 0;
