@@ -10,6 +10,7 @@ button:disabled{opacity:.4}button.on{background:#dbe7ff;border-color:#9bb7f5}but
 #top{position:fixed;left:0;right:0;top:0;min-height:54px;background:var(--top);color:#fff;display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:7px 10px;z-index:5}
 #top::-webkit-scrollbar{display:none}#top b.lg{font-size:16px;margin-right:6px;white-space:nowrap}
 #top button{background:#243142;color:#e8eef6;border-color:#344357;white-space:nowrap;padding:7px 10px}#top button.on{background:#e3a21a;color:#16202c;border-color:#e3a21a}#top button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
+#bProj span{display:inline-block;max-width:220px;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}.pj-l{max-height:55vh;overflow:auto;margin:10px 0}.pj-i{display:flex;gap:6px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:6px 8px;margin-bottom:6px}.pj-i.cur{border-color:var(--acc);box-shadow:0 0 0 2px #c7d7fb}.pj-i .pj-o{flex:1;text-align:left;border:0;background:none;padding:2px}.pj-i .pj-o small{display:block;color:var(--mute);font-size:12px}.pj-i button{padding:4px 8px}
 #top .sep{width:1px;height:28px;background:#344357;margin:0 4px;flex:0 0 1px}#top .grp{display:flex;gap:3px}
 #side{position:fixed;left:0;top:54px;bottom:30px;width:320px;overflow:auto;background:#f8fafc;border-right:1px solid var(--line);padding:8px}
 #main{position:fixed;left:320px;right:0;top:54px;bottom:30px;overflow:auto}
@@ -43,23 +44,24 @@ canvas.band{width:100%;height:32px;display:block;border-radius:6px;touch-action:
 @media (max-width:900px){#side{width:260px}#main{left:260px}}
 @media (max-width:640px){#side{display:none}#main{left:0}}
 </style></head><body>
-<div id="top"><b class="lg">Скан</b>
+<div id="top"><b class="lg">Скан</b><button id="bProj" title="Проекты: переключиться, создать, переименовать">📁 <span id="pjName">Проекты</span></button><span class="sep"></span>
   <button id="bAdd" class="pri">＋ Сканы</button><span class="sep"></span>
   <div class="grp"><button data-view="grid">▦ Все сканы</button><button data-view="asm">⧉ Сборка</button><button data-view="plan">📐 План</button></div><span class="sep"></span>
   <div class="grp"><button data-tool="hand">✋ Обзор</button><button data-tool="line">／ Линия</button><button data-tool="point">• Точка</button><button data-tool="erase">🗑 Метка</button></div><span class="sep"></span><div class="grp"><button data-tool="corner">⌖ Общий угол</button><button data-tool="brush">🧹 Стереть</button><button data-tool="keep">✏ Нужное</button></div><span class="sep"></span>
   <button id="bAuto">🤖 Авто</button><button id="bStitch" class="pri">🧩 Сшить</button><button id="bUndo">↶</button><button id="bRedo">↷</button><button id="bFit">⤢</button>
   <span id="colsBox" class="grp"><span class="sep"></span><button data-cols="1">1</button><button data-cols="2">2</button><button data-cols="3">3</button><button data-cols="4">4</button><button id="bTW" title="Повернуть рамки как в сборке">↻ как в сборке</button></span><span class="sep"></span>
-  <button id="bSave">💾 Файл</button><button id="bOpen">📂</button><button id="bNew">Новая</button><button id="bHelp">Справка</button>
+  <button id="bSave">💾 Файл</button><button id="bOpen">📂</button><button id="bNew">＋ Новый проект</button><button id="bHelp">Справка</button>
 </div>
 <div id="side"><div id="list"></div></div>
 <div id="main"></div>
 <div id="rotbar" title="Повернуть выбранный скан"><button id="bR1">⟲ 1°</button><button id="bR01">⟲ 0,1°</button><button id="bRm01">⟳ 0,1°</button><button id="bRm1">⟳ 1°</button><button id="bR90">⟲ 90°</button></div>
 <div id="ubar"><button id="fUndo" disabled>↶ Отменить шаг</button><button id="fRedo" disabled>↷ Вернуть</button><button id="fDel">🗑 Удалить выбранное</button></div>
-<div id="foot"><span id="status"></span><span id="saved"></span><span id="ver">Скан 2.4 · © d1sco, 2026</span></div>
+<div id="foot"><span id="status"></span><span id="saved"></span><span id="ver">Скан 2.5 · © d1sco, 2026</span></div>
 <div id="busy" hidden><span>…</span></div>
 <input type="file" id="fileIn" multiple accept=".e57" hidden><input type="file" id="projIn" hidden>
 <div id="help" hidden><div class="lh"><h3>Как сшивать</h3><button id="helpX">✕</button></div>
 <ol>
+<li><b>📁 Проекты</b> (слева вверху) — список работ: у каждой своё название, свои сканы, метки, сборка и план. Касание — открыть, ✎ — переименовать, 🗑 — удалить. <b>＋ Новый проект</b> — начать новую работу; нынешняя сохраняется и остаётся в списке.</li>
 <li><b>＋ Сканы</b> — выберите все E57 объекта (сканы FARO пересохраняются в E57 файлом <code>fls_to_e57.bat</code>). Всё хранится в памяти устройства: обновление страницы ничего не сотрёт.</li>
 <li><b>▦ Все сканы</b> — все сканы на одном листе, каждый в своей рамке, вид сверху. Двумя пальцами (или колесом мыши) — масштаб в рамке. Кнопки 1–4 — сколько рамок в ряд. «⇄» на рамке — показать этот скан рядом с выбранным.</li>
 <li><b>Полоса высот</b> у каждого скана в списке слева: тяните её края по графику высот (пол → потолок) или нажмите «Низ / Середина / Верх / Всё». Берите ту часть, где стены видны чисто, без мебели: где-то это низ, где-то верх.</li>
@@ -900,10 +902,50 @@ async function put(k, v) { const d = await db(); if (!d) return false; return ne
 async function get(k) { const d = await db(); if (!d) return null; return new Promise(res => { try { const tx = d.transaction('kv', 'readonly'), r = tx.objectStore('kv').get(k); r.onsuccess = () => res(r.result); r.onerror = () => res(null); } catch (e) { res(null); } }); }
 async function del(k) { const d = await db(); if (!d) return; return new Promise(res => { const tx = d.transaction('kv', 'readwrite'); tx.objectStore('kv').delete(k); tx.oncomplete = () => res(); tx.onerror = () => res(); }); }
 let saveT = 0;
+// ---------- проекты: несколько работ, у каждой своё имя; точки сканов лежат отдельно (pts:ключ), состояние — state:id ----------
+const PJ = { list: [], id: null };
+const pjCur = () => PJ.list.find(p => p.id === PJ.id);
+function showPj() { const p = pjCur(); $('#pjName').textContent = p ? p.name : 'Проекты'; document.title = (p ? p.name + ' — ' : '') + 'Скан'; }
+async function pjLoad() {
+  const l = await get('projects'); PJ.list = Array.isArray(l) ? l : []; let cur = await get('cur');
+  if (!PJ.list.length) { // первый запуск или перенос работы из прежней версии (одна работа под ключом state)
+    const id = 'j' + Date.now(), old = await get('state'); let n = 0; try { n = old ? (JSON.parse(old).scans || []).length : 0; } catch (e) { }
+    PJ.list = [{ id, name: old ? 'Сшивка (прежняя работа)' : 'Сшивка ' + new Date().toLocaleDateString('ru'), created: Date.now(), updated: Date.now(), n }];
+    if (old && await put('state:' + id, old)) await del('state'); await put('projects', PJ.list); cur = id; await put('cur', id); }
+  if (!PJ.list.some(p => p.id === cur)) { cur = PJ.list[0].id; await put('cur', cur); }
+  PJ.id = cur; showPj();
+}
+async function pjFlush() { clearTimeout(saveT); if (PJ.id) { await put('state:' + PJ.id, JSON.stringify(stateObj())); const p = pjCur(); if (p) { p.updated = Date.now(); p.n = S.scans.length; await put('projects', PJ.list); } } }
+async function pjGo(id) { busy('Открываю проект…'); await pjFlush(); await put('cur', id); location.reload(); }
+const pjDef = () => 'Сшивка ' + new Date().toLocaleDateString('ru');
+async function pjNew() {
+  const nm = await uiDialog({ title: 'Новый проект', text: 'Название объекта (его видно в списке проектов). Нынешняя работа сохранится и останется в списке.', input: pjDef(), ok: 'Создать', cancel: 'Отмена' }); if (nm == null) return;
+  const id = 'j' + Date.now(); PJ.list.push({ id, name: nm.trim() || pjDef(), created: Date.now(), updated: Date.now(), n: 0 }); await pjFlush(); await put('projects', PJ.list); await pjGo(id);
+}
+async function pjRename(id) { const p = PJ.list.find(x => x.id === id); if (!p) return; const nm = await uiDialog({ title: 'Название проекта', input: p.name, ok: 'Сохранить', cancel: 'Отмена' }); if (nm == null || !nm.trim()) return; p.name = nm.trim(); await put('projects', PJ.list); showPj(); }
+async function pjDelete(id) { const p = PJ.list.find(x => x.id === id); if (!p) return false;
+  if (!(await uiDialog({ title: `Удалить проект «${p.name}»?`, text: 'Сканы и метки этого проекта будут стёрты из памяти устройства. Если нужно — сначала откройте его и «💾 Файл».', ok: 'Удалить', cancel: 'Отмена' }))) return false;
+  busy('Удаляю…'); let keys = []; if (id === PJ.id) keys = S.scans.map(s => s.key); else { try { keys = (JSON.parse(await get('state:' + id) || '{}').scans || []).map(q => q.key); } catch (e) { } }
+  for (const k of keys) await del('pts:' + k); await del('state:' + id); PJ.list = PJ.list.filter(x => x !== p); busy('');
+  if (id === PJ.id) { if (!PJ.list.length) PJ.list.push({ id: 'j' + Date.now(), name: pjDef(), created: Date.now(), updated: Date.now(), n: 0 }); await put('projects', PJ.list); PJ.id = null; await put('cur', PJ.list[0].id); location.reload(); return true; }
+  await put('projects', PJ.list); return true; }
+function pjMenu() {
+  const p0 = pjCur(); if (p0) { p0.n = S.scans.length; }
+  const ov = document.createElement('div'); ov.className = 'dlg'; const tf = t => t ? new Date(t).toLocaleString('ru', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+  const list = PJ.list.slice().sort((a, b) => (b.updated || 0) - (a.updated || 0));
+  ov.innerHTML = `<div class="dlg-b"><div class="lh"><div class="dlg-t">Проекты</div><button data-x>✕</button></div><div class="dlg-x">Каждый проект — своя работа: свои сканы, метки, сборка и план. Всё хранится на этом устройстве.</div><div class="pj-l">${list.map(p => `<div class="pj-i ${p.id === PJ.id ? 'cur' : ''}"><button class="pj-o" data-open="${p.id}"><b></b><small>${p.id === PJ.id ? 'открыт · ' : ''}сканов ${p.n || 0} · ${tf(p.updated)}</small></button><button data-ren="${p.id}" title="Переименовать">✎</button><button data-del="${p.id}" title="Удалить">🗑</button></div>`).join('')}</div><div class="row r"><button class="pri" data-new>＋ Новый проект</button></div></div>`;
+  list.forEach((p, i) => { ov.querySelectorAll('.pj-o b')[i].textContent = p.name; });
+  const close = () => ov.remove(); ov.onclick = e => { if (e.target === ov) close(); };
+  ov.querySelector('[data-x]').onclick = close; ov.querySelector('[data-new]').onclick = () => { close(); pjNew(); };
+  ov.querySelectorAll('[data-open]').forEach(b => b.onclick = () => { close(); if (b.dataset.open !== PJ.id) pjGo(b.dataset.open); });
+  ov.querySelectorAll('[data-ren]').forEach(b => b.onclick = async () => { close(); await pjRename(b.dataset.ren); pjMenu(); });
+  ov.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => { close(); if (await pjDelete(b.dataset.del) !== null) pjMenu(); });
+  document.body.appendChild(ov);
+}
 function stateObj() { return { v: 1, nextMark: S.nextMark, nextScan: S.nextScan, asmV: S.asmV, cols: S.cols, plan: S.plan, scans: S.scans.map(s => ({ id: s.id, key: s.key, name: s.name, floor: s.floor, ceil: s.ceil, hist: s.hist, color: s.color, pose: s.pose, band: s.band, anchor: s.anchor, vis: s.vis, tile: s.tile, placed: s.placed, auto: s.auto, erase: s.erase || [], keepL: s.keepL || [], keepP: s.keepP || [] })), marks: S.marks, hints: S.hints || [], keepOnly: !!S.keepOnly }; }
-function saveSoon() { clearTimeout(saveT); saveT = setTimeout(async () => { const ok = await put('state', JSON.stringify(stateObj())); $('#saved').textContent = ok ? '✓ сохранено ' + new Date().toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '⚠ не сохранилось'; }, 500); }
+function saveSoon() { clearTimeout(saveT); saveT = setTimeout(async () => { if (!PJ.id) return; const ok = await put('state:' + PJ.id, JSON.stringify(stateObj())); { const p = pjCur(); if (p && (p.n !== S.scans.length || Date.now() - (p.updated || 0) > 60000)) { p.n = S.scans.length; p.updated = Date.now(); put('projects', PJ.list); } } $('#saved').textContent = ok ? '✓ сохранено ' + new Date().toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '⚠ не сохранилось'; }, 500); }
 async function restore() {
-  const t = await get('state'); if (!t) return false; let j; try { j = JSON.parse(t); } catch (e) { return false; }
+  const t = PJ.id ? await get('state:' + PJ.id) : null; if (!t) return false; let j; try { j = JSON.parse(t); } catch (e) { return false; }
   busy('Открываю сохранённую работу…'); let miss = 0; S.keepOnly = !!j.keepOnly;
   for (const q of j.scans || []) { const buf = await get('pts:' + q.key); if (!buf) { miss++; continue; } const s = Object.assign({}, q, { pts: new Float32Array(buf) }); prepScan(s); S.scans.push(s); }
   S.marks = (j.marks || []).filter(m => scanById(m.sid)); S.nextMark = j.nextMark || 1; S.nextScan = j.nextScan || S.scans.length + 1; if (j.asmV) S.asmV = j.asmV; if (j.cols) S.cols = j.cols; if (j.plan) S.plan = j.plan; S.hints = j.hints || [];
@@ -1180,7 +1222,7 @@ function refreshTileHead(sid) { const t = $(`#tile-${sid} .th span`); if (t) t.i
 function rotSel(deg) { const s = scanById(S.sel); if (!s) { stat('Выберите скан (касание по нему в «Сборке» или в списке).'); return; } pushUndo(); setRot(s, { ...s.pose }, bandCenter(s), deg * Math.PI / 180); S.lastSolve = null; drawAsm(); saveSoon(); }
 
 // ---------- проект файлом ----------
-function saveProjectFile() { const j = stateObj(); j.app = 'skan'; const blob = new Blob([JSON.stringify(j)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'Сшивка_' + new Date().toISOString().slice(0, 10) + '.skan.json'; document.body.appendChild(a); a.click(); a.remove(); stat('Файл проекта сохранён (без точек: при открытии на другом устройстве загрузите те же E57 — метки и положения встанут по именам сканов).'); }
+function saveProjectFile() { const j = stateObj(); j.app = 'skan'; const blob = new Blob([JSON.stringify(j)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = ((pjCur() && pjCur().name) || 'Сшивка_' + new Date().toISOString().slice(0, 10)).replace(/[\\/:*?"<>|]/g, '_') + '.skan.json'; document.body.appendChild(a); a.click(); a.remove(); stat('Файл проекта сохранён (без точек: при открытии на другом устройстве загрузите те же E57 — метки и положения встанут по именам сканов).'); }
 async function openProjectFile(f) { let j; try { j = JSON.parse(await f.text()); } catch (e) { uiAlert('Это не файл проекта сшивки.'); return; } pushUndo(); let n = 0; const map = new Map();
   for (const q of j.scans || []) { const s = S.scans.find(x => x.name === q.name); if (!s) continue; map.set(q.id, s.id); Object.assign(s, { pose: q.pose, band: q.band, anchor: q.anchor }); prepScan(s); n++; }
   const ms = (j.marks || []).filter(m => map.has(m.sid)).map(m => ({ ...m, id: S.nextMark++, sid: map.get(m.sid) })); S.marks = S.marks.filter(m => !ms.some(q => q.sid === m.sid)).concat(ms);
@@ -1202,10 +1244,10 @@ document.addEventListener('DOMContentLoaded', async () => { layoutTop();
   $('#bTW').onclick = () => { S.tileWorld = !S.tileWorld; S.scans.forEach(x => x.tile = null); renderAll(); stat(S.tileWorld ? 'Рамки повёрнуты как в сборке: одна и та же стена на соседних сканах смотрит в одну сторону.' : 'Рамки — каждый скан как снят.'); }; $('#bStitch').onclick = stitch; $('#bAuto').onclick = autoStitch; $('#bUndo').onclick = undo; $('#bRedo').onclick = redo; $('#fUndo').onclick = undo; $('#fRedo').onclick = redo; $('#fDel').onclick = delSelected; $('#bFit').onclick = () => { if (S.view === 'asm' || S.view === 'plan') fitAsm(); else { S.scans.forEach(fitTile); redraw(); } };
   $('#bR1').onclick = () => rotSel(1); $('#bR01').onclick = () => rotSel(0.1); $('#bRm01').onclick = () => rotSel(-0.1); $('#bRm1').onclick = () => rotSel(-1); $('#bR90').onclick = () => rotSel(90);
   $('#bSave').onclick = saveProjectFile; $('#bOpen').onclick = () => $('#projIn').click(); $('#projIn').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) openProjectFile(f); };
-  $('#bNew').onclick = async () => { if (!(await uiDialog({ title: 'Начать новую сшивку?', text: 'Все сканы и метки этой работы будут убраны из программы. Если нужно — сначала «Сохранить файл».', ok: 'Начать заново', cancel: 'Отмена' }))) return; for (const s of S.scans) await del('pts:' + s.key); await del('state'); location.reload(); };
+  $('#bNew').onclick = pjNew; $('#bProj').onclick = pjMenu;
   $('#bHelp').onclick = () => $('#help').hidden = !$('#help').hidden; $('#helpX').onclick = () => $('#help').hidden = true;
   const main = $('#main'); main.ondragover = e => e.preventDefault(); main.ondrop = e => { e.preventDefault(); if (e.dataTransfer.files.length) loadFiles(e.dataTransfer.files); };
-  renderAll(); await restore(); setTool('hand');
+  await pjLoad(); renderAll(); await restore(); setTool('hand');
 });
 
 // ===================== ПЛАН: стены по сшитым сканам и быстрая правка =====================
