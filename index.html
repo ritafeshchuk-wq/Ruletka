@@ -288,7 +288,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 8.9 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 9.0 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -4992,6 +4992,80 @@ function promPoint(w) {
   const q = addPoint(w); q.free = true; adjust(); return q;
 }
 function nearestWall(w, px = 14) { let best = null, bd = px * HITK() / S.view.s, bt = 0; for (const e of M.edges) { if (e.obj) continue; const A = ptById(e.a), B = ptById(e.b); if (!A || !B) continue; const [d, t] = distSeg(w, PX(A), PX(B)); if (d < bd) { bd = d; best = e; bt = t; } } return best ? { e: best, t: bt } : null; }
+// ---------- IFC (ISO 16739, IFC4): стены с толщиной, помещения с площадями, двери и окна — для Revit / ArchiCAD / Renga ----------
+function ifcGuid() { const C = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_$', b = new Uint8Array(16); (window.crypto || {}).getRandomValues ? crypto.getRandomValues(b) : b.forEach((_, i) => b[i] = Math.random() * 256 | 0);
+  let n = 0n; for (const x of b) n = (n << 8n) | BigInt(x); let s = ''; for (let i = 0; i < 22; i++) { s = C[Number(n & 63n)] + s; n >>= 6n; } return s.replace(/^[^0-3]/, c => C[C.indexOf(c) & 3]); }
+function wallRuns() { // стены одной прямой (с проёмами) — одна стена IFC
+  const E = M.edges.filter(e => !e.obj && ptById(e.a) && ptById(e.b)), used = new Set(), runs = [], P = id => PX(ptById(id));
+  const coll = (e1, e2, v) => { const o1 = e1.a === v ? e1.b : e1.a, o2 = e2.a === v ? e2.b : e2.a, a = P(o1), c = P(v), b = P(o2), d1 = [c[0] - a[0], c[1] - a[1]], d2 = [b[0] - c[0], b[1] - c[1]], l1 = Math.hypot(...d1) || 1, l2 = Math.hypot(...d2) || 1; return (d1[0] * d2[0] + d1[1] * d2[1]) / l1 / l2 > Math.cos(4 * Math.PI / 180); };
+  const next = (e, v) => { const c = E.filter(x => x !== e && !used.has(x) && (x.a === v || x.b === v) && coll(e, x, v)); return c.length === 1 ? c[0] : null; };
+  for (const e0 of E) { if (used.has(e0)) continue; used.add(e0); const seq = [e0]; let v0 = e0.a, v1 = e0.b;
+    for (let e = e0, v = v1, n; (n = next(e, v)); e = n) { used.add(n); seq.push(n); v = n.a === v ? n.b : n.a; v1 = v; }
+    for (let e = e0, v = v0, n; (n = next(e, v)); e = n) { used.add(n); seq.unshift(n); v = n.a === v ? n.b : n.a; v0 = v; }
+    const A = P(v0), B = P(v1), L = Math.hypot(B[0] - A[0], B[1] - A[1]); if (L < 0.02) continue; const u = [(B[0] - A[0]) / L, (B[1] - A[1]) / L];
+    let n = [-u[1], u[0]]; const R = seq.map(e => roomWith(e.a, e.b)).find(Boolean); // наружу — от помещения
+    if (R) { const C = R.ids.map(id => P(id)), cx = C.reduce((s2, q) => s2 + q[0], 0) / C.length, cy = C.reduce((s2, q) => s2 + q[1], 0) / C.length; if ((cx - A[0]) * n[0] + (cy - A[1]) * n[1] > 0) n = [-n[0], -n[1]]; }
+    const ops = seq.filter(e => e.open).map(e => { const s0 = (P(e.a)[0] - A[0]) * u[0] + (P(e.a)[1] - A[1]) * u[1], s1 = (P(e.b)[0] - A[0]) * u[0] + (P(e.b)[1] - A[1]) * u[1]; return { e, s0: Math.min(s0, s1), s1: Math.max(s0, s1) }; });
+    runs.push({ v0, v1, A, B, L, u, n, seq, ops, room: R }); }
+  return runs; }
+function buildIFC(opt = {}) {
+  const H = opt.h || 2.7, extT = opt.extT || 0.3, name = opt.name || 'Обмер';
+  const L = []; let id = 0; const add = s2 => { L.push(`#${++id}=${s2};`); return '#' + id; };
+  const f = v => { const x = Math.round(v * 1e6) / 1e6; return Number.isInteger(x) ? x + '.' : String(x); };
+  const str = s2 => "'" + String(s2 == null ? '' : s2).replace(/\\/g, '\\\\').replace(/'/g, "''").replace(/[^\x20-\x7e]+/g, run => '\\X2\\' + [...run].map(ch => { const c = ch.codePointAt(0); return c < 0x10000 ? c.toString(16).toUpperCase().padStart(4, '0') : '003F'; }).join('') + '\\X0\\') + "'";
+  const pt = (x, y, z) => add(z == null ? `IFCCARTESIANPOINT((${f(x)},${f(y)}))` : `IFCCARTESIANPOINT((${f(x)},${f(y)},${f(z)}))`), dir = (x, y, z) => add(z == null ? `IFCDIRECTION((${f(x)},${f(y)}))` : `IFCDIRECTION((${f(x)},${f(y)},${f(z)}))`);
+  const O = pt(0, 0, 0), Z = dir(0, 0, 1), X = dir(1, 0, 0), AX = add(`IFCAXIS2PLACEMENT3D(${O},${Z},${X})`);
+  const ctx = add(`IFCGEOMETRICREPRESENTATIONCONTEXT($,'Model',3,1.E-05,${AX},$)`), body = add(`IFCGEOMETRICREPRESENTATIONSUBCONTEXT('Body','Model',*,*,*,*,${ctx},$,.MODEL_VIEW.,$)`);
+  const units = add(`IFCUNITASSIGNMENT((${[add("IFCSIUNIT(*,.LENGTHUNIT.,$,.METRE.)"), add("IFCSIUNIT(*,.AREAUNIT.,$,.SQUARE_METRE.)"), add("IFCSIUNIT(*,.VOLUMEUNIT.,$,.CUBIC_METRE.)"), add("IFCSIUNIT(*,.PLANEANGLEUNIT.,$,.RADIAN.)")].join(',')}))`);
+  const proj = add(`IFCPROJECT('${ifcGuid()}',$,${str(name)},${str('Обмер рулеткой · Рулетка · © d1sco')},$,$,$,(${ctx}),${units})`);
+  const lpSite = add(`IFCLOCALPLACEMENT($,${AX})`), site = add(`IFCSITE('${ifcGuid()}',$,${str('Участок')},$,$,${lpSite},$,$,.ELEMENT.,$,$,$,$,$)`);
+  const lpB = add(`IFCLOCALPLACEMENT(${lpSite},${AX})`), bld = add(`IFCBUILDING('${ifcGuid()}',$,${str(opt.building || 'Здание')},$,$,${lpB},$,$,.ELEMENT.,$,$,$)`);
+  const lpS = add(`IFCLOCALPLACEMENT(${lpB},${AX})`), sto = add(`IFCBUILDINGSTOREY('${ifcGuid()}',$,${str(opt.storey || 'Этаж')},$,$,${lpS},$,$,.ELEMENT.,0.)`);
+  add(`IFCRELAGGREGATES('${ifcGuid()}',$,$,$,${proj},(${site}))`); add(`IFCRELAGGREGATES('${ifcGuid()}',$,$,$,${site},(${bld}))`); add(`IFCRELAGGREGATES('${ifcGuid()}',$,$,$,${bld},(${sto}))`);
+  const place = (rel, x, y, z, ux, uy) => add(`IFCLOCALPLACEMENT(${rel},${add(`IFCAXIS2PLACEMENT3D(${pt(x, y, z)},${Z},${dir(ux, uy, 0)})`)})`);
+  const boxRep = (cx, cy, w, d, h) => { const prof = add(`IFCRECTANGLEPROFILEDEF(.AREA.,$,${add(`IFCAXIS2PLACEMENT2D(${pt(cx, cy)},$)`)},${f(w)},${f(d)})`), sol = add(`IFCEXTRUDEDAREASOLID(${prof},${AX},${Z},${f(h)})`); return add(`IFCPRODUCTDEFINITIONSHAPE($,$,(${add(`IFCSHAPEREPRESENTATION(${body},'Body','SweptSolid',(${sol}))`)}))`); };
+  const prop = (target, pset, props) => { const ps = props.filter(x => x[1] != null).map(([k, v]) => add(`IFCPROPERTYSINGLEVALUE(${str(k)},$,${typeof v === 'number' ? `IFCREAL(${f(v)})` : `IFCLABEL(${str(v)})`},$)`)); if (ps.length) add(`IFCRELDEFINESBYPROPERTIES('${ifcGuid()}',$,$,$,(${target}),${add(`IFCPROPERTYSET('${ifcGuid()}',$,${str(pset)},$,(${ps.join(',')}))`)})`); };
+  const inStorey = [], spaces = [];
+  // стены: пары лиц одной перегородки → одна стена толщиной = зазор; без пары — наружная: толщина по подоконникам или по умолчанию
+  const runs = wallRuns(), ow = outerWalls(), done = new Set(); let nW = 0, nD = 0, nWin = 0, nO = 0, measuredT = 0;
+  for (const r of runs) { if (done.has(r)) continue; done.add(r);
+    let best = null; for (const q of runs) { if (done.has(q)) continue; if (Math.abs(r.u[0] * q.u[1] - r.u[1] * q.u[0]) > 0.05) continue; const d = (q.A[0] - r.A[0]) * r.n[0] + (q.A[1] - r.A[1]) * r.n[1]; if (!(d > 0.02 && d < 0.8)) continue; if (q.n[0] * r.n[0] + q.n[1] * r.n[1] > -0.5) continue;
+      const sa = (q.A[0] - r.A[0]) * r.u[0] + (q.A[1] - r.A[1]) * r.u[1], sb = (q.B[0] - r.A[0]) * r.u[0] + (q.B[1] - r.A[1]) * r.u[1], ov = Math.min(r.L, Math.max(sa, sb)) - Math.max(0, Math.min(sa, sb)); if (ov < 0.5 * Math.min(r.L, q.L)) continue; if (!best || d < best.d) best = { q, d, cover: ov / q.L }; }
+    let t, kind; if (best) { t = best.d; kind = 'перегородка/стена между помещениями (толщина по обмеру)'; if (best.cover > 0.8) done.add(best.q); measuredT++; }
+    else { const o2 = ow.find(x => Math.abs((x.a[0] - r.A[0]) * r.n[0] + (x.a[1] - r.A[1]) * r.n[1] - x.t) < 0.05 && Math.abs(r.u[0] * (x.b[1] - x.a[1]) - r.u[1] * (x.b[0] - x.a[0])) / (Math.hypot(x.b[0] - x.a[0], x.b[1] - x.a[1]) || 1) < 0.05); if (!o2 && r.L < 0.3 && !r.ops.length) continue; t = o2 ? o2.t : r.L < 0.7 ? Math.min(extT, 0.1) : extT; kind = o2 ? 'наружная (толщина по подоконнику)' : r.L < 0.7 ? 'уступ / откос (условно)' : 'наружная или не промерена (толщина по умолчанию)'; if (o2) measuredT++; }
+    const ext = best || r.L < 0.7 ? 0 : t; // длинные наружные — продлеваем на толщину, чтобы углы сошлись
+    const lp = place(lpS, r.A[0] - r.u[0] * ext, r.A[1] - r.u[1] * ext, 0, r.u[0], r.u[1]), Lw = r.L + 2 * ext;
+    const nl = [-r.u[1], r.u[0]], side = nl[0] * r.n[0] + nl[1] * r.n[1] > 0 ? 1 : -1; // локальная ось Y — влево; стена лежит наружу от лица
+    const wall = add(`IFCWALL('${ifcGuid()}',$,${str('Стена ' + pname(r.v0) + '–' + pname(r.v1))},${str(kind)},$,${lp},${boxRep(Lw / 2, side * t / 2, Lw, t, H)},$,.STANDARD.)`); inStorey.push(wall); nW++;
+    prop(wall, 'Рулетка', [['Толщина, м', t], ['Источник толщины', kind], ['Длина по лицу, м', r.L]]);
+    for (const o of r.ops) { const w = o.s1 - o.s0; if (w < 0.05) continue; const isW = o.e.kind === 'window', isD = o.e.kind === 'door', z0 = isW ? (opt.sillH || 0.85) : 0, hh = isW ? (opt.winH || 1.5) : (opt.doorH || 2.1);
+      const lpo = add(`IFCLOCALPLACEMENT(${lp},${add(`IFCAXIS2PLACEMENT3D(${pt(ext + o.s0, 0, z0)},${Z},${X})`)})`);
+      const op = add(`IFCOPENINGELEMENT('${ifcGuid()}',$,${str('Проём')},$,$,${lpo},${boxRep(w / 2, side * t / 2, w, t + 0.04, hh)},$,.OPENING.)`); add(`IFCRELVOIDSELEMENT('${ifcGuid()}',$,$,$,${wall},${op})`); nO++;
+      const m = distMeas(o.e.a, o.e.b), wv = m ? m.v : w;
+      if (isD || isW) { const lpf = add(`IFCLOCALPLACEMENT(${lpo},${AX})`), rep = boxRep(w / 2, side * t / 2, w, Math.min(0.06, t), hh);
+        const el = isD ? add(`IFCDOOR('${ifcGuid()}',$,${str('Дверь ' + fm(wv))},$,$,${lpf},${rep},$,${f(hh)},${f(wv)},.DOOR.,$,$)`) : add(`IFCWINDOW('${ifcGuid()}',$,${str('Окно ' + fm(wv))},$,$,${lpf},${rep},$,${f(hh)},${f(wv)},.WINDOW.,$,$)`);
+        add(`IFCRELFILLSELEMENT('${ifcGuid()}',$,$,$,${op},${el})`); inStorey.push(el); isD ? nD++ : nWin++; prop(el, 'Рулетка', [['Ширина по замеру, м', m ? m.v : null], ['Высота принята, м', hh]]); } } }
+  // помещения
+  for (const R of M.rooms) { const P = R.ids.map(i2 => ptById(i2)).filter(Boolean).map(PX); if (P.length < 3) continue; let area = 0; try { area = TAPE.roomInfo(M, R).area; } catch (e) { }
+    const poly = add(`IFCPOLYLINE((${P.concat([P[0]]).map(q => pt(q[0], q[1])).join(',')}))`), prof = add(`IFCARBITRARYCLOSEDPROFILEDEF(.AREA.,$,${poly})`), sol = add(`IFCEXTRUDEDAREASOLID(${prof},${AX},${Z},${f(H)})`);
+    const pds = add(`IFCPRODUCTDEFINITIONSHAPE($,$,(${add(`IFCSHAPEREPRESENTATION(${body},'Body','SweptSolid',(${sol}))`)}))`), lp = add(`IFCLOCALPLACEMENT(${lpS},${AX})`);
+    const sp = add(`IFCSPACE('${ifcGuid()}',$,${str(String(R.num))},$,$,${lp},${pds},${str(R.name || 'Помещение')},.ELEMENT.,.INTERNAL.,$)`); spaces.push(sp);
+    const qa = add(`IFCQUANTITYAREA('NetFloorArea',$,$,${f(area)},$)`), qh = add(`IFCQUANTITYLENGTH('Height',$,$,${f(H)},$)`); add(`IFCRELDEFINESBYPROPERTIES('${ifcGuid()}',$,$,$,(${sp}),${add(`IFCELEMENTQUANTITY('${ifcGuid()}',$,'Qto_SpaceBaseQuantities',$,$,(${qa},${qh}))`)})`);
+    prop(sp, 'Рулетка', [['Номер', String(R.num)], ['Площадь по обмеру, м²', Math.round(area * 100) / 100]]); }
+  if (spaces.length) add(`IFCRELAGGREGATES('${ifcGuid()}',$,$,$,${sto},(${spaces.join(',')}))`);
+  if (inStorey.length) add(`IFCRELCONTAINEDINSPATIALSTRUCTURE('${ifcGuid()}',$,$,$,(${inStorey.join(',')}),${sto})`);
+  const ts = new Date().toISOString().slice(0, 19);
+  const head = `ISO-10303-21;\nHEADER;\nFILE_DESCRIPTION(('ViewDefinition [ReferenceView]'),'2;1');\nFILE_NAME(${str(name + '.ifc')},'${ts}',(''),(''),'Ruletka','Ruletka 9.0','');\nFILE_SCHEMA(('IFC4'));\nENDSEC;\nDATA;\n`;
+  return { text: head + L.join('\n') + '\nENDSEC;\nEND-ISO-10303-21;\n', stats: { walls: nW, doors: nD, windows: nWin, openings: nO, spaces: spaces.length, measuredT } };
+}
+async function exportIFC() {
+  if (!M.edges.length) { stat('Нечего сохранять — начните обход.'); return; }
+  const v = await uiAsk('IFC (BIM): высота этажа, м. Стены и помещения будут этой высоты; толщина стен — по обмеру (толщина, общий промер между помещениями, подоконник), остальные наружные — 0,3 м.', String(M.ifcH || 2.7).replace('.', ','));
+  if (v == null) return; const h = parseFloat(String(v).replace(',', '.')); if (!(h > 1.5 && h < 10)) { stat('Высота этажа — число от 1,5 до 10 м.'); return; } M.ifcH = h;
+  try { const r = buildIFC({ h, name: fileBase() });
+    const st = r.stats; await fileReady(fileBase() + '.ifc', new TextEncoder().encode(r.text), 'application/x-step', `IFC готов: стен ${st.walls} (с толщиной по обмеру ${st.measuredT}), помещений ${st.spaces}, дверей ${st.doors}, окон ${st.windows}. Откроется в Revit, ArchiCAD, Renga, BIMvision.`); }
+  catch (e) { console.error(e); stat('Не получилось собрать IFC: ' + e.message); }
+}
 // ---------- подоконник: длина вдоль стены, привязка к углу стены, глубина в помещение ----------
 function wallCorner(e, fromId) { // идём от конца стены дальше по той же прямой до угла
   let prev = fromId === e.a ? e.b : e.a, cur = fromId, guard = 0; const P = id => PX(ptById(id));
@@ -6683,6 +6757,7 @@ function renderTape() {
     <button id="rFind" ${M.edges.length > 2 ? '' : 'disabled'} title="Каждый замкнутый контур стен станет помещением с площадью">▢ Найти помещения</button>
     <button id="bOvPdf" class="pri" ${M.pts.length ? '' : 'disabled'}>📄 PDF на подложке</button>
     <button id="toSheetT" ${M.rooms.length || M.edges.length ? '' : 'disabled'}>🗎 Листы и DXF</button>
+    <button id="bIfc" ${M.edges.length ? '' : 'disabled'} title="Международный формат BIM (ISO 16739, IFC4): стены с толщиной, помещения с площадями, двери и окна — для Revit, ArchiCAD, Renga">⬡ IFC (BIM)</button>
   </div>
   <details><summary>⚙ Настройки обмера</summary>
   <div class="row seg2"><button id="mFact" class="${M.cond ? '' : 'on'}">Факт по замерам</button><button id="mCond" class="${M.cond ? 'on' : ''}">Условно по чертежу</button></div>
@@ -6720,6 +6795,7 @@ function renderTape() {
   if (T.tool === 'gps') gpsPanelBind();
   const bo = $('#bOvPdf'); if (bo) bo.onclick = exportOverlayPdf;
   const bs = $('#bStr'); if (bs) bs.onclick = () => straighten(T.selSet && T.selSet.size > 1 ? new Set(T.selSet) : null);
+  { const bi = $('#bIfc'); if (bi) bi.onclick = exportIFC; }
   const bsa = $('#bSelAll'); if (bsa) bsa.onclick = () => selectPts(M.pts.map(p => p.id), false, true);
   const setCond = v => { M.cond = v; adjust(); draw(); renderTape(); };
   $('#mFact').onclick = () => setCond(false); $('#mCond').onclick = () => setCond(true);
