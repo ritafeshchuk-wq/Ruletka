@@ -288,7 +288,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 8.1 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 8.2 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -2127,9 +2127,9 @@ const TAPE = (() => {
     if (M.ortho !== false) {
       for (const R of M.rooms || []) {
         const ids = R.ids, k = ids.length;
-        for (let j = 0; j < k; j++) angCons.push([ids[(j - 1 + k) % k], ids[j], ids[(j + 1) % k]]);
+        for (let j = 0; j < k; j++) { const a = ids[(j - 1 + k) % k], b = ids[j], c = ids[(j + 1) % k]; if (hasEdge(a, b) && hasEdge(b, c)) angCons.push([a, b, c]); } // угол — только между настоящими стенами, не по «воображаемой» стороне контура
       }
-      for (const ch of M.chains || []) for (let j = 1; j + 1 < ch.length; j++) angCons.push([ch[j - 1], ch[j], ch[j + 1]]);
+      for (const ch of M.chains || []) for (let j = 1; j + 1 < ch.length; j++) if (hasEdge(ch[j - 1], ch[j]) && hasEdge(ch[j], ch[j + 1])) angCons.push([ch[j - 1], ch[j], ch[j + 1]]);
       const nb = new Map(); for (const e of M.edges || []) { if (!nb.has(e.a)) nb.set(e.a, []); if (!nb.has(e.b)) nb.set(e.b, []); nb.get(e.a).push(e.b); nb.get(e.b).push(e.a); }
       for (const [v, ns] of nb) for (let i = 0; i < ns.length; i++) for (let j = i + 1; j < ns.length; j++) angCons.push([ns[i], v, ns[j]]);
     }
@@ -4800,6 +4800,7 @@ function tapeMenu(w, cx, cy) {
         items.push([h.pt.free ? '∟ Угол около 90° считать прямым' : '∠ Угол не прямой — не выравнивать', () => { tPush(); h.pt.free = !h.pt.free; adjust(); renderTape(); draw(); }]);
       } }
     items.push([h.pt.fixed ? '📌 Открепить точку' : '📌 Закрепить точку (не будет сдвигаться при правке)', () => { tPush(); adjust(); if (h.pt.fixed) delete h.pt.fixed; else { if (h.pt.x != null) { h.pt.x0 = h.pt.x; h.pt.y0 = h.pt.y; } h.pt.fixed = true; } adjust(); draw(); renderTape(); }]);
+    { const rs = M.rooms.filter(R => R.ids.includes(id)); if (rs.length >= 2) for (const R of rs) items.push([`✂ Отвязать от помещения ${R.num} (своя точка там)`, () => { tPush(); const q = splitPoint(id, R); draw(); renderTape(); stat(q ? `Точка ${pname(id)} разделена: у помещения ${R.num} теперь своя ${pname(q.id)} на том же месте — её положение считается по замерам этого помещения. Отменить — ↶.` : 'Здесь нечего разделять: все стены у точки общие.'); }]); }
     items.push(['✥ Передвинуть', () => moveMode({ pt: h.pt })]);
     items.push([nm ? `🗑 Удалить точку и её замеры (${nm})` : '🗑 Удалить точку', () => { T.sel = { pt: h.pt }; tapeDelete(); stat('Точка удалена. ↶ Отменить — вернуть'); }, 'danger']);
   } else if (h.edge) {
@@ -5326,12 +5327,17 @@ function showSelBox() {
   else if (mx <= 3 * tol) { verdict = `Небольшая неувязка: наибольшая ${Math.round(mx * 1000)} мм (допуск ${Math.round(tol * 1000)} мм). Уравнять можно — расхождение разойдётся по всем замерам.`; cls = 'warn'; }
   else { verdict = `⚠ Большая неувязка: ${Math.round(mx * 1000)} мм — похоже на ошибку в замере.`; cls = 'bad'; }
   let blunder = null; if (cls === 'bad') { blunder = findBlunder(list); adjust(); }
+  let hin = null; if (list.length && mx > 0.003 && T.selSet.size >= M.pts.length * 0.5) { try { hin = findHindrances(3); } catch (e) { console.warn(e); } }
   const angTxt = ai.filter(x => x.lin > tol).slice(0, 3).map(x => `${pname(x.b)}: ${fdeg(x.deg)}`).join(', ');
   if (!el) { el = document.createElement('div'); el.id = 'selbox'; $('#main').appendChild(el); }
   el.className = cls + (T.selMin ? ' min' : '');
   el.innerHTML = `<div class="sb-h"><span>Выделено: точек ${T.selSet.size}, замеров ${list.length}${rooms ? ', помещений ' + rooms : ''}</span><button id="sbMin" title="Свернуть / развернуть">${T.selMin ? '▸' : '▾'}</button></div><div class="sb-v">${verdict}</div>${angTxt ? `<div class="sb-v">Углы, которые должны быть прямыми, по замерам выходят: ${angTxt}.</div>` : ''}
     ${blunder ? `<div class="sb-v">Вероятно, ошибка в замере <b>${pname(blunder.m.a)}–${pname(blunder.m.b)}</b>: записано ${fm(blunder.m.v)} м, а по остальным замерам выходит ≈ ${fm(blunder.exp)} м${blunder.mx <= tol ? ' (без него всё сходится)' : ''}.</div>
       <div class="row"><button id="sbShow">Показать</button><button id="sbRe">↻ Перемерить</button><button id="sbOff">Не учитывать этот замер</button></div>` : ''}
+    ${(() => { const L = []; for (const Rm of M.rooms) { if (!Rm.ids.some(id => T.selSet.has(id))) continue; for (const c of roomClosure(Rm)) if (Math.abs(c.f) > TOL()) { const sm = a => a.map(x => fm(x[3])).join(' + '), tot = a => a.reduce((s, x) => s + x[3], 0);
+        L.push(`Помещение ${Rm.num}: стороны ${c.k ? 'по вертикали' : 'по горизонтали'} не сходятся на <b>${Math.round(Math.abs(c.f) * 1000)} мм</b>: ${sm(c.pos)} = ${fm(tot(c.pos))} против ${sm(c.neg)} = ${fm(tot(c.neg))}`); } }
+      return L.length ? `<div class="sb-v">${L.join('<br>')}<br><span class="hint">Проверьте эти стены; проём, замеренный с другой стороны стены, может отличаться.</span></div>` : ''; })()}
+    ${hin && hin.list.length ? `<div class="sb-v"><b>Что мешает сойтись</b> (замеры точные — не сходится одно из допущений):${hin.list.map((c, i) => `<div style="margin-top:4px">${i + 1}. ${c.txt} → невязки в целом меньше в <b>${c.k2 >= 10 ? '10+' : c.k2.toFixed(1)} раза</b> (наибольшая ${Math.round(hin.base.mx * 1000)} → ${Math.round(c.mx * 1000)} мм)<div class="row"><button data-hin="${i}" ${i ? '' : 'class="pri"'}>${c.btn}</button></div></div>`).join('')}</div>` : ''}
     <div class="row">${list.length ? `<button class="pri" id="sbAdj" ${cls === 'bad' ? '' : ''}>✓ Уравнять${cls === 'bad' ? ' всё равно' : ''}</button>` : ''}<button id="sbKeep">Оставить как есть</button><button id="sbAll">Выделить всё</button></div>
     ${T.selSet.size === 2 ? `<div class="row"><button id="sbPath">↔ Весь участок ${pname([...T.selSet][0])} → ${pname([...T.selSet][1])}</button>${chainPath([...T.selSet][0], [...T.selSet][1]) && chainPath([...T.selSet][0], [...T.selSet][1]).closed ? '<button id="sbPath2">↔ другой стороной</button>' : ''}</div>` : ''}
     <div class="row"><button id="sbSq" class="pri" title="Стены выделенного участка — строго по осям, под 90°, длины — по замерам; остальной план не двигается">▦ Выровнять 90° выделенное</button></div>
@@ -5349,12 +5355,80 @@ function showSelBox() {
   el.querySelectorAll('[data-r]').forEach(bn => bn.onclick = () => rotateSel(+bn.dataset.r));
   q('#sbAng').onclick = async () => { const v = await uiAsk('Повернуть на угол, градусы (плюс — против часовой, минус — по часовой):', ''); if (v == null) return; const d = parseFloat(String(v).replace(',', '.')); if (!isFinite(d) || !d) return; rotateSel(d); };
   if (q('#sbAdj')) q('#sbAdj').onclick = () => { tPush(); adjust(); for (const p of M.pts) if (T.selSet.has(p.id) && p.x != null) { p.x0 = p.x; p.y0 = p.y; } adjust(); stat(`Уравнено: ${T.selSet.size} точек, чертёж совпал с замерами.`); selectPts([]); renderTape(); };
+  if (hin) el.querySelectorAll('[data-hin]').forEach(bn => bn.onclick = () => { const c = hin.list[+bn.dataset.hin]; applyHindrance(c); stat(`Сделано: ${c.txt}. Наибольшая невязка теперь ${Math.round(maxRes().mx * 1000)} мм. Отменить — ↶.`); showSelBox(); });
   if (blunder) {
     q('#sbShow').onclick = () => { const A = PX(ptById(blunder.m.a)), B = PX(ptById(blunder.m.b)); fitBounds([Math.min(A[0], B[0]) - 1.5, Math.min(A[1], B[1]) - 1.5, Math.max(A[0], B[0]) + 1.5, Math.max(A[1], B[1]) + 1.5]); T.sel = hasEdge(blunder.m.a, blunder.m.b) ? { edge: hasEdge(blunder.m.a, blunder.m.b) } : { meas: blunder.m }; draw(); };
     q('#sbRe').onclick = () => { const m = blunder.m; tPush(); M.meas = M.meas.filter(x => x !== m); adjust(); selectPts([]); makePending({ type: 'dist', a: m.a, b: m.b, re: true }); stat('Перемерьте ' + pname(m.a) + '–' + pname(m.b)); };
     q('#sbOff').onclick = () => { tPush(); blunder.m.on = false; adjust(); showSelBox(); renderTape(); };
   }
 }
+// ---------- отвязать точку: одна точка служит углом двух разных помещений, а по замерам это разные места ----------
+const roomPair = (R, a, b) => { const k = R.ids.indexOf(a); return k >= 0 && (R.ids[(k + 1) % R.ids.length] === b || R.ids[(k - 1 + R.ids.length) % R.ids.length] === b); };
+function splitPoint(pid, R, quiet) { // стены помещения R у точки pid переходят на новую точку (общие с другими помещениями — копируются)
+  const P0 = ptById(pid); if (!P0 || !R || !R.ids.includes(pid)) return null;
+  const others = M.rooms.filter(x => x !== R), inc = M.edges.filter(e => !e.obj && (e.a === pid || e.b === pid)), mv = [], dup = [], stay = [];
+  for (const e of inc) { const o = e.a === pid ? e.b : e.a, inX = roomPair(R, pid, o), inO = others.some(x => roomPair(x, pid, o)); (inX ? (inO ? dup : mv) : stay).push([e, o]); }
+  if (!mv.length || !stay.length && !dup.length) return null;
+  const q = { ...JSON.parse(JSON.stringify(P0)), id: M.nextId++ }; delete q.gps; delete q.gpsPt; delete q.fixed; delete q.sq; M.pts.push(q);
+  { const C = R.ids.map(id => ptById(id)).filter(Boolean).map(PX), cx = C.reduce((s, c) => s + c[0], 0) / C.length, cy = C.reduce((s, c) => s + c[1], 0) / C.length, c0 = PX(P0), d = Math.hypot(cx - c0[0], cy - c0[1]) || 1, k = 0.003 / d; // на 3 мм внутрь помещения — чтобы контуры не путались
+    for (const [kx, ky] of [['x0', 'y0'], ['x', 'y']]) if (q[kx] != null) { q[kx] += (cx - c0[0]) * k; q[ky] += (cy - c0[1]) * k; } }
+  const movedNb = new Set(mv.map(x => x[1])), stayNb = new Set(stay.map(x => x[1]));
+  for (const [e] of mv) { if (e.a === pid) e.a = q.id; else e.b = q.id; }
+  for (const [e, o] of dup) { const c = { ...e, a: e.a === pid ? q.id : e.a, b: e.b === pid ? q.id : e.b }; M.edges.push(c); const dm = distMeas(pid, o); if (dm) M.meas.push({ ...dm, id: M.nextMeas++, a: dm.a === pid ? q.id : dm.a, b: dm.b === pid ? q.id : dm.b }); }
+  const sw = v => v === pid ? q.id : v;
+  for (const m of M.meas) { if (![m.a, m.b, m.c, m.d, m.p].includes(pid)) continue; let go = false;
+    if (m.type === 'dist' || m.type === 'tie') go = movedNb.has(m.a === pid ? m.b : m.a);
+    else if (m.type === 'line') { const oth = [m.a, m.b, m.p].filter(v => v !== pid); go = oth.some(v => movedNb.has(v)) && !oth.some(v => stayNb.has(v)); }
+    else if (m.type === 'thick') { const pr = [m.a, m.b].includes(pid) ? [m.a, m.b] : [m.c, m.d], o = pr[0] === pid ? pr[1] : pr[0]; go = movedNb.has(o); }
+    else if (m.type === 'angle') go = movedNb.has(m.a) || movedNb.has(m.c);
+    if (go) for (const k of ['a', 'b', 'c', 'd', 'p']) if (m[k] === pid) m[k] = q.id; }
+  for (const ch of M.chains) for (let i = 0; i < ch.length; i++) if (ch[i] === pid) { const nb = [ch[i - 1], ch[i + 1]].filter(v => v != null); if (nb.some(v => movedNb.has(v)) && !nb.some(v => stayNb.has(v))) ch[i] = q.id; }
+  R.ids = R.ids.map(sw);
+  if (!quiet) { rebuildRooms(); adjust(); }
+  return q;
+}
+function roomClosure(R) { // невязка помещения по осям: сумма стен «туда» и «обратно», как в ходе
+  const ax = M.axis || 0, ca = Math.cos(ax), sa = Math.sin(ax), ids = R.ids, n = ids.length, f = [0, 0], ok = [true, true], parts = [[], []];
+  for (let i = 0; i < n; i++) { const a = ids[i], b = ids[(i + 1) % n]; if (!hasEdge(a, b)) { ok[0] = ok[1] = false; break; } const A = PX(ptById(a)), B = PX(ptById(b)), dx = B[0] - A[0], dy = B[1] - A[1], u = ca * dx + sa * dy, v = -sa * dx + ca * dy, k = Math.abs(u) >= Math.abs(v) ? 0 : 1, L = Math.hypot(dx, dy);
+    if (Math.atan2(Math.min(Math.abs(u), Math.abs(v)), Math.max(Math.abs(u), Math.abs(v))) > 10 * Math.PI / 180) { ok[0] = ok[1] = false; break; }
+    if (L < 1e-6) continue; const m = distMeas(a, b); if (!m || m.on === false || m.auto) { ok[k] = false; continue; } const sg = Math.sign(k ? v : u); f[k] += sg * m.v; parts[k].push([a, b, sg, m.v]); }
+  return [0, 1].map(k => ok[k] && parts[k].length >= 2 ? { k, f: f[k], pos: parts[k].filter(x => x[2] > 0), neg: parts[k].filter(x => x[2] < 0) } : null).filter(Boolean); }
+function maxRes() { let mx = 0, w = null; for (const m of M.meas) if (m.on !== false && m.type !== 'line' && m.res != null && Math.abs(m.res) > mx) { mx = Math.abs(m.res); w = m; } return { mx, m: w }; }
+function bestSplit() { // какую общую точку отвязать, чтобы невязки ушли (пробуем по очереди, ничего не меняя)
+  const base = maxRes().mx; if (base < 0.004) return null; const snap = tSnap(), cand = [];
+  for (const p of M.pts) { const rs = M.rooms.filter(R => R.ids.includes(p.id)); if (rs.length >= 2) for (const R of rs) cand.push([p.id, R.num]); }
+  let best = null;
+  for (const [pid, num] of cand.slice(0, 40)) { try { const R = M.rooms.find(x => x.num === num); if (!splitPoint(pid, R, true)) continue; T.result = TAPE.solve(M); const r = maxRes().mx; if (r < base * 0.6 && (!best || r < best.mx)) best = { pid, num, mx: r }; } catch (e) { } finally { tApply(snap); } }
+  T.result = TAPE.solve(M); return best ? { ...best, base } : null;
+}
+// ---------- «что мешает»: по очереди снимаем одно допущение программы и смотрим, насколько уходят невязки ----------
+function resScore() { let ss = 0, mx = 0; for (const m of M.meas) if (m.on !== false && m.type !== 'line' && m.res != null) { const r = Math.abs(m.res); ss += r * r; if (r > mx) mx = r; } return { ss, mx }; }
+function findHindrances(limit = 3) {
+  const snap = tSnap(), ortho = M.ortho, sq = M.sqStrict; T.result = TAPE.solve(M); const base = resScore(); if (base.mx < 0.003) return { base, list: [] };
+  const C = [], nb = new Map(); for (const e of M.edges) { if (e.obj) continue; for (const [x, y] of [[e.a, e.b], [e.b, e.a]]) { if (!nb.has(x)) nb.set(x, []); nb.get(x).push(y); } }
+  // 1) общая точка двух помещений → у одного из них своя
+  for (const p of M.pts) { const rs = M.rooms.filter(R => R.ids.includes(p.id)); if (rs.length >= 2) for (const R of rs) C.push({ k: 'split', pid: p.id, num: R.num, txt: `${pname(p.id)} — разные места для помещений: у помещения ${R.num} своя точка`, btn: `✂ Отвязать ${pname(p.id)} от пом. ${R.num}` }); }
+  // 2) стена у проёма не продолжается по прямой (есть уступ)
+  for (const m of M.meas) if (m.type === 'line' && m.on !== false) C.push({ k: 'off', id: m.id, txt: `стена ${pname(m.a)}–${pname(m.b)} не по одной прямой у ${pname(m.p)} (уступ у проёма)`, btn: `Уступ у ${pname(m.p)} — не выпрямлять` });
+  // 3) угол не прямой
+  for (const [v, ns] of nb) if (ns.length >= 2 && !ptById(v).free) C.push({ k: 'free', pid: v, txt: `угол у ${pname(v)} не ровно 90°`, btn: `∠ ${pname(v)}: угол не прямой` });
+  // (выключение отдельных замеров ищет findBlunder — здесь только допущения программы)
+  const out = [];
+  for (const c of C.slice(0, 220)) { try { tApply(snap); M.ortho = ortho; M.sqStrict = sq;
+      if (c.k === 'split') { if (!splitPoint(c.pid, M.rooms.find(x => x.num === c.num), true)) continue; rebuildRooms(); }
+      else if (c.k === 'off') { const m = M.meas.find(x => x.id === c.id); if (!m) continue; m.on = false; }
+      else if (c.k === 'free') ptById(c.pid).free = true;
+      T.result = TAPE.solve(M); const r = resScore(); if (r.ss < base.ss * 0.6 && r.mx < base.mx * 0.75) out.push({ ...c, mx: r.mx, ss: r.ss, k2: base.ss / Math.max(r.ss, 1e-9) }); } catch (e) { } }
+  tApply(snap); M.ortho = ortho; M.sqStrict = sq; T.result = TAPE.solve(M);
+  out.sort((a, b) => a.ss - b.ss); const seen = new Set(), list = [];
+  for (const c of out) { const key = c.k + (c.pid || c.id); if (seen.has(key)) continue; seen.add(key); list.push(c); if (list.length >= limit) break; }
+  return { base, list };
+}
+function applyHindrance(c) { tPush();
+  if (c.k === 'split') { splitPoint(c.pid, M.rooms.find(x => x.num === c.num)); }
+  else if (c.k === 'off') { const m = M.meas.find(x => x.id === c.id); if (m) m.on = false; adjust(); }
+  else if (c.k === 'free') { ptById(c.pid).free = true; adjust(); }
+  draw(); renderTape(); }
 // ---------- несколько листов одного PDF в одном проекте ----------
 const PGS = { data: {} };
 const MKEYS = ['pts', 'meas', 'edges', 'rooms', 'chains', 'objs', 'notes', 'marks', 'lastNum', 'nextId', 'nextMeas', 'cond', 'axis', 'snap90', 'scaleFit', 'scaleAsked', 'ortho', 'zoomLog', 'gpsHidden', 'sqStrict'];
@@ -5554,12 +5628,42 @@ function autoRoom(a, b) { const adj = new Map(); for (const e of M.edges) { if (
   const key = [...path].sort((u, v) => u - v).join(); if (M.rooms.some(R => [...R.ids].sort((u, v) => u - v).join() === key)) return null;
   const P = path.map(id => PX(ptById(id))); let A = 0; for (let i = 0; i < P.length; i++) { const u = P[i], v = P[(i + 1) % P.length]; A += u[0] * v[1] - v[0] * u[1]; } if (Math.abs(A / 2) < 0.3) return null;
   const R = { num: M.rooms.reduce((m, r) => Math.max(m, +r.num || 0), 0) + 1, name: 'Помещение', ids: path }; M.rooms.push(R); return R; }
+// помещения = замкнутые области плана (грани плоского графа стен и проёмов), а не «кратчайшие кольца» точек.
+// Делят помещения только стены с замером и проёмы; линия без замера между двумя частями одной области (замыкание «напрямик», случайная связь) — не делит.
+function planFaces(E) { // E: [[a,b]] → грани: { ids, area } (area > 0 — внутренние)
+  const nb = new Map(), pos = new Map(); for (const [a, b] of E) for (const [x, y] of [[a, b], [b, a]]) { if (!nb.has(x)) nb.set(x, []); nb.get(x).push(y); }
+  for (const id of nb.keys()) pos.set(id, PX(ptById(id)));
+  for (const [x, L] of nb) { const c = pos.get(x); L.sort((u, v) => { const pu = pos.get(u), pv = pos.get(v); return Math.atan2(pu[1] - c[1], pu[0] - c[0]) - Math.atan2(pv[1] - c[1], pv[0] - c[0]); }); }
+  const seen = new Set(), faces = [], fOf = new Map(), K = (u, v) => u + '>' + v;
+  for (const [u0, L0] of nb) for (const v0 of L0) { if (seen.has(K(u0, v0))) continue; const ids = [], fi = faces.length; let u = u0, v = v0, guard = 0;
+    while (!seen.has(K(u, v)) && guard++ < 5000) { seen.add(K(u, v)); fOf.set(K(u, v), fi); ids.push(u); const L = nb.get(v), k = L.indexOf(u), w = L[(k - 1 + L.length) % L.length]; u = v; v = w; }
+    let A = 0; for (let i = 0; i < ids.length; i++) { const p1 = pos.get(ids[i]), p2 = pos.get(ids[(i + 1) % ids.length]); A += p1[0] * p2[1] - p2[0] * p1[1]; }
+    faces.push({ ids, area: A / 2 }); }
+  return { faces, fOf, K };
+}
+function rebuildRooms() {
+  const key = (a, b) => a < b ? a + '-' + b : b + '-' + a, seenE = new Set();
+  let E = []; for (const e of M.edges) { if (e.obj || e.a === e.b || !ptById(e.a) || !ptById(e.b)) continue; const k = key(e.a, e.b); if (seenE.has(k)) continue; seenE.add(k); E.push([e.a, e.b, e]); }
+  const chord = e => !e.open && !distMeas(e.a, e.b);
+  let F; for (let it = 0; it < 60; it++) { F = planFaces(E.map(x => [x[0], x[1]])); const { faces, fOf, K } = F;
+    const drop = new Set(); for (let i = 0; i < E.length; i++) { const [a, b, e] = E[i], f1 = fOf.get(K(a, b)), f2 = fOf.get(K(b, a));
+      if (f1 === f2) drop.add(i); // хвост или мостик — ничего не ограничивает
+      else if (chord(e) && faces[f1].area > 0 && faces[f2].area > 0) drop.add(i); } // линия без замера внутри области — не делит её
+    if (!drop.size) break; E = E.filter((x, i) => !drop.has(i)); }
+  const nf = F.faces.filter(f => f.area > 0.3 && f.ids.length >= 3 && new Set(f.ids).size === f.ids.length);
+  const old = M.rooms.slice(), used = new Set(), out = []; let added = [];
+  for (const f of nf) { const S1 = new Set(f.ids); let best = null, bj = 0.34;
+    for (const R of old) { if (used.has(R)) continue; const S2 = new Set(R.ids); let c = 0; for (const x of S1) if (S2.has(x)) c++; const j = c / (S1.size + S2.size - c); if (j > bj) { bj = j; best = R; } }
+    if (best) { used.add(best); out.push(Object.assign(best, { ids: f.ids })); } else { const R = { name: 'Помещение', ids: f.ids }; out.push(R); added.push(R); } }
+  let mx = out.reduce((m, r) => Math.max(m, +r.num || 0), 0); for (const R of added) R.num = ++mx;
+  const removed = old.filter(R => !used.has(R)).length; M.rooms = out; return { n: out.length, added, removed };
+}
+function roomWith(a, b) { return M.rooms.find(R => { const k = R.ids.indexOf(a); return k >= 0 && (R.ids[(k + 1) % R.ids.length] === b || R.ids[(k - 1 + R.ids.length) % R.ids.length] === b); }); }
 // найти все замкнутые контуры стен, которые ещё не помещения; концы обхода, почти совпавшие (до 15 см, «не попал в точку»), соединяются стеной
 function findRooms() { let joined = 0; const deg = new Map(); for (const e of M.edges) { if (e.obj) continue; deg.set(e.a, (deg.get(e.a) || 0) + 1); deg.set(e.b, (deg.get(e.b) || 0) + 1); }
   const ends = M.pts.filter(p => deg.get(p.id) === 1);
   for (let i = 0; i < ends.length; i++) for (let j = i + 1; j < ends.length; j++) { const A = ends[i], B = ends[j]; if (deg.get(A.id) !== 1 || deg.get(B.id) !== 1) continue; const a = PX(A), b = PX(B); if (Math.hypot(a[0] - b[0], a[1] - b[1]) > 0.15 || hasEdge(A.id, B.id)) continue; M.edges.push({ a: A.id, b: B.id }); deg.set(A.id, 2); deg.set(B.id, 2); joined++; }
-  let n = 0; for (const e of M.edges.slice()) { if (e.obj) continue; const inR = M.rooms.some(R => { const k = R.ids.indexOf(e.a); return k >= 0 && (R.ids[(k + 1) % R.ids.length] === e.b || R.ids[(k - 1 + R.ids.length) % R.ids.length] === e.b); }); if (inR) continue; if (autoRoom(e.a, e.b)) n++; }
-  if (joined || n) adjust(); return { n, joined }; }
+  const r = rebuildRooms(); adjust(); return { n: r.added.length, total: r.n, removed: r.removed, joined }; }
 function walkTo(p, w, e) { // провести стену от конца обхода к точке p (или к новой точке в w)
   const prev = T.chain[T.chain.length - 1];
     tPush(); zoomNote(); if (!M.chains.includes(T.chain)) M.chains.push(T.chain); walkChipOff();
@@ -5577,12 +5681,12 @@ function walkTo(p, w, e) { // провести стену от конца обх
     const ch = T.chain;
     if (closing) {
       T.chain = null;
-      const R = { num: (M.rooms.reduce((m, r) => Math.max(m, +r.num || 0), 0) + 1), name: 'Помещение', ids: ch.slice() };
-      M.rooms.push(R);
+      rebuildRooms(); let R = roomWith(prev, p.id);
+      if (!R) { R = { num: (M.rooms.reduce((m, r) => Math.max(m, +r.num || 0), 0) + 1), name: 'Помещение', ids: ch.slice() }; M.rooms.push(R); }
       makePending({ type: 'dist', a: prev, b: p.id, after: () => stat(`Помещение ${R.num} замкнуто. Добавьте диагональ (инструмент «Замер») для контроля углов.`) });
-    } else { ch.push(p.id); const R2 = autoRoom(prev, p.id); makePending({ type: 'dist', a: prev, b: p.id, after: R2 ? () => stat(`Контур замкнулся — помещение ${R2.num}, площадь посчитана. Добавьте диагональ («Промер») для контроля углов.`) : undefined }); }
+    } else { ch.push(p.id); const nR = M.rooms.length; rebuildRooms(); const R2 = M.rooms.length > nR ? roomWith(prev, p.id) : null; makePending({ type: 'dist', a: prev, b: p.id, after: R2 ? () => stat(`Контур замкнулся — помещение ${R2.num}, площадь посчитана. Добавьте диагональ («Промер») для контроля углов.`) : undefined }); }
     adjust();
-    if (closing) { const R = M.rooms[M.rooms.length - 1], dup = M.meas.filter(m => m.auto && R.ids.includes(m.a) && R.ids.includes(m.b));
+    if (closing) { const R = roomWith(prev, p.id) || M.rooms[M.rooms.length - 1], dup = M.meas.filter(m => m.auto && R.ids.includes(m.a) && R.ids.includes(m.b));
       if (T.pending && T.pending.got == null && dup.some(m => (m.a === T.pending.a && m.b === T.pending.b) || (m.a === T.pending.b && m.b === T.pending.a))) { T.pending.opt = true; T.pending.hint = 'взята по противоположной стороне — можно перемерить для контроля или идти дальше'; }
       if (dup.length) stat(`Помещение ${R.num} замкнуто. Без замера: ${dup.map(m => pname(m.a) + '–' + pname(m.b) + ' = ' + fm(m.v)).join(', ')} (по противоположным сторонам). Перемерить — замер этой стены заменит число.`); }
     renderTape(); draw();
@@ -6497,7 +6601,7 @@ function renderTape() {
   <div class="list" style="margin-top:6px">${rows.map(m => `<div class="item"><input type="checkbox" data-mon="${m.id}" ${m.on !== false ? 'checked' : ''}><span>${m.type === 'tie' ? 'люк ↔ ' : m.type === 'thick' ? (m.span ? '↔ ' : 'δ ') : ''}${pname(m.a)}–${pname(m.type === 'thick' ? m.c : m.b)}</span><input type="text" data-mv="${m.id}" value="${fm(m.v)}" style="width:72px"><span class="q ${warn(m)}">${m.res != null ? (m.res > 0 ? '+' : '') + Math.round(m.res * 1000) + ' мм' : ''}</span><button data-mdel="${m.id}" style="padding:1px 6px">×</button></div>`).join('') || '<div class="hint" style="padding:6px">Замеров пока нет</div>'}</div>
   </details>
   <div class="row" style="display:none"><button id="tUndo"></button><button id="tRedo"></button></div>`;
-  { const rf = $('#rFind'); if (rf) rf.onclick = () => { tPush(); const r = findRooms(); draw(); renderTape(); stat(r.n ? `Найдено помещений: ${r.n} — площадь на чертеже.${r.joined ? ` Соединено почти совпавших концов стен: ${r.joined}.` : ''}` : 'Замкнутых контуров нет — проверьте, что последняя стена доведена до первой точки.'); }; }
+  { const rf = $('#rFind'); if (rf) rf.onclick = () => { tPush(); const r = findRooms(); draw(); renderTape(); stat(r.total ? `Помещений: ${r.total}${r.n ? `, новых ${r.n}` : ''}${r.removed ? `, убрано неверных ${r.removed}` : ''} — площади по замкнутым контурам; делят помещения только стены с замером и проёмы.${r.joined ? ` Соединено почти совпавших концов стен: ${r.joined}.` : ''} Отменить — ↶.` : 'Замкнутых контуров нет — проверьте, что последняя стена доведена до первой точки.'); }; }
   document.querySelectorAll('[data-rlb]').forEach(b => b.onclick = () => { const R = M.rooms.find(x => String(x.num) === b.dataset.rlb); if (!R) return; tPush(); R.hideLbl = !R.hideLbl; draw(); renderTape(); });
   $('#uLoad').onclick = () => $('#uFile').click();
   $('#uFile').onchange = e => e.target.files[0] && loadUnderlay(e.target.files[0]);
