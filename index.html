@@ -138,6 +138,7 @@ body.touch #steps li{padding:10px 6px 8px}
 #selbox .sb-rot{align-items:center;flex-wrap:wrap}#selbox .sb-rot span{font-size:13px;color:var(--muted,#667)}#selbox .sb-rot button{padding:6px 9px}
 #dchip{position:absolute;left:50%;transform:translateX(-50%);bottom:150px;z-index:7;display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:center;background:#1B2430;color:#fff;border-radius:14px;padding:8px 10px;box-shadow:0 6px 18px rgba(0,0,0,.25);max-width:calc(100% - 24px)}#dchip span{font-weight:600;padding:0 6px}#dchip button{background:#2b3646;color:#fff;border:0;border-radius:10px;padding:9px 12px;font-size:15px}
 body.stSheet #trail,body.stSheet #mcard,body.stSheet #tbar,body.stSheet #selbox,body.stSheet #dchip,body.stSheet #wchip{display:none!important}
+#btprobe{position:fixed;right:12px;bottom:40px;width:min(520px,calc(100% - 24px));max-height:60vh;display:flex;flex-direction:column;background:#fff;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.25);padding:10px 12px;z-index:70;font-size:14px}#btprobe .bp-h{display:flex;justify-content:space-between;align-items:center}#btprobe .bp-t{color:#5b6577;margin:4px 0}#btprobe pre{flex:1;overflow:auto;background:#f4f6f9;border-radius:8px;padding:6px;font-size:11px;white-space:pre-wrap;margin:6px 0;min-height:80px}
 #wchip{position:absolute;z-index:6;background:#1B2430;color:#fff;border:0;border-radius:12px;padding:10px 14px;font-size:15px;box-shadow:0 6px 18px rgba(0,0,0,.25)}
 #tmenu .tm-num{padding:6px 8px 8px;border-bottom:1px solid var(--line);margin-bottom:4px;display:flex;flex-direction:column;gap:8px}
 #tmenu .tm-num-r{display:flex;align-items:center;gap:8px}#tmenu .tm-num-r span{font-size:13px;font-weight:600;white-space:nowrap}
@@ -287,7 +288,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 7.5 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 7.6 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -5807,6 +5808,41 @@ async function connectDisto() {
     T.bt = dev; await gattStart(dev);
   } catch (e) { T.btState = T.bt && T.bt.gatt && T.bt.gatt.connected ? 'подключена' : 'нет'; if (!/cancel|chooser|abort/i.test(e.message || '')) uiAlert('DISTO: ' + (e.message || e)); renderTape(); }
 }
+// ---------- другая рулетка (проба): подключиться к любой, показать, что присылает, и принять замер, если это число ----------
+const BT_SVCS = ['0000ffe0-0000-1000-8000-00805f9b34fb', '0000fff0-0000-1000-8000-00805f9b34fb', '0000ffb0-0000-1000-8000-00805f9b34fb', '0000ff00-0000-1000-8000-00805f9b34fb', '0000ffd0-0000-1000-8000-00805f9b34fb', '0000fee7-0000-1000-8000-00805f9b34fb', '0000fe59-0000-1000-8000-00805f9b34fb',
+  '6e400001-b5a3-f393-e0a9-e50e24dcca9e', '49535343-fe7d-4ae5-8fa9-9fafd205e455', '0000180a-0000-1000-8000-00805f9b34fb', 'battery_service', '00005301-0000-0041-5253-534f46540000', '02a6c0d0-0451-4000-b000-fb3210111989', DISTO_SVC];
+const BTP = { log: [], dev: null, accept: true };
+function btpLog(t) { BTP.log.push(new Date().toLocaleTimeString('ru') + '  ' + t); if (BTP.log.length > 300) BTP.log.shift(); btpShow(); }
+function btpParse(dv) { const u8 = new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength), hex = [...u8].map(b => b.toString(16).padStart(2, '0')).join(' '), asc = [...u8].map(b => b >= 32 && b < 127 ? String.fromCharCode(b) : '.').join('');
+  let v = null, how = ''; const m = asc.match(/(-?\d{1,4}[.,]\d{1,4})\s*(mm|m|ft|in)?/i) || asc.match(/(\d{3,6})\s*(mm)/i);
+  if (m) { v = parseFloat(m[1].replace(',', '.')); const un = (m[2] || '').toLowerCase(); if (un === 'mm' || (!un && v > 300)) v /= 1000; if (un === 'ft') v *= 0.3048; if (un === 'in') v *= 0.0254; how = 'текст'; }
+  const cand = []; for (let o = 0; o + 4 <= u8.length; o++) { const f = dv.getFloat32(o, true); if (f > 0.05 && f < 300 && Math.abs(f * 1000 - Math.round(f * 1000)) < 0.02) cand.push('float@' + o + '=' + f.toFixed(3)); }
+  for (let o = 0; o + 4 <= u8.length; o++) { const i = dv.getUint32(o, true); if (i >= 50 && i <= 300000) cand.push('мм32@' + o + '=' + (i / 1000).toFixed(3)); }
+  for (let o = 0; o + 2 <= u8.length; o++) { const i = dv.getUint16(o, true); if (i >= 50 && i <= 65000) cand.push('мм16@' + o + '=' + (i / 1000).toFixed(3)); }
+  return { v: v > 0.02 && v < 300 ? v : null, how, hex, asc, cand: cand.slice(0, 6) }; }
+function btpShow() { let el = document.getElementById('btprobe'); if (!el) { el = document.createElement('div'); el.id = 'btprobe'; document.body.appendChild(el); }
+  el.innerHTML = `<div class="bp-h"><b>Другая рулетка: ${escH(BTP.dev ? BTP.dev.name || 'без имени' : '—')}</b><button id="bpX">✕</button></div><div class="bp-t">Нажмите на рулетке «замер». Если внизу появилось число — оно встанет как замер. Если нет — нажмите «Скопировать журнал» и пришлите мне: по нему сделаю точное подключение этой модели.</div>
+    <label class="bp-c"><input type="checkbox" id="bpAcc" ${BTP.accept ? 'checked' : ''}> принимать распознанное число как замер</label>
+    <pre>${escH(BTP.log.slice(-40).join('\n'))}</pre><div class="row"><button id="bpCopy" class="pri">Скопировать журнал</button><button id="bpOff">Отключить</button></div>`;
+  el.querySelector('#bpX').onclick = () => el.remove(); el.querySelector('#bpAcc').onchange = e => BTP.accept = e.target.checked;
+  el.querySelector('#bpCopy').onclick = async () => { const t = BTP.log.join('\n'); try { await navigator.clipboard.writeText(t); stat('Журнал скопирован — вставьте его в сообщение.'); } catch (e) { uiAlert(t.slice(-3000)); } };
+  el.querySelector('#bpOff').onclick = () => { try { BTP.dev && BTP.dev.gatt.disconnect(); } catch (e) { } btpLog('отключено'); }; }
+async function connectOther() {
+  if (!navigator.bluetooth) { uiAlert('В этом браузере нет Bluetooth. На iPad — Bluefy.'); return; }
+  let dev; try { dev = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: BT_SVCS }); } catch (e) { if (!/cancel|chooser|abort/i.test(e.message || '')) uiAlert('Bluetooth: ' + (e.message || e)); return; }
+  BTP.dev = dev; BTP.log = []; btpShow(); btpLog('устройство: ' + (dev.name || 'без имени') + ' · id ' + (dev.id || '').slice(0, 12));
+  try { const srv = await dev.gatt.connect(); btpLog('подключено');
+    let svcs = []; try { svcs = await srv.getPrimaryServices(); } catch (e) { btpLog('службы не прочитаны: ' + e.message); }
+    let subs = 0; for (const sv of svcs) { btpLog('служба ' + sv.uuid); let chs = []; try { chs = await sv.getCharacteristics(); } catch (e) { continue; }
+      for (const ch of chs) { const pr = ch.properties, fl = ['read', 'write', 'writeWithoutResponse', 'notify', 'indicate'].filter(k => pr[k]).join(','); btpLog('  хар-ка ' + ch.uuid + ' [' + fl + ']');
+        if (pr.read) { try { const dv = await ch.readValue(); const r = btpParse(dv); btpLog('    чтение: ' + r.hex + '  «' + r.asc + '»'); } catch (e) { } }
+        if (pr.notify || pr.indicate) { try { ch.addEventListener('characteristicvaluechanged', e => { const r = btpParse(e.target.value); btpLog('◀ ' + ch.uuid.slice(4, 8) + ': ' + r.hex + '  «' + r.asc + '»' + (r.v != null ? '  → ' + r.v.toFixed(3) + ' м (' + r.how + ')' : '') + (r.cand.length && r.v == null ? '  ? ' + r.cand.join(' ') : ''));
+              if (r.v != null && BTP.accept) { try { onReading(r.v, 'bt'); } catch (er) { } } }); await ch.startNotifications(); subs++; } catch (e) { btpLog('    подписка не удалась: ' + e.message); } } } }
+    btpLog(subs ? `слушаю ${subs} канал(а). Нажмите замер на рулетке.` : 'нет каналов с уведомлениями среди известных служб — пришлите журнал');
+    T.btState = 'подключена'; T.btName = (dev.name || 'рулетка') + ' (проба)'; renderTape();
+    dev.addEventListener('gattserverdisconnected', () => { btpLog('связь потеряна'); T.btState = 'отключена'; renderTape(); });
+  } catch (e) { btpLog('ошибка: ' + (e.message || e)); }
+}
 function onBtLost() {
   T.btState = 'отключена'; T.cmd = null; renderTape();
   if (!T.wantBt) return;
@@ -6395,6 +6431,7 @@ function renderTape() {
   </details>
   <div class="stephead"><span class="stepn">2</span>Рулетка</div>
   <div class="row"><span class="btdot ${T.btState === 'подключена' ? 'on' : /…/.test(T.btState) ? 'wait' : ''}"></span><button class="btbig ${T.btState === 'подключена' ? 'on' : 'pri'}" id="bBt">${T.btState === 'подключена' ? '✓ ' + escH(T.btName) : 'Подключить DISTO'}</button>${T.btState === 'отключена' ? '<button id="bRe" class="pri">Переподключить</button>' : ''}${T.cmd && T.btState === 'подключена' ? '<button id="bMeas" class="btbig">◉ Замер</button>' : ''}<span class="hint" style="margin:0">${T.btState === 'нет' ? '' : escH(T.btState)}${T.batt != null ? ' · ' + T.batt + '%' : ''}</span></div>
+  ${T.btState !== 'подключена' ? '<div class="row"><button id="bBtOther" title="Рулетка другой фирмы: CONDTROL, Bosch, Mileseey и др. Программа подключится, покажет, что присылает рулетка, и попробует принять замер">Другая рулетка (проба)</button></div>' : ''}
   ${btShort}
   <div class="stephead"><span class="stepn">3</span>Обмер — сейчас: ${escH((TTOOLS.find(t => t[0] === T.tool) || [])[1] || '')}</div>
   ${T.tool === 'gps' ? gpsPanel() : ''}
@@ -6429,6 +6466,7 @@ function renderTape() {
   const up = $('#uPage'); if (up) up.onchange = e => switchPage(+e.target.value);
   const uc = $('#uCal'); if (uc) uc.onclick = () => { T.calMode = !T.calMode; T.cal = []; stat(T.calMode ? 'Щёлкните начало и конец известного размера на подложке' : ''); renderTape(); };
   const ua = $('#uA'); if (ua) ua.oninput = e => { U.alpha = +e.target.value; draw(); };
+  { const bo = $('#bBtOther'); if (bo) bo.onclick = connectOther; }
   $('#bBt').onclick = async () => { if (T.btState !== 'подключена') return connectDisto(); if (await uiDialog({ title: 'Отключить DISTO?', text: 'Рулетка перестанет передавать замеры, пока не подключите её снова.', ok: 'Отключить', cancel: 'Оставить' })) disconnectDisto(); };
   const bm = $('#bMeas'); if (bm) bm.onclick = distoMeasure;
   if (T.pending && T.pending.got == null && T.btState !== 'подключена' && !T.dragPt) { const f = $('#mIn'); if (f && document.activeElement !== f) try { f.focus({ preventScroll: true }); } catch (e) { } }
