@@ -288,7 +288,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 7.9 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 8.0 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -6474,6 +6474,7 @@ function renderTape() {
   <div class="acts">
     <button id="bSelAll" ${M.meas.length ? '' : 'disabled'}>⬚ Проверить невязки</button>
     <button id="bStr" ${M.pts.length > 2 ? '' : 'disabled'}>▦ Выровнять 90°</button>
+    <button id="rFind" ${M.edges.length > 2 ? '' : 'disabled'} title="Каждый замкнутый контур стен станет помещением с площадью">▢ Найти помещения</button>
     <button id="bOvPdf" class="pri" ${M.pts.length ? '' : 'disabled'}>📄 PDF на подложке</button>
     <button id="toSheetT" ${M.rooms.length || M.edges.length ? '' : 'disabled'}>🗎 Листы и DXF</button>
   </div>
@@ -6487,7 +6488,6 @@ function renderTape() {
   <p class="hint">${pdfSz() === 's' ? 'Подписи в PDF такого же размера относительно чертежа, как на экране при том увеличении, на котором вы мерили.' : 'Подписи крупнее, чем на экране, — удобно для печати мелкого масштаба.'}</p>
   </details>
   <details><summary>Помещения и замеры (${M.rooms.length} / ${M.meas.filter(m => m.type !== 'line' && m.type !== 'angle' && m.type !== 'right').length}) · невязка <b class="${(R.maxR || 0) > 0.015 ? 'bad' : (R.maxR || 0) > 0.005 ? 'warn' : 'ok'}">${Math.round((R.maxR || 0) * 1000)} мм</b></summary>
-  <div class="row" style="margin:4px 0"><button id="rFind" title="Каждый замкнутый контур стен станет помещением с площадью">▢ Найти замкнутые контуры</button></div>
   ${M.rooms.map(Rm => { const i = TAPE.roomInfo(M, Rm); return `<div class="item" data-room="${Rm.num}"><input type="text" value="${escH(Rm.name)}" data-rn="${Rm.num}" style="width:120px">${Rm.num}<button data-rlb="${Rm.num}" title="Показывать площадь на чертеже" style="padding:1px 6px" class="${Rm.hideLbl ? '' : 'on'}">м²</button><span class="q ${i.diags < i.need ? 'warn' : 'ok'}">${SHEET.fmtArea(i.area)} м² · стороны ${i.sides}/${i.k} · диаг. ${i.diags}${i.diags < i.need ? ' (нужно ' + i.need + ')' : ''}</span></div>`; }).join('')}
   <div class="list" style="margin-top:6px">${rows.map(m => `<div class="item"><input type="checkbox" data-mon="${m.id}" ${m.on !== false ? 'checked' : ''}><span>${m.type === 'tie' ? 'люк ↔ ' : m.type === 'thick' ? (m.span ? '↔ ' : 'δ ') : ''}${pname(m.a)}–${pname(m.type === 'thick' ? m.c : m.b)}</span><input type="text" data-mv="${m.id}" value="${fm(m.v)}" style="width:72px"><span class="q ${warn(m)}">${m.res != null ? (m.res > 0 ? '+' : '') + Math.round(m.res * 1000) + ' мм' : ''}</span><button data-mdel="${m.id}" style="padding:1px 6px">×</button></div>`).join('') || '<div class="hint" style="padding:6px">Замеров пока нет</div>'}</div>
   </details>
