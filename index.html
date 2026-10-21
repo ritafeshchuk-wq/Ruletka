@@ -288,7 +288,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 9.0 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 9.1 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -6094,7 +6094,7 @@ async function connectDisto() {
     uiAlert((IOS ? 'Нужен браузер Bluefy.\n\nSafari и Chrome на iPad не пускают страницы к Bluetooth. Установите «Bluefy – Web BLE Browser» (App Store, бесплатно) и откройте в нём эту же ссылку' + (copied ? ' — она уже скопирована, просто вставьте в адресную строку Bluefy.' : ':\n' + location.href) : 'Этот браузер не поддерживает Bluetooth. Откройте программу в Google Chrome или Microsoft Edge.')); return; }
   try {
     T.btState = 'поиск…'; renderTape();
-    const dev = await navigator.bluetooth.requestDevice({ filters: [{ namePrefix: 'DISTO' }, { services: [DISTO_SVC] }], optionalServices: [DISTO_SVC, 'battery_service'] });
+    const dev = await navigator.bluetooth.requestDevice({ filters: [{ namePrefix: 'DISTO' }, { namePrefix: 'Leica' }, { services: [DISTO_SVC] }], optionalServices: [DISTO_SVC, 'battery_service'] });
     T.btName = dev.name || 'DISTO'; T.wantBt = true;
     if (!dev._s2p) { dev._s2p = 1; dev.addEventListener('gattserverdisconnected', onBtLost); }
     T.bt = dev; await gattStart(dev);
@@ -6119,9 +6119,11 @@ function btpShow() { let el = document.getElementById('btprobe'); if (!el) { el 
   el.querySelector('#bpX').onclick = () => el.remove(); el.querySelector('#bpAcc').onchange = e => BTP.accept = e.target.checked;
   el.querySelector('#bpCopy').onclick = async () => { const t = BTP.log.join('\n'); try { await navigator.clipboard.writeText(t); stat('Журнал скопирован — вставьте его в сообщение.'); } catch (e) { uiAlert(t.slice(-3000)); } };
   el.querySelector('#bpOff').onclick = () => { try { BTP.dev && BTP.dev.gatt.disconnect(); } catch (e) { } btpLog('отключено'); }; }
-async function connectOther() {
+const BT_NAMES = ['DISTO', 'Leica', 'CONDTROL', 'Condtrol', 'XP3', 'XP4', 'Bosch', 'GLM', 'PLR', 'Mileseey', 'MILESEEY', 'Hilti', 'HILTI', 'PD-', 'ADA', 'RGK', 'Stabila', 'STABILA', 'Makita', 'DeWALT', 'DEWALT', 'Huepar', 'UNI-T', 'Sndway', 'Ermenrich', 'Instrumax', 'Nivelir', 'Laser', 'LASER', 'Meter', 'METER'];
+async function connectOther(all) {
   if (!navigator.bluetooth) { uiAlert('В этом браузере нет Bluetooth. На iPad — Bluefy.'); return; }
-  let dev; try { dev = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: BT_SVCS }); } catch (e) { if (!/cancel|chooser|abort/i.test(e.message || '')) uiAlert('Bluetooth: ' + (e.message || e)); return; }
+  if (all !== true) { const k = await ask3('Другая рулетка', 'Включите Bluetooth на рулетке. Сначала программа покажет только устройства с понятными названиями рулеток (Leica, CONDTROL, Bosch, Mileseey, Hilti…). Leica DISTO лучше подключать основной кнопкой «Подключить DISTO».', [['f', 'Показать рулетки', 'pri'], ['a', 'Все устройства (если рулетки нет в списке)', ''], ['x', 'Отмена', '']]); if (k === 'x' || !k) return; if (k === 'a') all = true; }
+  let dev; try { dev = await navigator.bluetooth.requestDevice(all === true ? { acceptAllDevices: true, optionalServices: BT_SVCS.concat([DISTO_SVC]) } : { filters: BT_NAMES.map(n => ({ namePrefix: n })), optionalServices: BT_SVCS.concat([DISTO_SVC]) }); } catch (e) { if (!/cancel|chooser|abort/i.test(e.message || '')) uiAlert('Bluetooth: ' + (e.message || e)); return; }
   BTP.dev = dev; BTP.log = []; btpShow(); btpLog('устройство: ' + (dev.name || 'без имени') + ' · id ' + (dev.id || '').slice(0, 12));
   try { const srv = await dev.gatt.connect(); btpLog('подключено');
     let svcs = []; try { svcs = await srv.getPrimaryServices(); } catch (e) { btpLog('службы не прочитаны: ' + e.message); }
@@ -6745,7 +6747,7 @@ function renderTape() {
   </details>
   <div class="stephead"><span class="stepn">2</span>Рулетка</div>
   <div class="row"><span class="btdot ${T.btState === 'подключена' ? 'on' : /…/.test(T.btState) ? 'wait' : ''}"></span><button class="btbig ${T.btState === 'подключена' ? 'on' : 'pri'}" id="bBt">${T.btState === 'подключена' ? '✓ ' + escH(T.btName) : 'Подключить DISTO'}</button>${T.btState === 'отключена' ? '<button id="bRe" class="pri">Переподключить</button>' : ''}${T.cmd && T.btState === 'подключена' ? '<button id="bMeas" class="btbig">◉ Замер</button>' : ''}<span class="hint" style="margin:0">${T.btState === 'нет' ? '' : escH(T.btState)}${T.batt != null ? ' · ' + T.batt + '%' : ''}</span></div>
-  ${T.btState !== 'подключена' ? '<div class="row"><button id="bBtOther" title="Рулетка другой фирмы: CONDTROL, Bosch, Mileseey и др. Программа подключится, покажет, что присылает рулетка, и попробует принять замер">Другая рулетка (проба)</button></div>' : ''}
+  ${T.btState !== 'подключена' ? '<div class="row"><button id="bBtOther" title="Рулетка другой фирмы: CONDTROL, Bosch, Mileseey и др. Программа подключится, покажет, что присылает рулетка, и попробует принять замер">Другая рулетка (проба)</button><a href="d810.html" target="_blank" rel="noopener" style="align-self:center;font-size:13px">Инструкция D810</a></div>' : ''}
   ${btShort}
   <div class="stephead"><span class="stepn">3</span>Обмер — сейчас: ${escH((TTOOLS.find(t => t[0] === T.tool) || [])[1] || '')}</div>
   ${T.tool === 'gps' ? gpsPanel() : ''}

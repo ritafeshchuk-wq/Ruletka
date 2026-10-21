@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Leica DISTO D810 в Рулетке</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#1b2430;--mut:#5d6b7a;--line:#e2e6eb;--acc:#d9932a;--ok:#1f8a4c;--bad:#c4372f;--blue:#1f6feb}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12161c;--card:#1b222b;--ink:#e7ecf2;--mut:#9aa7b5;--line:#2b3542;--acc:#e6a43c;--ok:#3fb56f;--bad:#e5605a;--blue:#5a9cff}}
+:root[data-theme="dark"]{--bg:#12161c;--card:#1b222b;--ink:#e7ecf2;--mut:#9aa7b5;--line:#2b3542;--acc:#e6a43c;--ok:#3fb56f;--bad:#e5605a;--blue:#5a9cff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 -apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+main{max-width:760px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:24px;margin:4px 0 4px}
+.sub{color:var(--mut);margin:0 0 18px}
+section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:12px 0}
+h2{font-size:18px;margin:0 0 8px;display:flex;gap:10px;align-items:center}
+h2 .n{flex:0 0 28px;height:28px;border-radius:50%;background:var(--acc);color:#fff;display:grid;place-items:center;font-size:15px}
+ol,ul{margin:6px 0;padding-left:22px}
+li{margin:4px 0}
+b.k{display:inline-block;border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;padding:0 6px;font-size:14px;background:var(--bg)}
+.note{border-left:4px solid var(--acc);background:color-mix(in srgb,var(--acc) 10%,transparent);padding:8px 12px;border-radius:8px;margin:8px 0}
+.warn{border-left-color:var(--bad);background:color-mix(in srgb,var(--bad) 9%,transparent)}
+.okn{border-left-color:var(--ok);background:color-mix(in srgb,var(--ok) 9%,transparent)}
+table{width:100%;border-collapse:collapse;font-size:15px}
+td{border-top:1px solid var(--line);padding:7px 6px;vertical-align:top}
+td:first-child{width:42%;font-weight:600}
+a{color:var(--blue)}
+.foot{color:var(--mut);font-size:13px;margin-top:20px}
+</style>
+</head>
+<body>
+<main>
+<h1>Leica DISTO D810 touch в Рулетке</h1>
+<p class="sub">Подключение, настройки и работа — коротко, по шагам.</p>
+
+<section>
+<h2><span class="n">1</span>Один раз — настроить D810</h2>
+<ol>
+<li><b>Bluetooth включён.</b> Настройки (Settings) → <b>Bluetooth® Settings</b> → <b>ON</b>. По умолчанию он и так включён. Чёрный значок Bluetooth в строке состояния — включён, <span style="color:var(--blue)"><b>синий</b></span> — подключён.</li>
+<li><b>Режим — App (для приложений).</b> В тех же настройках Bluetooth выберите режим <b>App</b>. В режимах <i>Text</i> и <i>Spreadsheet</i> D810 работает как клавиатура, и Рулетка его не увидит.</li>
+<li><b>Единицы — метры, 0.000 m.</b> Настройки → <b>Distance units</b> → <b>0.000 m</b>. Тогда на экране D810 то же число, что придёт в программу.</li>
+</ol>
+<div class="note warn">Если раньше D810 подключали к iPad как клавиатуру (в «Настройках» iPad → Bluetooth), удалите его там: «ⓘ» → «Забыть это устройство». Иначе он подключится как клавиатура и не будет виден в Рулетке.</div>
+</section>
+
+<section>
+<h2><span class="n">2</span>Подключить к Рулетке</h2>
+<ol>
+<li>На iPad откройте Рулетку в браузере <b>Bluefy</b>. В Safari и Chrome на iPad Bluetooth для сайтов не работает.</li>
+<li>Включите D810.</li>
+<li>Нажмите <b>«Подключить DISTO»</b>. «Другая рулетка» для Leica не нужна.</li>
+<li>В списке выберите <b>DISTO…</b> (номер после слова — серийный номер вашего прибора) → «Подключить».</li>
+<li>Если iPad спросит «Запрос на создание пары» — нажмите <b>«Создать пару»</b>.</li>
+<li>Готово: значок Bluetooth на D810 стал синим, в программе — «подключена».</li>
+</ol>
+</section>
+
+<section>
+<h2><span class="n">3</span>Мерить</h2>
+<ol>
+<li>В Рулетке выберите, что меряете (стена в обходе, промер, подоконник…) — сверху появится карточка «Замер …».</li>
+<li>На D810 нажмите <b class="k">DIST</b> (кнопка измерения) — число само придёт в карточку.</li>
+<li>Проверьте число и нажмите <b>«✓ Принять»</b>. Не то — «✕ Отклонить» и перемерьте.</li>
+<li>Чтобы не нажимать «Принять» каждый раз: «⚙ Настройки обмера» → «Принимать замер с DISTO сразу».</li>
+<li>Отправить ещё раз то, что на экране D810 (например, после функции), — кнопка <b class="k">=</b>.</li>
+</ol>
+<div class="note">Если карточки замера нет, а вы нажали DIST, число запомнится. Укажите стену или точки — оно подставится само.</div>
+</section>
+
+<section>
+<h2><span class="n">4</span>От чего меряет D810</h2>
+<table>
+<tr><td>Задний торец (по умолчанию)</td><td>Для обмера помещений — от стены до стены: прибор упирается задом в стену.</td></tr>
+<tr><td>Передний торец</td><td>Удобно в нишах и откосах, когда упираться нечем сзади.</td></tr>
+<tr><td>Резьба штатива / FTA 360</td><td>Для работы со штатива.</td></tr>
+</table>
+<p>Меняется в «Функции» → <b>измерительная база (reference)</b>. После выключения D810 база снова становится <b>задним торцом</b> — проверяйте после перезапуска.</p>
+</section>
+
+<section>
+<h2><span class="n">5</span>Полезные функции D810 для обмера</h2>
+<ul>
+<li><b>Smart Horizontal.</b> Горизонтальное расстояние, когда напрямую не достать: через мебель, на точку выше или ниже. D810 показывает расстояние, наклон и проекции x/y/z. Проверьте, какое число пришло в карточку, и для плана берите горизонтальное.</li>
+<li><b>Видоискатель (камера) с увеличением.</b> Точно попасть в дальний угол или край откоса, когда пятна лазера не видно.</li>
+<li><b>Измерительная база «перед»</b> — для глубины подоконника и откосов (см. п. 4).</li>
+</ul>
+</section>
+
+<section>
+<h2><span class="n">6</span>Если не подключается</h2>
+<ul>
+<li><b>D810 нет в списке.</b> Bluetooth на приборе включён? Режим <b>App</b>? Прибор не подключён к другому приложению (DISTO plan, sketch)? Закройте его и попробуйте снова.</li>
+<li><b>Был в списке, но «не удалось подключиться».</b> Выключите и включите D810, повторите «Подключить DISTO».</li>
+<li><b>Числа не приходят.</b> Проверьте режим App (не Text/Spreadsheet) и единицы 0.000 m. Если D810 подключён к iPad как клавиатура — «Забыть это устройство» в настройках iPad.</li>
+<li><b>Связь пропала.</b> Bluetooth выключается вместе с D810, в том числе при автоотключении. Включите прибор и снова нажмите «Подключить DISTO» — проект и замеры остаются на месте.</li>
+<li><b>Нужно на компьютере.</b> Chrome или Edge, Bluetooth 4.0 и Windows 8 или новее.</li>
+</ul>
+</section>
+
+<p class="foot">Рулетка · © d1sco, 2026. По руководству Leica DISTO™ D810 touch. Названия пунктов меню на приборе — английские; если у вас русское меню — те же пункты по смыслу.</p>
+</main>
+</body>
+</html>
