@@ -286,7 +286,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 7.2 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 7.3 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -1895,7 +1895,7 @@ const SHEET = (() => {
         const p = R.label || labelPos(R.poly);
         text([p[0], p[1] + 2.6 * k], String(R.num), 3.0, 0, 'TEKST');
         C.push({ c: [p[0], p[1] + 2.6 * k], r: 2.8 * k, layer: 'TEKST' });
-        text([p[0], p[1] - 2.0 * k], fmtArea(R.area), 2.5, 0, 'TEKST');
+        text([p[0], p[1] - 2.4 * k], fmtArea(R.area) + ' м²', 3.2, 0, 'TEKST'); // площадь — в центре помещения, крупнее размеров
       }
     }
     for (const t of plan.texts || []) text(t.p, t.s, t.h || 2.5, t.rot || 0, t.layer || 'TEKST');
@@ -6710,7 +6710,7 @@ function tapePlan() {
     const poly = R.ids.map(id => ptById(id)).filter(Boolean).map(PR); if (poly.length < 3) continue;
     const lens = M.cond ? R.ids.map((id, i) => { const m = distMeas(id, R.ids[(i + 1) % R.ids.length]); return m && m.on !== false ? m.v : null; }) : null;
     let area = Math.abs(VEC.polyArea(poly)); if (M.cond) { try { area = TAPE.roomInfo(M, R).area; } catch (e) { } }
-    rooms.push({ num: R.num, name: R.name, poly, area, lens });
+    rooms.push({ num: R.num, name: R.name, poly, area, lens, label: R.lp ? PR({ x0: R.lp[0], y0: R.lp[1], x: R.lp[0], y: R.lp[1] }) : null });
   }
   const extra = [], texts = [];
   for (const e of M.edges) for (const [p1, p2, k] of openGeom(e, PX)) { const q1 = PR({ x0: p1[0], y0: p1[1], x: p1[0], y: p1[1] }), q2 = PR({ x0: p2[0], y0: p2[1], x: p2[0], y: p2[1] }); extra.push({ a: q1, b: q2, w: k === 'arc' ? 0.13 : 0.25, layer: 'DVERI' }); }
