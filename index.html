@@ -288,7 +288,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 8.4 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 8.5 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -6631,7 +6631,10 @@ function renderTape() {
   <div class="chk"><input type="checkbox" id="orth" ${M.ortho !== false ? 'checked' : ''}><label for="orth">Углы около 90° считать прямыми</label></div>
   <p class="hint" style="margin-bottom:2px">Размер подписей и значков в PDF:</p>
   <div class="row seg2">${Object.entries(PDFSZ).map(([k, v]) => `<button data-pdfsz="${k}" class="${pdfSz() === k ? 'on' : ''}">${v.t}</button>`).join('')}</div>
-  <p class="hint">${pdfSz() === 's' ? 'Подписи в PDF такого же размера относительно чертежа, как на экране при том увеличении, на котором вы мерили.' : 'Подписи крупнее, чем на экране, — удобно для печати мелкого масштаба.'}</p>
+  <p class="hint">Высота цифр на бумаге: ${pdfSz() === 's' ? '≈ 2 мм' : pdfSz() === 'm' ? '≈ 2,5 мм' : '≈ 3 мм'}. Тесно — подпись выносится в сторону со сноской, ничего не налезает.</p>
+  <p class="hint" style="margin-bottom:2px">Масштаб PDF без подложки:</p>
+  <div class="row seg2">${PDFSC.map(v => `<button data-pdfsc="${v}" class="${String(pdfSc()) === String(v) ? 'on' : ''}">${v === 'auto' ? 'Авто' : '1:' + v}</button>`).join('')}</div>
+  <p class="hint">${pdfSc() === 'auto' ? 'Авто — программа берёт такой масштаб, чтобы размеры помещались на стенах (обычно 1:50); масштаб пишется внизу листа.' : 'Лист в масштабе 1:' + pdfSc() + '.'}</p>
   </details>
   <details><summary>Помещения и замеры (${M.rooms.length} / ${M.meas.filter(m => m.type !== 'line' && m.type !== 'angle' && m.type !== 'right').length}) · невязка <b class="${(R.maxR || 0) > 0.015 ? 'bad' : (R.maxR || 0) > 0.005 ? 'warn' : 'ok'}">${Math.round((R.maxR || 0) * 1000)} мм</b></summary>
   ${M.rooms.map(Rm => { const i = TAPE.roomInfo(M, Rm); return `<div class="item" data-room="${Rm.num}"><input type="text" value="${escH(Rm.name)}" data-rn="${Rm.num}" style="width:120px">${Rm.num}<button data-rlb="${Rm.num}" title="Показывать площадь на чертеже" style="padding:1px 6px" class="${Rm.hideLbl ? '' : 'on'}">м²</button><span class="q ${i.diags < i.need ? 'warn' : 'ok'}">${SHEET.fmtArea(i.area)} м² · стороны ${i.sides}/${i.k} · диаг. ${i.diags}${i.diags < i.need ? ' (нужно ' + i.need + ')' : ''}</span></div>`; }).join('')}
@@ -6678,6 +6681,7 @@ function renderTape() {
     setTimeout(() => document.addEventListener('pointerdown', flyOut, true), 0); }
   $('#tUndo').onclick = tUndo; $('#tRedo').onclick = tRedo;
   $('#orth').onchange = e => { M.ortho = e.target.checked; if (!M.ortho) { M.sqStrict = false; M.pts.forEach(p => delete p.sq); } adjust(); renderTape(); };
+  document.querySelectorAll('[data-pdfsc]').forEach(b => b.onclick = () => { const v = b.dataset.pdfsc === 'auto' ? 'auto' : +b.dataset.pdfsc; try { localStorage.setItem('rul_pdfsc', String(v)); } catch (e) { } if (S.sheetOpt) { S.sheetOpt.pdfSc = v; try { asSoon(); } catch (e) { } } stat('Масштаб PDF без подложки: ' + (v === 'auto' ? 'авто' : '1:' + v) + '.'); renderTape(); });
   document.querySelectorAll('[data-pdfsz]').forEach(b => b.onclick = () => { try { localStorage.setItem('rul_pdfsz', b.dataset.pdfsz); } catch (e) { } if (S.sheetOpt) { S.sheetOpt.pdfSz = b.dataset.pdfsz; try { asSoon(); } catch (e) { } } stat('Подписи в PDF: ' + PDFSZ[b.dataset.pdfsz].t.toLowerCase() + '.'); renderTape(); });
   side.querySelectorAll('[data-mon]').forEach(c => c.onchange = () => { const m = M.meas.find(x => x.id === +c.dataset.mon); tPush(); m.on = c.checked; adjust(); renderTape(); });
   side.querySelectorAll('[data-mv]').forEach(c => c.onchange = () => { const m = M.meas.find(x => x.id === +c.dataset.mv); const v = parseManual(c.value); if (v) { tPush(); m.v = v; adjust(); } renderTape(); });
@@ -6695,7 +6699,15 @@ function pdfKit() {
   const b = atob(document.getElementById('fontb64').textContent.trim()), u8 = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u8[i] = b.charCodeAt(i);
   PDFK = { L: window.PDFLib, font: window.opentype.parse(u8.buffer) }; return PDFK;
 }
-const PDFSZ = { s: { m: 1, t: 'Как на экране' }, m: { m: 1.6, t: 'Крупнее' }, l: { m: 2.5, t: 'Крупно' } };
+const PDFSZ = { s: { m: 1, t: 'Обычный' }, m: { m: 1.3, t: 'Крупнее' }, l: { m: 1.7, t: 'Крупно' } };
+const PDFSC = ['auto', 25, 50, 75, 100, 200];
+function pdfSc() { const v = S.sheetOpt && S.sheetOpt.pdfSc; if (v != null && PDFSC.includes(v)) return v; try { const l = localStorage.getItem('rul_pdfsc'); if (l) return l === 'auto' ? 'auto' : +l; } catch (e) { } return 'auto'; }
+function autoPdfScale(fsPt) { // масштаб листа без подложки: крупнее, пока на большинстве стен размер помещается вдоль стены; лист не больше ~1,2 м
+  const L = M.edges.filter(e => !e.obj).map(e => { const m = distMeas(e.a, e.b); return m ? m.v : 0; }).filter(v => v > 0.03).sort((a, b) => a - b); if (!L.length) return 100;
+  const xs = M.pts.map(PX), span = Math.max(Math.max(...xs.map(q => q[0])) - Math.min(...xs.map(q => q[0])), Math.max(...xs.map(q => q[1])) - Math.min(...xs.map(q => q[1])));
+  const labW = fsPt * 3.0 / 72 * 0.0254; // ширина подписи «0,000» на бумаге, м
+  for (const D of [25, 50, 75, 100, 200]) { if (span / D > 1.1) continue; const g = labW * D; const ok = L.filter(v => v >= g).length / L.length; if (ok >= 0.6 || D === 200) return D; }
+  return 200; }
 function pdfSz() { const v = S.sheetOpt && S.sheetOpt.pdfSz; if (v && PDFSZ[v]) return v; try { return localStorage.getItem('rul_pdfsz') || 's'; } catch (e) { return 's'; } } // размер подписей хранится и в проекте — PDF на другом устройстве выйдет таким же
 async function exportOverlayPdf(opt = {}) {
   const isPdf = !!(U.src && U.src.kind === 'pdf'); if (isPdf) await ensurePdf();
@@ -6720,7 +6732,7 @@ async function exportOverlayPdf(opt = {}) {
       if (srcDoc && !withWork.has(pg)) { if (copied) doc.addPage(copied.get(pg)); else { const [cp] = await doc.copyPages(srcDoc, [pg - 1]); doc.addPage(cp); } continue; } // лист без замеров — как в исходнике
       if (pages.length > 1 || pg !== curPg) { loadPageModel(pg); const d = PGS.data[pg]; if (d && d.u) Object.assign(U, { s: d.u.s, rot: d.u.rot, tx: d.u.tx, ty: d.u.ty, ptPerPx: d.u.ptPerPx, pw: d.u.pw, ph: d.u.ph }); U.srcPage = pg; adjust(); }
       await (async () => {
-    let W, H, toPt, page, wrapped = false, uM = null, uPg = 0;
+    let W, H, toPt, page, wrapped = false, uM = null, uPg = 0, scD = 0;
     if (U.img) {
       const ppx = U.ptPerPx || 0.75; W = (U.pw || U.img.width) * ppx; H = (U.ph || U.img.height) * ppx;
       toPt = (X, Y) => { const c = Math.cos(U.rot), sn = Math.sin(U.rot), dx = X - U.tx, dy = Y - U.ty; const x0 = c * dx + sn * dy, y0 = -sn * dx + c * dy; return [x0 / U.s * ppx, H + y0 / U.s * ppx]; };
@@ -6755,7 +6767,7 @@ async function exportOverlayPdf(opt = {}) {
         const jb = await (await fetch(cv2.toDataURL('image/jpeg', 0.92))).arrayBuffer(); page.drawImage(await doc.embedJpg(jb), { x: 0, y: 0, width: W, height: H }); }
     } else {
       const xs = M.pts.map(PX).concat((M.notes || []).map(n => n.at), (M.marks || []).map(m => m.p)); const x0 = Math.min(...xs.map(q => q[0])), y0 = Math.min(...xs.map(q => q[1])), x1 = Math.max(...xs.map(q => q[0])), y1 = Math.max(...xs.map(q => q[1]));
-      const k = 72 / 0.0254 / 100; W = (x1 - x0) * k + 240; H = (y1 - y0) * k + 160; toPt = (X, Y) => [(X - x0) * k + 120, (Y - y0) * k + 80]; page = doc.addPage([W, H]);
+      const sc0 = pdfSc(); scD = sc0 === 'auto' ? autoPdfScale(6.5 * (PDFSZ[pdfSz()] || PDFSZ.s).m) : sc0; const k = 72 / 0.0254 / scD; W = (x1 - x0) * k + 160; H = (y1 - y0) * k + 140; toPt = (X, Y) => [(X - x0) * k + 80, (Y - y0) * k + 80]; page = doc.addPage([W, H]);
     }
     const P2 = p => toPt(...PX(p));
     // размер шрифта — от длины стен на листе
@@ -6766,7 +6778,7 @@ async function exportOverlayPdf(opt = {}) {
     const zl = ((M.zoomLog && M.zoomLog.length ? M.zoomLog : T.zoomAll) || []).slice().sort((a, b) => a - b), zw = zl.length ? zl[Math.floor(zl.length / 2)] : null;
     const lensW = M.edges.filter(e => !e.obj).map(e => { const A = ptById(e.a), B = ptById(e.b); return A && B ? Math.hypot(PX(A)[0] - PX(B)[0], PX(A)[1] - PX(B)[1]) : 0; }).filter(v => v > 0.05).sort((a, b) => a - b), medW = lensW.length ? lensW[Math.floor(lensW.length / 2)] : null;
     const fsM = Math.max(0.04, Math.min(0.8, zw ? 13.5 / zw : 0.22, medW ? medW * 0.12 : 9)); void med;
-    const fs = Math.max(4.2, Math.min(9, ppm * fsM)) * (PDFSZ[pdfSz()] || PDFSZ.s).m; // на бумаге ~1,5–3 мм, независимо от увеличения при работе
+    const fs = (scD ? 6.5 : Math.max(4.2, Math.min(9, ppm * fsM))) * (PDFSZ[pdfSz()] || PDFSZ.s).m; // на бумаге ~1,5–3 мм, независимо от увеличения при работе
     const lw = Math.max(0.06, fs * 0.09);
     const sc = (x, d) => { const c = x && x.st && x.st.c; if (!c) return d; const n = parseInt(c.slice(1), 16); return rgb(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255); };
     const RED = rgb(0.80, 0.02, 0.10), BLUE = rgb(0.05, 0.25, 0.75), VIO = rgb(0.42, 0.20, 0.72), GRN = rgb(0.05, 0.55, 0.25), GRY = rgb(0.45, 0.48, 0.52);
@@ -6855,7 +6867,10 @@ async function exportOverlayPdf(opt = {}) {
     // помещения
     for (const R of M.rooms) { const pts = R.ids.map(ptById).filter(Boolean).map(P2); if (pts.length < 3) continue; const c = toPt(...(R.lp || roomLabelAt(R)));
       let area = 0; try { area = TAPE.roomInfo(M, R).area; } catch (e) { }
-      textC(`${R.num}. ${R.name}`, [c[0], c[1] + fs * 0.7], fs * 1.05, BLUE); textC(SHEET.fmtArea(area) + ' м²', [c[0], c[1] - fs * 0.7], fs, BLUE); }
+      const nm = R.name && R.name !== 'Помещение' ? `${R.num}. ${R.name}` : null, ar = SHEET.fmtArea(area) + ' м²', l1 = nm || `${R.num} · ${ar}`;
+      let best = null, bn = 1e9; for (const k of [{ c }].concat(ptCands(c, fs * 1.1, 1.2))) { const B1 = boxOf(l1, fs * 1.05, nm ? [k.c[0], k.c[1] + fs * 0.7] : k.c, 0), B2 = nm ? boxOf(ar, fs, [k.c[0], k.c[1] - fs * 0.7], 0) : null; let n = k.lead ? 0.35 : 0;
+        for (const B of [B1, B2]) if (B) { if (INK) n += Math.min(1, INK(B) * 3.5) * 0.8; for (const o of OB) if (hit(o, B)) n += o.w || 1; } if (n < bn) { bn = n; best = k; } if (!n) break; }
+      const cc = best.c; textC(l1, nm ? [cc[0], cc[1] + fs * 0.7] : cc, fs * 1.05, BLUE); if (best.lead) leader(best.lead, OB[OB.length - 1], BLUE); if (nm) textC(ar, [cc[0], cc[1] - fs * 0.7], fs, BLUE); }
     // фото и сканы
     const RLC0 = rgb(0.76, 0.09, 0.36);
     for (const m of (M.marks || []).filter(x => x.type === 'rlab')) { const c = toPt(...m.p), l1 = m.num ? '№ ' + m.num : '', l2 = m.name || '', f1 = fs * 1.15 * stK(m), f2 = fs * 0.95 * stK(m), RLC = sc(m, RLC0);
@@ -6892,7 +6907,7 @@ async function exportOverlayPdf(opt = {}) {
     for (const p of M.pts) { if (p.soft) continue; const q = P2(p); page.drawCircle({ x: q[0], y: q[1], size: lw * 1.6, color: rgb(1, 1, 1), borderColor: rgb(0.1, 0.1, 0.1), borderWidth: lw * 0.6 });
       const own = !!p.name, s0 = pname(p.id), f0 = fs * (own ? 0.8 : 0.55), w = font.getAdvanceWidth(s0, f0) / 2 + f0 * 0.5;
       place(s0, own ? rgb(0.04, 0.24, 0.57) : rgb(0.3, 0.3, 0.3), 0, [[1, 1], [-1, 1], [1, -1], [-1, -1]].map(([sx, sy]) => ({ c: [q[0] + sx * w, q[1] + sy * f0 * 0.95], size: f0 })), own); }
-    const d = new Date(); text(`Обмер рулеткой · ${d.toLocaleDateString('ru')} · ${M.cond ? 'условно по чертежу' : 'факт по замерам'} · размеры в метрах · Рулетка · © d1sco`, [10, 10], Math.max(4, Math.min(8, W / 160)), GRY, 0, 'l');
+    const d = new Date(); text(`Обмер рулеткой · ${d.toLocaleDateString('ru')} · ${M.cond ? 'условно по чертежу' : 'факт по замерам'} · размеры в метрах${scD ? ' · М 1:' + scD : ''} · Рулетка · © d1sco`, [10, 10], Math.max(4, Math.min(8, W / 160)), GRY, 0, 'l');
     if (wrapped) page.pushOperators(popGraphicsState());
       })();
     }
