@@ -288,7 +288,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 7.7 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 7.8 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -2173,7 +2173,7 @@ const TAPE = (() => {
         const tgts = [Math.PI / 2, Math.PI, 1.5 * Math.PI];
         const tol = (opt.angTol || M.orthoTol || 15) * Math.PI / 180; let best = null; for (const t of tgts) if (Math.abs(r.f - t) < tol) best = t;
         if (best === null) continue;
-        add(r.J, best - r.f, 1 / (SIG.angle ** 2));
+        const dv = Math.abs(best - r.f), sgA = M.sigAng || (dv < 3 * Math.PI / 180 ? (M.sqStrict ? 0.01 : 0.3) * Math.PI / 180 : SIG.angle); add(r.J, best - r.f, 1 / (sgA ** 2));
       }
       // solve A dx = g (Cholesky with tiny damping)
       for (let i = 0; i < N; i++) A[i * N + i] += 1e-9;
@@ -4725,7 +4725,7 @@ function numBlock(el, p) {
     stat(`Нумерация подряд: точка — № ${start}. Касайтесь следующих точек по порядку: № ${T.numbering.next}, … Коснитесь пустого места — закончить.`); };
   const c = box.querySelector('[data-n="clr"]'); if (c) c.onclick = () => { setPtName(p, ''); done(); };
 }
-function tSnap() { return JSON.stringify({ pts: M.pts, meas: M.meas, gpsHidden: M.gpsHidden || [], lastNum: M.lastNum || {}, edges: M.edges, rooms: M.rooms, chains: M.chains, objs: M.objs || [], notes: M.notes || [], marks: M.marks || [], nextId: M.nextId, nextMeas: M.nextMeas, scaleFit: M.scaleFit, scaleAsked: M.scaleAsked, axis: M.axis,
+function tSnap() { return JSON.stringify({ pts: M.pts, meas: M.meas, gpsHidden: M.gpsHidden || [], lastNum: M.lastNum || {}, edges: M.edges, rooms: M.rooms, chains: M.chains, objs: M.objs || [], notes: M.notes || [], marks: M.marks || [], nextId: M.nextId, nextMeas: M.nextMeas, scaleFit: M.scaleFit, scaleAsked: M.scaleAsked, axis: M.axis, sqStrict: !!M.sqStrict,
   _u: U.img ? { sn: U.s / (U.ptPerPx || 1), rot: U.rot, tx: U.tx, ty: U.ty, pg: U.srcPage || 1 } : null, _w: { ch: T.chain ? M.chains.indexOf(T.chain) : -1, cc: T.chain ? T.chain.slice() : null, mA: T.mA || null } }); }
 function tApply(txt) { const j = JSON.parse(txt), u = j._u, wk = j._w || null; delete j._u; delete j._w; Object.assign(M, j); M.objs = M.objs || []; M.notes = M.notes || []; M.marks = M.marks || []; markObjEdges();
   if (u && U.img && u.pg === (U.srcPage || 1)) Object.assign(U, { s: u.sn * (U.ptPerPx || 1), rot: u.rot, tx: u.tx, ty: u.ty }); return wk; }
@@ -4851,7 +4851,7 @@ function tapeMenu(w, cx, cy) {
     if (isFig4(o)) items.push([o.type === 'fig' ? '🗑 Удалить фигуру (с размерами и привязками)' : '🗑 Удалить люк целиком (с размерами и привязками)', () => { tPush(); delFig4(o); renderTape(); draw(); }, 'danger']);
     else items.push(['🗑 Удалить объект (точки и замеры останутся)', () => { tPush(); M.objs = M.objs.filter(x => x !== o); markObjEdges(); renderTape(); draw(); }, 'danger']);
   } else {
-    const m = h.meas; title = m.type === 'tie' ? `Привязка к стене ${pname(m.a)}–${pname(m.b)} · ${mv(m)}` : (m.type === 'thick' ? 'Толщина ' : 'Замер ') + `${pname(m.a)}–${pname(m.type === 'thick' ? m.c : m.b)} · ${mv(m)}`;
+    const m = h.meas; title = m.type === 'tie' ? `Привязка к стене ${pname(m.a)}–${pname(m.b)} · ${mv(m)}` : (m.type === 'thick' ? (m.span ? 'Общий промер ' : 'Толщина ') : 'Замер ') + `${pname(m.a)}–${pname(m.type === 'thick' ? m.c : m.b)} · ${mv(m)}`;
     items.push(remeasure(m), edit(m), toggle(m), delM(m));
   }
   const el = document.createElement('div'); el.id = 'tmenu';
@@ -5117,18 +5117,33 @@ function snap90(prevId, w) {
   const t = a - d; return [P[0] + Math.cos(t) * L, P[1] + Math.sin(t) * L];
 }
 // ---------- выровнять нарисованное: углы около 90° делаются прямыми, длины на чертеже сохраняются ----------
+// «Выровнять 90°» по замерам: каждая стена — строго по оси или поперёк (как идёт сейчас, с точностью до 45°), длина — замер.
+// Положение точек — уравнивание (МНК) отдельно по двум осям: невязка обхода (не сошлось по X/Y) разносится по стенам пропорционально длине,
+// общие промеры стена—стена тоже участвуют. Углы после этого прямые, а не «гуляют», чтобы спрятать невязку.
 function straighten() {
-  if (M.pts.length < 3) return;
-  tPush();
-  const tmp = { pts: M.pts.map(p => ({ id: p.id, x0: p.x0, y0: p.y0 })), edges: M.edges, rooms: M.rooms, chains: M.chains, objs: [], ortho: true,
-    meas: M.edges.map((e, i) => { const A = ptById(e.a), B = ptById(e.b); return { id: i + 1, type: 'dist', a: e.a, b: e.b, v: Math.hypot(B.x0 - A.x0, B.y0 - A.y0), on: true }; }) };
-  const sv = { ...TAPE.SIG }; Object.assign(TAPE.SIG, { prior: 3, dist: 0.2, angle: 0.01 * Math.PI / 180 }); try { TAPE.solve(tmp, { angTol: 20 }); TAPE.solve(tmp, { angTol: 20 }); } finally { Object.assign(TAPE.SIG, sv); }
-  // общий поворот: самая длинная стена — строго по горизонтали/вертикали
-  let best = null; for (const e of M.edges) { const A = tmp.pts.find(p => p.id === e.a), B = tmp.pts.find(p => p.id === e.b); const L = Math.hypot(B.x - A.x, B.y - A.y); if (!best || L > best.L) best = { L, a: Math.atan2(B.y - A.y, B.x - A.x) }; }
-  let rot = 0; if (best) { const q = Math.PI / 2; rot = -(best.a - Math.round(best.a / q) * q); if (Math.abs(rot) > 20 * Math.PI / 180) rot = 0; }
-  const c = [tmp.pts.reduce((s0, p) => s0 + p.x, 0) / tmp.pts.length, tmp.pts.reduce((s0, p) => s0 + p.y, 0) / tmp.pts.length], cr = Math.cos(rot), sr = Math.sin(rot);
-  for (const p of M.pts) { const q = tmp.pts.find(x => x.id === p.id); const dx = q.x - c[0], dy = q.y - c[1]; p.x0 = c[0] + cr * dx - sr * dy; p.y0 = c[1] + sr * dx + cr * dy; p.x = p.x0; p.y = p.y0; }
-  M.axis = 0; adjust(); draw(); renderTape(); stat('Чертёж выровнен: углы около 90° стали прямыми. Не то — «↶ Отменить».');
+  if (M.pts.length < 3) return; tPush();
+  const ax = M.axis || 0, ca = Math.cos(ax), sa = Math.sin(ax), toL = q => [ca * q[0] + sa * q[1], -sa * q[0] + ca * q[1]], toW = q => [ca * q[0] - sa * q[1], sa * q[0] + ca * q[1]];
+  const E = M.edges.filter(e => !e.obj && ptById(e.a) && ptById(e.b)), ids = [...new Set(E.flatMap(e => [e.a, e.b]))], ix = new Map(ids.map((id, k) => [id, k])), n = ids.length; if (n < 2) return;
+  const cur = ids.map(id => toL(PX(ptById(id))));
+  const sys = [0, 1].map(() => ({ A: new Float64Array(n * n), b: new Float64Array(n) }));
+  const addE = (ax2, i, j, val, sig) => { const S2 = sys[ax2], w = 1 / (sig * sig); S2.A[i * n + i] += w; S2.A[j * n + j] += w; S2.A[i * n + j] -= w; S2.A[j * n + i] -= w; S2.b[j] += w * val; S2.b[i] -= w * val; }; // x_j − x_i = val
+  const stats = [], stray = []; let skew = 0;
+  for (const e of E) { const i = ix.get(e.a), j = ix.get(e.b), d = [cur[j][0] - cur[i][0], cur[j][1] - cur[i][1]], Ld = Math.hypot(d[0], d[1]); if (Ld < 1e-6) continue;
+    const m = distMeas(e.a, e.b), L = m && m.on !== false ? m.v : Ld, horiz = Math.abs(d[0]) >= Math.abs(d[1]), sg = horiz ? Math.sign(d[0]) : Math.sign(d[1]);
+    const dev = Math.abs(Math.atan2(horiz ? d[1] : d[0], horiz ? Math.abs(d[0]) : Math.abs(d[1]))) * 180 / Math.PI, meas = m && m.on !== false;
+    if (!meas && dev > 20) { stray.push(e); continue; } // косая линия без замера (например, замыкание обхода «напрямик») — не стена по осям, не учитываем
+    if (dev > 20) skew++;
+    const sAlong = m && m.on !== false ? (m.auto ? 0.01 : 0.001 + 0.001 * L) : 0.05; // замер — твёрдо (ошибка пропорциональна длине), без замера — мягко
+    addE(horiz ? 0 : 1, i, j, sg * L, sAlong); addE(horiz ? 1 : 0, i, j, 0, meas ? 0.0002 : 0.01); stats.push({ e, i, j, horiz, sg, L, m }); }
+  for (const m of M.meas) if (m.type === 'thick' && m.on !== false && [m.a, m.b, m.c, m.d].every(id => ix.has(id))) { // общий промер / толщина: расстояние между параллельными стенами
+    const a = cur[ix.get(m.a)], b = cur[ix.get(m.b)], horiz = Math.abs(b[0] - a[0]) >= Math.abs(b[1] - a[1]), k = horiz ? 1 : 0;
+    for (const c of [m.c, m.d]) { const cc = cur[ix.get(c)][k] - a[k]; addE(k, ix.get(m.a), ix.get(c), Math.sign(cc || 1) * m.v, 0.002); } }
+  for (let k = 0; k < n; k++) for (const ax2 of [0, 1]) { const w = k === 0 ? 1e6 : 1e-6; sys[ax2].A[k * n + k] += w; sys[ax2].b[k] += w * cur[k][ax2]; } // первая точка — на месте
+  const sol = sys.map(S2 => { const A = S2.A, x = S2.b.slice(); for (let c = 0; c < n; c++) { let p0 = c; for (let r = c + 1; r < n; r++) if (Math.abs(A[r * n + c]) > Math.abs(A[p0 * n + c])) p0 = r; if (p0 !== c) { for (let q = 0; q < n; q++) { const t = A[c * n + q]; A[c * n + q] = A[p0 * n + q]; A[p0 * n + q] = t; } const t = x[c]; x[c] = x[p0]; x[p0] = t; } const dd = A[c * n + c]; if (Math.abs(dd) < 1e-18) continue; for (let r = c + 1; r < n; r++) { const f = A[r * n + c] / dd; if (!f) continue; for (let q = c; q < n; q++) A[r * n + q] -= f * A[c * n + q]; x[r] -= f * x[c]; } } for (let r = n - 1; r >= 0; r--) { let sm = x[r]; for (let q = r + 1; q < n; q++) sm -= A[r * n + q] * x[q]; x[r] = sm / (A[r * n + r] || 1); } return x; });
+  let mx = 0, mxE = null; for (const st of stats) { if (!st.m || st.m.on === false) continue; const got = (st.horiz ? sol[0][st.j] - sol[0][st.i] : sol[1][st.j] - sol[1][st.i]) * st.sg, r = Math.abs(got - st.L); if (r > mx) { mx = r; mxE = st.e; } }
+  for (const id of ids) { const k = ix.get(id), q = toW([sol[0][k], sol[1][k]]), p = ptById(id); p.x0 = q[0]; p.y0 = q[1]; p.x = q[0]; p.y = q[1]; }
+  M.sqStrict = true; adjust(); draw(); renderTape();
+  stat(`Выровнено по замерам: все стены — строго по осям, длины — замеры. Невязка обхода разнесена по стенам: наибольшая поправка ${Math.round(mx * 1000)} мм${mxE ? ` (${pname(mxE.a)}–${pname(mxE.b)})` : ''}${mx > 3 * TOL() ? ' — много, проверьте этот замер' : ''}.${skew ? ` Стен, стоявших косо больше 20° (тоже выпрямлены): ${skew} — если это настоящий скос, «↶ Отменить».` : ''}${stray.length ? ` Косые линии без замера: ${stray.map(e => pname(e.a) + '–' + pname(e.b)).join(', ')} — похоже на лишнюю стену (замыкание напрямик), удалите её.` : ''} Не то — «↶ Отменить».`);
 }
 // ---------- двери и окна в проёмах ----------
 const OPN = e => !e.open ? 'стена' : e.kind === 'door' ? 'дверь' : e.kind === 'window' ? 'окно' : 'проём';
@@ -5337,7 +5352,7 @@ function showSelBox() {
 }
 // ---------- несколько листов одного PDF в одном проекте ----------
 const PGS = { data: {} };
-const MKEYS = ['pts', 'meas', 'edges', 'rooms', 'chains', 'objs', 'notes', 'marks', 'lastNum', 'nextId', 'nextMeas', 'cond', 'axis', 'snap90', 'scaleFit', 'scaleAsked', 'ortho', 'zoomLog', 'gpsHidden'];
+const MKEYS = ['pts', 'meas', 'edges', 'rooms', 'chains', 'objs', 'notes', 'marks', 'lastNum', 'nextId', 'nextMeas', 'cond', 'axis', 'snap90', 'scaleFit', 'scaleAsked', 'ortho', 'zoomLog', 'gpsHidden', 'sqStrict'];
 function savePage() { if (!U.img || !U.srcPage || AS.hold) return; const m = {}; MKEYS.forEach(k => m[k] = M[k]); PGS.data[U.srcPage] = { m: JSON.stringify(m), u: { s: U.s, rot: U.rot, tx: U.tx, ty: U.ty, alpha: U.alpha, ptPerPx: U.ptPerPx, pw: U.pw || (U.img && U.img.width), ph: U.ph || (U.img && U.img.height) } }; }
 const mHas = m => !!m && ((m.pts || []).length > 0 || (m.marks || []).length > 0 || (m.notes || []).length > 0);
 function pgHas(n) { const d = PGS.data[n]; if (!d) return false; try { return mHas(JSON.parse(d.m)); } catch (e) { return false; } }
@@ -5920,7 +5935,10 @@ function acceptPending() {
   else if (p.type === 'thick') {
     const A = PX(ptById(p.a)), B = PX(ptById(p.b)), C = PX(ptById(p.c));
     const side = Math.sign((B[0] - A[0]) * (C[1] - A[1]) - (B[1] - A[1]) * (C[0] - A[0])) || 1;
-    M.meas.push({ id: M.nextMeas++, type: 'thick', a: p.a, b: p.b, c: p.c, d: p.d, v: p.got, side, on: true });
+    let before = null; if (p.span) { const L = (q, a, b) => Math.abs((b[0] - a[0]) * (q[1] - a[1]) - (b[1] - a[1]) * (q[0] - a[0])) / (Math.hypot(b[0] - a[0], b[1] - a[1]) || 1); before = Math.max(Math.abs(L(PX(ptById(p.c)), A, B) - p.got), Math.abs(L(PX(ptById(p.d)), A, B) - p.got)); }
+    M.meas.push({ id: M.nextMeas++, type: 'thick', a: p.a, b: p.b, c: p.c, d: p.d, v: p.got, side, on: true, ...(p.span ? { span: true } : {}) });
+    if (p.span) setTimeout(() => { const rs = M.meas.filter(m => m.res != null && m.on !== false && !m.auto).map(m => Math.abs(m.res)), mx = rs.length ? Math.max(...rs) : 0, tol = TOL();
+      stat(`Общий промер ${fm(p.got)} м учтён: чертёж расходился с ним на ${Math.round(Math.abs(before) * 1000)} мм. Ошибка разошлась по замерам — наибольшая поправка ${Math.round(mx * 1000)} мм${mx > 3 * tol ? ' — много: проверьте, нет ли грубой ошибки в одном замере («Проверить невязки»)' : ''}. Для углов — второй общий промер в другую сторону.`); renderTape(); draw(); }, 30);
   } else if (p.type === 'tie') {
     const A = PX(ptById(p.a)), B = PX(ptById(p.b)), C = PX(ptById(p.c)), D = PX(ptById(p.d)), Mq = [(C[0] + D[0]) / 2, (C[1] + D[1]) / 2];
     const side = Math.sign((B[0] - A[0]) * (Mq[1] - A[1]) - (B[1] - A[1]) * (Mq[0] - A[0])) || 1;
@@ -6010,6 +6028,13 @@ function tapeDown(e, w) {
     const ed = nearestEdge(w, 12); if (!ed) { stat('Коснитесь отрезка стены или двух точек — краёв проёма'); return; }
     if (KIND === 'door' && ed.e.open && ed.e.kind === 'door') { doorChip(ed.e); stat('Дверь выбрана — петли, сторону открывания или «без двери» — кнопками внизу.'); draw(); return; }
     tPush(); cycleOpening(ed.e, KIND); if (KIND === 'door' && ed.e.kind === 'door') { doorChip(ed.e); stat('Дверь. Петли и сторону открывания — кнопками внизу.'); } else doorChipOff(); draw(); renderTape(); return; }
+  if (t === 'span') { // общий промер: перпендикуляр между двумя стенами (обычно — самыми дальними противоположными)
+    const ed = nearestEdge(w, 14); if (!ed) { stat('Коснитесь стены'); return; }
+    if (!T.tA) { T.tA = ed.e; T.sel = { edge: ed.e }; stat(`Стена ${pname(ed.e.a)}–${pname(ed.e.b)}. Теперь коснитесь противоположной стены — между ними будет общий промер.`); draw(); renderTape(); return; }
+    const e1 = T.tA, e2 = ed.e; T.tA = null; T.sel = null; if (e1 === e2) { stat('Это та же стена — коснитесь противоположной.'); return; }
+    const A = PX(ptById(e1.a)), B = PX(ptById(e1.b)), C = PX(ptById(e2.a)), D = PX(ptById(e2.b)), u1 = Math.atan2(B[1] - A[1], B[0] - A[0]), u2 = Math.atan2(D[1] - C[1], D[0] - C[0]); let da = Math.abs(u1 - u2) % Math.PI; if (da > Math.PI / 2) da = Math.PI - da;
+    if (da > 10 * Math.PI / 180) { stat('Стены не параллельны (угол больше 10°) — общий промер берут между противоположными стенами.'); draw(); return; }
+    makePending({ type: 'thick', span: true, a: e1.a, b: e1.b, c: e2.a, d: e2.b, hint: 'расстояние стена — стена' }); return; }
   if (t === 'thick') {
     const ed = nearestEdge(w); if (!ed) { stat('Щёлкните по стене'); return; }
     if (!T.tA) { T.tA = ed.e; stat('Теперь щёлкните по противоположной стороне этой стены (в соседнем помещении)'); renderTape(); return; }
@@ -6061,7 +6086,7 @@ function insertBetween(arr, a, b, p, cyclic) {
   const n = arr.length;
   for (let i = 0; i < n - (cyclic ? 0 : 1); i++) { const x = arr[i], y = arr[(i + 1) % n]; if ((x === a && y === b) || (x === b && y === a)) { arr.splice(i + 1, 0, p); return; } }
 }
-function pendLabel(p) { if (p.label) return p.label; if (p.prom) return `промер ${pname(p.a)} → ${pname(p.b)}`; if (p.type === 'tie') return `привязка ↔ стена ${pname(p.a)}–${pname(p.b)}`; return p.type === 'thick' ? `толщины стены ${pname(p.a)}–${pname(p.b)} ↔ ${pname(p.c)}–${pname(p.d)}` : `${pname(p.a)} → ${pname(p.b)}`; }
+function pendLabel(p) { if (p.label) return p.label; if (p.prom) return `промер ${pname(p.a)} → ${pname(p.b)}`; if (p.type === 'tie') return `привязка ↔ стена ${pname(p.a)}–${pname(p.b)}`; return p.type === 'thick' && p.span ? `общий промер ${pname(p.a)}–${pname(p.b)} ↔ ${pname(p.c)}–${pname(p.d)}` : p.type === 'thick' ? `толщины стены ${pname(p.a)}–${pname(p.b)} ↔ ${pname(p.c)}–${pname(p.d)}` : `${pname(p.a)} → ${pname(p.b)}`; }
 function approxOf(p) { if (p.type === 'tie') { const g = tieGeom(p, PX); return g ? Math.hypot(g.q[0] - g.p[0], g.q[1] - g.p[1]) : null; } if (p.type !== 'dist') return null; const a = PX(ptById(p.a)), b = PX(ptById(p.b)); return Math.hypot(b[0] - a[0], b[1] - a[1]); }
 function tapeMove(w) {
   if (T.rotSel) { moveSelRot(w); return true; }
@@ -6303,7 +6328,11 @@ function drawTape() {
     const sk = stK(m); ctx.font = `bold ${11 * dpr * sk}px Golos Text, Segoe UI`; ctx.textAlign = 'center'; const tx = fm(m.v) + (bad ? ` (${m.res > 0 ? '+' : ''}${Math.round(m.res * 1000)} мм)` : ''); const tw = ctx.measureText(tx).width;
     ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fillRect(-tw / 2 - 3 * dpr, -17 * dpr * sk, tw + 6 * dpr, 14 * dpr * sk); ctx.fillStyle = bad || m.on === false ? col : stC(m, col); ctx.fillText(tx, 0, -6 * dpr * sk); ctx.restore(); ctx.textAlign = 'start';
   }
-  for (const m of M.meas) if (m.type === 'thick') {
+  for (const m of M.meas) if (m.type === 'thick' && m.span) { // общий промер: пунктир по перпендикуляру и число
+    const a = PX(ptById(m.a)), b = PX(ptById(m.b)), c = PX(ptById(m.c)), d = PX(ptById(m.d)), mc = [(c[0] + d[0]) / 2, (c[1] + d[1]) / 2], ux = b[0] - a[0], uy = b[1] - a[1], L2 = ux * ux + uy * uy || 1, t = ((mc[0] - a[0]) * ux + (mc[1] - a[1]) * uy) / L2, f = [a[0] + ux * t, a[1] + uy * t];
+    const S1 = W2S(...f), S2 = W2S(...mc), off = m.on === false; ctx.strokeStyle = off ? '#9aa3b2' : stC(m, '#1f6feb'); ctx.lineWidth = 1.5 * dpr; ctx.setLineDash([6 * dpr, 4 * dpr]); ctx.beginPath(); ctx.moveTo(...S1); ctx.lineTo(...S2); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = ctx.strokeStyle; ctx.font = `bold ${11 * dpr * stK(m)}px Golos Text, Segoe UI`; ctx.textAlign = 'center'; ctx.fillText('↔ ' + fm(m.v) + (m.res != null && Math.abs(m.res) > 0.003 ? ` (${m.res > 0 ? '+' : ''}${Math.round(m.res * 1000)})` : ''), (S1[0] + S2[0]) / 2, (S1[1] + S2[1]) / 2 - 4 * dpr); ctx.textAlign = 'start'; }
+  for (const m of M.meas) if (m.type === 'thick' && !m.span) {
     const a = PX(ptById(m.a)), b = PX(ptById(m.b)), c = PX(ptById(m.c)), d = PX(ptById(m.d));
     const [x, y] = W2S((a[0] + b[0] + c[0] + d[0]) / 4, (a[1] + b[1] + c[1] + d[1]) / 4);
     ctx.fillStyle = stC(m, '#c4372f'); ctx.font = `bold ${11 * dpr * stK(m)}px Golos Text, Segoe UI`; ctx.textAlign = 'center'; ctx.fillText('δ ' + fm(m.v), x, y); ctx.textAlign = 'start';
@@ -6382,12 +6411,13 @@ const TTOOLS = [['erase', 'Удалить (ластик)', 'коснитесь �
   Object.assign(f('open'), { 1: 'Дверь', 2: 'коснитесь отрезка стены — весь станет дверью; или двух точек — краёв проёма. Касание по двери: повернуть (4 положения) → пустой проём → стена' });
   TTOOLS.push(['fig', 'Фигуры', 'условные обозначения: колонна круглая / квадратная / прямоугольная, стояк, трап, вентшахта, оборудование, опора. Выберите фигуру, коснитесь места — введите диаметр или стороны; следующая такая же — тот же размер одним «✓ Принять». Затем касайтесь стен — привязки от края фигуры. Сменить фигуру — «Объекты ▸» → «Фигуры»']);
   TTOOLS.push(['gps', 'Исп GPS', 'точки съёмки GPS: коснитесь места пикета — введите его номер (как в приёмнике). Длины не спрашиваются. Следующая точка соединяется линией с предыдущей (касание последней точки ещё раз — разорвать линию). Касание существующей точки — сделать её пикетом. Потом в левой панели «📂 Загрузить PCO» — точки встанут по координатам, длины посчитаются сами']);
+  TTOOLS.push(['span', 'Общий промер', 'увязка: коснитесь стены, потом противоположной стены того же помещения — и замерьте расстояние между ними (по перпендикуляру). Невязка обхода разойдётся по всем замерам — углы сойдутся']);
   TTOOLS.push(['gap', 'Проём', 'проём без двери: коснитесь отрезка стены — весь станет проёмом; или двух точек — краёв проёма. Касание по проёму — снова стена']);
   TTOOLS.push(['window', 'Окно', 'коснитесь отрезка стены — весь станет окном; или двух точек — краёв окна. Касание по окну: пустой проём → стена']); }
 // колонка: частое — одним касанием; родственные инструменты — в группах (касание группы включает последний из неё и показывает выбор)
 const RAIL = ['walk', 'G:meas', 'thick', 'gps', '|', 'G:open', '|', 'rlab', 'G:obj', '|', 'G:note', '|', 'box', 'drag', 'select', 'erase'];
-const RGROUPS = { meas: { name: 'Промер', subs: ['meas', 'online'] }, open: { name: 'Проём', subs: ['open', 'gap', 'window'] }, obj: { name: 'Объекты', subs: ['hatch', 'fig', 'obj', 'room'] }, note: { name: 'Пометки', subs: ['note', 'photo', 'scan'] } };
-const RHINT = { meas: 'размер между двумя местами: точки, стены, пустое место', online: 'новая точка на стене (угол, откос) — делит стену', open: 'дверь: касание стены или двух точек', gap: 'проём без двери: касание стены или двух точек', window: 'окно: касание стены или двух точек', hatch: 'люк, приступок — прямоугольник с размерами и привязками', fig: 'колонна, вентшахта, стояк, трап… (условные)', obj: 'лестница, пандус, шахта — по углам', room: 'контур помещения по точкам', note: 'выноска: стрелка и текст', photo: 'место и направление фото', scan: 'станция сканера' };
+const RGROUPS = { meas: { name: 'Промер', subs: ['meas', 'span', 'online'] }, open: { name: 'Проём', subs: ['open', 'gap', 'window'] }, obj: { name: 'Объекты', subs: ['hatch', 'fig', 'obj', 'room'] }, note: { name: 'Пометки', subs: ['note', 'photo', 'scan'] } };
+const RHINT = { meas: 'размер между двумя местами: точки, стены, пустое место', online: 'новая точка на стене (угол, откос) — делит стену', span: 'общий промер стена — стена: увязать невязку обхода', open: 'дверь: касание стены или двух точек', gap: 'проём без двери: касание стены или двух точек', window: 'окно: касание стены или двух точек', hatch: 'люк, приступок — прямоугольник с размерами и привязками', fig: 'колонна, вентшахта, стояк, трап… (условные)', obj: 'лестница, пандус, шахта — по углам', room: 'контур помещения по точкам', note: 'выноска: стрелка и текст', photo: 'место и направление фото', scan: 'станция сканера' };
 function closeFly() { const f = document.getElementById('tfly'); if (f) f.remove(); document.removeEventListener('pointerdown', flyOut, true); }
 function flyOut(e) { const f = document.getElementById('tfly'); if (!f) { document.removeEventListener('pointerdown', flyOut, true); return; } if (f.contains(e.target) || (e.target.closest && e.target.closest('#trail [data-tg]'))) return; closeFly(); }
 const TORDER = ['walk', 'meas', 'online', 'thick', 'gps', '|', 'open', 'window', '|', 'room', 'rlab', 'hatch', 'fig', 'obj', '|', 'note', 'photo', 'scan', '|', 'box', 'drag', 'select', 'erase'];
@@ -6400,8 +6430,8 @@ function renderTape() {
   const R = T.result || {};
   const rows = M.meas.filter(m => m.type !== 'line' && m.type !== 'angle' && m.type !== 'right').slice().reverse();
   const warn = m => Math.abs(m.res || 0) > 0.015 ? 'bad' : Math.abs(m.res || 0) > 0.005 ? 'warn' : 'ok';
-  const TICON = { walk: '⬠', meas: '⟷', online: '⊸', open: '🚪', gap: '▯', window: '🪟', thick: '▥', room: '▢', obj: '◆', hatch: '⊠', fig: '◉', gps: '🛰', note: '💬', photo: '📷', scan: '◬', rlab: '№', box: '⬚', drag: '✥', select: '✎' };
-  const TSHORT = { walk: 'Обход', meas: 'Промер', online: 'На стене', open: 'Дверь', gap: 'Проём', window: 'Окно', thick: 'Толщина', room: 'Помещ.', obj: 'Объект', hatch: 'Люк', fig: 'Фигуры', gps: 'Исп GPS', note: 'Выноска', photo: 'Фото', scan: 'Скан', rlab: '№ пом.', box: 'Выделить', drag: 'Двигать', select: 'Правка' };
+  const TICON = { walk: '⬠', meas: '⟷', span: '⇹', online: '⊸', open: '🚪', gap: '▯', window: '🪟', thick: '▥', room: '▢', obj: '◆', hatch: '⊠', fig: '◉', gps: '🛰', note: '💬', photo: '📷', scan: '◬', rlab: '№', box: '⬚', drag: '✥', select: '✎' };
+  const TSHORT = { walk: 'Обход', meas: 'Промер', span: 'Общий', online: 'На стене', open: 'Дверь', gap: 'Проём', window: 'Окно', thick: 'Толщина', room: 'Помещ.', obj: 'Объект', hatch: 'Люк', fig: 'Фигуры', gps: 'Исп GPS', note: 'Выноска', photo: 'Фото', scan: 'Скан', rlab: '№ пом.', box: 'Выделить', drag: 'Двигать', select: 'Правка' };
   // панель инструментов на чертеже — всегда под рукой
   let rail = document.getElementById('trail'); if (!rail) { rail = document.createElement('div'); rail.id = 'trail'; $('#main').appendChild(rail); }
   const gCur = g => { const G = RGROUPS[g]; if (G.subs.includes(T.tool)) return T.tool; let l = null; try { l = localStorage.getItem('rul_g_' + g); } catch (e) { } return G.subs.includes(l) ? l : G.subs[0]; };
@@ -6459,7 +6489,7 @@ function renderTape() {
   <details><summary>Помещения и замеры (${M.rooms.length} / ${M.meas.filter(m => m.type !== 'line' && m.type !== 'angle' && m.type !== 'right').length}) · невязка <b class="${(R.maxR || 0) > 0.015 ? 'bad' : (R.maxR || 0) > 0.005 ? 'warn' : 'ok'}">${Math.round((R.maxR || 0) * 1000)} мм</b></summary>
   <div class="row" style="margin:4px 0"><button id="rFind" title="Каждый замкнутый контур стен станет помещением с площадью">▢ Найти замкнутые контуры</button></div>
   ${M.rooms.map(Rm => { const i = TAPE.roomInfo(M, Rm); return `<div class="item" data-room="${Rm.num}"><input type="text" value="${escH(Rm.name)}" data-rn="${Rm.num}" style="width:120px">${Rm.num}<button data-rlb="${Rm.num}" title="Показывать площадь на чертеже" style="padding:1px 6px" class="${Rm.hideLbl ? '' : 'on'}">м²</button><span class="q ${i.diags < i.need ? 'warn' : 'ok'}">${SHEET.fmtArea(i.area)} м² · стороны ${i.sides}/${i.k} · диаг. ${i.diags}${i.diags < i.need ? ' (нужно ' + i.need + ')' : ''}</span></div>`; }).join('')}
-  <div class="list" style="margin-top:6px">${rows.map(m => `<div class="item"><input type="checkbox" data-mon="${m.id}" ${m.on !== false ? 'checked' : ''}><span>${m.type === 'tie' ? 'люк ↔ ' : m.type === 'thick' ? 'δ ' : ''}${pname(m.a)}–${pname(m.type === 'thick' ? m.c : m.b)}</span><input type="text" data-mv="${m.id}" value="${fm(m.v)}" style="width:72px"><span class="q ${warn(m)}">${m.res != null ? (m.res > 0 ? '+' : '') + Math.round(m.res * 1000) + ' мм' : ''}</span><button data-mdel="${m.id}" style="padding:1px 6px">×</button></div>`).join('') || '<div class="hint" style="padding:6px">Замеров пока нет</div>'}</div>
+  <div class="list" style="margin-top:6px">${rows.map(m => `<div class="item"><input type="checkbox" data-mon="${m.id}" ${m.on !== false ? 'checked' : ''}><span>${m.type === 'tie' ? 'люк ↔ ' : m.type === 'thick' ? (m.span ? '↔ ' : 'δ ') : ''}${pname(m.a)}–${pname(m.type === 'thick' ? m.c : m.b)}</span><input type="text" data-mv="${m.id}" value="${fm(m.v)}" style="width:72px"><span class="q ${warn(m)}">${m.res != null ? (m.res > 0 ? '+' : '') + Math.round(m.res * 1000) + ' мм' : ''}</span><button data-mdel="${m.id}" style="padding:1px 6px">×</button></div>`).join('') || '<div class="hint" style="padding:6px">Замеров пока нет</div>'}</div>
   </details>
   <div class="row" style="display:none"><button id="tUndo"></button><button id="tRedo"></button></div>`;
   { const rf = $('#rFind'); if (rf) rf.onclick = () => { tPush(); const r = findRooms(); draw(); renderTape(); stat(r.n ? `Найдено помещений: ${r.n} — площадь на чертеже.${r.joined ? ` Соединено почти совпавших концов стен: ${r.joined}.` : ''}` : 'Замкнутых контуров нет — проверьте, что последняя стена доведена до первой точки.'); }; }
@@ -6501,7 +6531,7 @@ function renderTape() {
     el.querySelectorAll('[data-fs]').forEach(x => x.onclick = e => { e.stopPropagation(); closeFly(); pick(x.dataset.fs, true); });
     setTimeout(() => document.addEventListener('pointerdown', flyOut, true), 0); }
   $('#tUndo').onclick = tUndo; $('#tRedo').onclick = tRedo;
-  $('#orth').onchange = e => { M.ortho = e.target.checked; adjust(); renderTape(); };
+  $('#orth').onchange = e => { M.ortho = e.target.checked; if (!M.ortho) M.sqStrict = false; adjust(); renderTape(); };
   document.querySelectorAll('[data-pdfsz]').forEach(b => b.onclick = () => { try { localStorage.setItem('rul_pdfsz', b.dataset.pdfsz); } catch (e) { } if (S.sheetOpt) { S.sheetOpt.pdfSz = b.dataset.pdfsz; try { asSoon(); } catch (e) { } } stat('Подписи в PDF: ' + PDFSZ[b.dataset.pdfsz].t.toLowerCase() + '.'); renderTape(); });
   side.querySelectorAll('[data-mon]').forEach(c => c.onchange = () => { const m = M.meas.find(x => x.id === +c.dataset.mon); tPush(); m.on = c.checked; adjust(); renderTape(); });
   side.querySelectorAll('[data-mv]').forEach(c => c.onchange = () => { const m = M.meas.find(x => x.id === +c.dataset.mv); const v = parseManual(c.value); if (v) { tPush(); m.v = v; adjust(); } renderTape(); });
@@ -6660,7 +6690,7 @@ async function exportOverlayPdf(opt = {}) {
       const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, nx = -(b[1] - a[1]) / L * lw * 3, ny = (b[0] - a[0]) / L * lw * 3;
       for (const z of [a, b]) page.drawLine({ start: { x: z[0] - nx, y: z[1] - ny }, end: { x: z[0] + nx, y: z[1] + ny }, thickness: lw * 0.8, color: RED });
       DL.push({ pr: 2, L, a, b, s: fm(m.v), size: fs * 0.85 * stK(m), col: sc(m, RED) }); }
-    for (const m of M.meas) if (m.type === 'thick' && m.on !== false) { const q = [m.a, m.b, m.c, m.d].map(id => P2(ptById(id))); DL.push({ pr: 4, p: [(q[0][0] + q[1][0] + q[2][0] + q[3][0]) / 4, (q[0][1] + q[1][1] + q[2][1] + q[3][1]) / 4], s: 'δ ' + fm(m.v), size: fs * 0.85 * stK(m), col: sc(m, RED) }); }
+    for (const m of M.meas) if (m.type === 'thick' && !m.span && m.on !== false) { const q = [m.a, m.b, m.c, m.d].map(id => P2(ptById(id))); DL.push({ pr: 4, p: [(q[0][0] + q[1][0] + q[2][0] + q[3][0]) / 4, (q[0][1] + q[1][1] + q[2][1] + q[3][1]) / 4], s: 'δ ' + fm(m.v), size: fs * 0.85 * stK(m), col: sc(m, RED) }); }
     for (const m of M.meas) if (m.type === 'angle' && m.on !== false) { const q = P2(ptById(m.b)); DL.push({ pr: 5, p: q, s: '∠' + fdeg(m.v), size: fs * 0.85 * stK(m), col: sc(m, VIO) }); }
     // помещения
     for (const R of M.rooms) { const pts = R.ids.map(ptById).filter(Boolean).map(P2); if (pts.length < 3) continue; const c = toPt(...(R.lp || roomLabelAt(R)));
@@ -6765,7 +6795,7 @@ function tapePlan() {
     if (e.open) openings.push({ dir: 2, x1: a[0], y1: a[1], x2: b[0], y2: b[1] });
     else segs.push({ dir: 2, x1: a[0], y1: a[1], x2: b[0], y2: b[1] });
   }
-  for (const m of M.meas) if (m.type === 'thick' && m.on !== false) {
+  for (const m of M.meas) if (m.type === 'thick' && !m.span && m.on !== false) {
     const a = PR(ptById(m.a)), b = PR(ptById(m.b)), c = PR(ptById(m.c)), d = PR(ptById(m.d));
     let rot = Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI; if (rot > 90) rot -= 180; if (rot <= -90) rot += 180;
     walls.push({ p: [(a[0] + b[0] + c[0] + d[0]) / 4, (a[1] + b[1] + c[1] + d[1]) / 4], t: m.v, rot });
