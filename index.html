@@ -288,7 +288,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 8.0 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 8.1 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -2173,7 +2173,7 @@ const TAPE = (() => {
         const tgts = [Math.PI / 2, Math.PI, 1.5 * Math.PI];
         const tol = (opt.angTol || M.orthoTol || 15) * Math.PI / 180; let best = null; for (const t of tgts) if (Math.abs(r.f - t) < tol) best = t;
         if (best === null) continue;
-        const dv = Math.abs(best - r.f), sgA = M.sigAng || (dv < 3 * Math.PI / 180 ? (M.sqStrict ? 0.01 : 0.3) * Math.PI / 180 : SIG.angle); add(r.J, best - r.f, 1 / (sgA ** 2));
+        const dv = Math.abs(best - r.f), sgA = M.sigAng || (dv < 3 * Math.PI / 180 ? (M.sqStrict || (ptById(b) || {}).sq ? 0.01 : 0.3) * Math.PI / 180 : SIG.angle); add(r.J, best - r.f, 1 / (sgA ** 2));
       }
       // solve A dx = g (Cholesky with tiny damping)
       for (let i = 0; i < N; i++) A[i * N + i] += 1e-9;
@@ -5120,10 +5120,10 @@ function snap90(prevId, w) {
 // «Выровнять 90°» по замерам: каждая стена — строго по оси или поперёк (как идёт сейчас, с точностью до 45°), длина — замер.
 // Положение точек — уравнивание (МНК) отдельно по двум осям: невязка обхода (не сошлось по X/Y) разносится по стенам пропорционально длине,
 // общие промеры стена—стена тоже участвуют. Углы после этого прямые, а не «гуляют», чтобы спрятать невязку.
-function straighten() {
-  if (M.pts.length < 3) return; tPush();
+function straighten(sel = null) { // sel — набор id точек: выровнять только этот участок, остальное — на месте
+  if (M.pts.length < 3) return; if (sel && !sel.size) sel = null; tPush();
   const ax = M.axis || 0, ca = Math.cos(ax), sa = Math.sin(ax), toL = q => [ca * q[0] + sa * q[1], -sa * q[0] + ca * q[1]], toW = q => [ca * q[0] - sa * q[1], sa * q[0] + ca * q[1]];
-  const E = M.edges.filter(e => !e.obj && ptById(e.a) && ptById(e.b)), ids = [...new Set(E.flatMap(e => [e.a, e.b]))], ix = new Map(ids.map((id, k) => [id, k])), n = ids.length; if (n < 2) return;
+  const E = M.edges.filter(e => !e.obj && ptById(e.a) && ptById(e.b) && (!sel || sel.has(e.a) || sel.has(e.b))), ids = [...new Set(E.flatMap(e => [e.a, e.b]))], ix = new Map(ids.map((id, k) => [id, k])), n = ids.length; if (n < 2) return;
   const cur = ids.map(id => toL(PX(ptById(id))));
   const sys = [0, 1].map(() => ({ A: new Float64Array(n * n), b: new Float64Array(n) }));
   const addE = (ax2, i, j, val, sig) => { const S2 = sys[ax2], w = 1 / (sig * sig); S2.A[i * n + i] += w; S2.A[j * n + j] += w; S2.A[i * n + j] -= w; S2.A[j * n + i] -= w; S2.b[j] += w * val; S2.b[i] -= w * val; }; // x_j − x_i = val
@@ -5138,10 +5138,13 @@ function straighten() {
   for (const m of M.meas) if (m.type === 'thick' && m.on !== false && [m.a, m.b, m.c, m.d].every(id => ix.has(id))) { // общий промер / толщина: расстояние между параллельными стенами
     const a = cur[ix.get(m.a)], b = cur[ix.get(m.b)], horiz = Math.abs(b[0] - a[0]) >= Math.abs(b[1] - a[1]), k = horiz ? 1 : 0;
     for (const c of [m.c, m.d]) { const cc = cur[ix.get(c)][k] - a[k]; addE(k, ix.get(m.a), ix.get(c), Math.sign(cc || 1) * m.v, 0.002); } }
-  for (let k = 0; k < n; k++) for (const ax2 of [0, 1]) { const w = k === 0 ? 1e6 : 1e-6; sys[ax2].A[k * n + k] += w; sys[ax2].b[k] += w * cur[k][ax2]; } // первая точка — на месте
+  const anchor = sel ? ids.some(id => !sel.has(id)) : false;
+  for (let k = 0; k < n; k++) for (const ax2 of [0, 1]) { const w = (sel && anchor ? !sel.has(ids[k]) : k === 0) ? 1e6 : 1e-6; sys[ax2].A[k * n + k] += w; sys[ax2].b[k] += w * cur[k][ax2]; } // первая точка — на месте
   const sol = sys.map(S2 => { const A = S2.A, x = S2.b.slice(); for (let c = 0; c < n; c++) { let p0 = c; for (let r = c + 1; r < n; r++) if (Math.abs(A[r * n + c]) > Math.abs(A[p0 * n + c])) p0 = r; if (p0 !== c) { for (let q = 0; q < n; q++) { const t = A[c * n + q]; A[c * n + q] = A[p0 * n + q]; A[p0 * n + q] = t; } const t = x[c]; x[c] = x[p0]; x[p0] = t; } const dd = A[c * n + c]; if (Math.abs(dd) < 1e-18) continue; for (let r = c + 1; r < n; r++) { const f = A[r * n + c] / dd; if (!f) continue; for (let q = c; q < n; q++) A[r * n + q] -= f * A[c * n + q]; x[r] -= f * x[c]; } } for (let r = n - 1; r >= 0; r--) { let sm = x[r]; for (let q = r + 1; q < n; q++) sm -= A[r * n + q] * x[q]; x[r] = sm / (A[r * n + r] || 1); } return x; });
   let mx = 0, mxE = null; for (const st of stats) { if (!st.m || st.m.on === false) continue; const got = (st.horiz ? sol[0][st.j] - sol[0][st.i] : sol[1][st.j] - sol[1][st.i]) * st.sg, r = Math.abs(got - st.L); if (r > mx) { mx = r; mxE = st.e; } }
   for (const id of ids) { const k = ix.get(id), q = toW([sol[0][k], sol[1][k]]), p = ptById(id); p.x0 = q[0]; p.y0 = q[1]; p.x = q[0]; p.y = q[1]; }
+  if (sel) { for (const id of ids) if (sel.has(id)) ptById(id).sq = true; adjust(); draw(); renderTape(); try { showSelBox(); } catch (e) { }
+    stat(`Выровнен выделенный участок: ${sel.size} точек, стены — по осям, длины — по замерам${anchor ? ', соседние стены остались на месте' : ''}. Наибольшая поправка ${Math.round(mx * 1000)} мм${mxE ? ` (${pname(mxE.a)}–${pname(mxE.b)})` : ''}. Отменить — ↶.`); return; }
   M.sqStrict = true; adjust(); draw(); renderTape();
   stat(`Выровнено по замерам: все стены — строго по осям, длины — замеры. Невязка обхода разнесена по стенам: наибольшая поправка ${Math.round(mx * 1000)} мм${mxE ? ` (${pname(mxE.a)}–${pname(mxE.b)})` : ''}${mx > 3 * TOL() ? ' — много, проверьте этот замер' : ''}.${skew ? ` Стен, стоявших косо больше 20° (тоже выпрямлены): ${skew} — если это настоящий скос, «↶ Отменить».` : ''}${stray.length ? ` Косые линии без замера: ${stray.map(e => pname(e.a) + '–' + pname(e.b)).join(', ')} — похоже на лишнюю стену (замыкание напрямик), удалите её.` : ''} Не то — «↶ Отменить».`);
 }
@@ -5331,6 +5334,7 @@ function showSelBox() {
       <div class="row"><button id="sbShow">Показать</button><button id="sbRe">↻ Перемерить</button><button id="sbOff">Не учитывать этот замер</button></div>` : ''}
     <div class="row">${list.length ? `<button class="pri" id="sbAdj" ${cls === 'bad' ? '' : ''}>✓ Уравнять${cls === 'bad' ? ' всё равно' : ''}</button>` : ''}<button id="sbKeep">Оставить как есть</button><button id="sbAll">Выделить всё</button></div>
     ${T.selSet.size === 2 ? `<div class="row"><button id="sbPath">↔ Весь участок ${pname([...T.selSet][0])} → ${pname([...T.selSet][1])}</button>${chainPath([...T.selSet][0], [...T.selSet][1]) && chainPath([...T.selSet][0], [...T.selSet][1]).closed ? '<button id="sbPath2">↔ другой стороной</button>' : ''}</div>` : ''}
+    <div class="row"><button id="sbSq" class="pri" title="Стены выделенного участка — строго по осям, под 90°, длины — по замерам; остальной план не двигается">▦ Выровнять 90° выделенное</button></div>
     <div class="row"><button id="sbPin">📌 Править только выделенное</button>${M.pts.some(p => p.fixed === 'sel') ? '<button id="sbUnpin">Открепить всё</button>' : ''}</div>
     <div class="row sb-rot"><span>Повернуть:</span><button data-r="5">⟲ 5°</button><button data-r="0.5">⟲ 0,5°</button><button data-r="-0.5">⟳ 0,5°</button><button data-r="-5">⟳ 5°</button><button data-r="-90">⟳ 90°</button><button id="sbAng">∠ на угол…</button></div><div class="sb-v" style="margin-top:2px">Или тяните кружок ↻ над рамкой — поворот на любой угол.</div>
     <div class="row"><button id="sbDel" class="danger">🗑 Удалить</button><button id="sbCopy">⧉ Копировать</button><button id="sbCut">✂ Вырезать</button></div>`;
@@ -5340,6 +5344,7 @@ function showSelBox() {
   q('#sbDel').onclick = () => selDelete(); q('#sbCopy').onclick = () => selCopy(false); q('#sbCut').onclick = () => selCopy(true);
   const pth = other => { const [a, b] = [...T.selSet], r = chainPath(a, b, other); if (!r) { stat('Между этими точками нет обхода или стен.'); return; } selectPts(r.ids); stat(`Выделен участок ${pname(a)} → ${pname(b)}: точек ${r.ids.length}. «📌 Править только выделенное» — остальное не сдвинется.`); };
   if (q('#sbPath')) q('#sbPath').onclick = () => pth(false); if (q('#sbPath2')) q('#sbPath2').onclick = () => pth(true);
+  q('#sbSq').onclick = () => straighten(new Set(T.selSet));
   q('#sbPin').onclick = pinOthers; if (q('#sbUnpin')) q('#sbUnpin').onclick = unpinAll;
   el.querySelectorAll('[data-r]').forEach(bn => bn.onclick = () => rotateSel(+bn.dataset.r));
   q('#sbAng').onclick = async () => { const v = await uiAsk('Повернуть на угол, градусы (плюс — против часовой, минус — по часовой):', ''); if (v == null) return; const d = parseFloat(String(v).replace(',', '.')); if (!isFinite(d) || !d) return; rotateSel(d); };
@@ -6507,7 +6512,7 @@ function renderTape() {
   const be = $('#bEnd'); if (be) be.onclick = endChain;
   if (T.tool === 'gps') gpsPanelBind();
   const bo = $('#bOvPdf'); if (bo) bo.onclick = exportOverlayPdf;
-  const bs = $('#bStr'); if (bs) bs.onclick = straighten;
+  const bs = $('#bStr'); if (bs) bs.onclick = () => straighten(T.selSet && T.selSet.size > 1 ? new Set(T.selSet) : null);
   const bsa = $('#bSelAll'); if (bsa) bsa.onclick = () => selectPts(M.pts.map(p => p.id));
   const setCond = v => { M.cond = v; adjust(); draw(); renderTape(); };
   $('#mFact').onclick = () => setCond(false); $('#mCond').onclick = () => setCond(true);
@@ -6531,7 +6536,7 @@ function renderTape() {
     el.querySelectorAll('[data-fs]').forEach(x => x.onclick = e => { e.stopPropagation(); closeFly(); pick(x.dataset.fs, true); });
     setTimeout(() => document.addEventListener('pointerdown', flyOut, true), 0); }
   $('#tUndo').onclick = tUndo; $('#tRedo').onclick = tRedo;
-  $('#orth').onchange = e => { M.ortho = e.target.checked; if (!M.ortho) M.sqStrict = false; adjust(); renderTape(); };
+  $('#orth').onchange = e => { M.ortho = e.target.checked; if (!M.ortho) { M.sqStrict = false; M.pts.forEach(p => delete p.sq); } adjust(); renderTape(); };
   document.querySelectorAll('[data-pdfsz]').forEach(b => b.onclick = () => { try { localStorage.setItem('rul_pdfsz', b.dataset.pdfsz); } catch (e) { } if (S.sheetOpt) { S.sheetOpt.pdfSz = b.dataset.pdfsz; try { asSoon(); } catch (e) { } } stat('Подписи в PDF: ' + PDFSZ[b.dataset.pdfsz].t.toLowerCase() + '.'); renderTape(); });
   side.querySelectorAll('[data-mon]').forEach(c => c.onchange = () => { const m = M.meas.find(x => x.id === +c.dataset.mon); tPush(); m.on = c.checked; adjust(); renderTape(); });
   side.querySelectorAll('[data-mv]').forEach(c => c.onchange = () => { const m = M.meas.find(x => x.id === +c.dataset.mv); const v = parseManual(c.value); if (v) { tPush(); m.v = v; adjust(); } renderTape(); });
