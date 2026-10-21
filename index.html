@@ -288,7 +288,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 8.3 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 8.4 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -4902,9 +4902,10 @@ function setAngle(id) {
   });
 }
 // ---------- объекты: лестница, пандус, шахта, колонна, приямок, подпись ----------
-const OBJT = { stair: 'Лестница', ramp: 'Пандус', shaft: 'Шахта', column: 'Колонна', pit: 'Приямок', hatch: 'Люк', note: 'Подпись' };
+const OBJT = { sill: 'Подоконник', stair: 'Лестница', ramp: 'Пандус', shaft: 'Шахта', column: 'Колонна', pit: 'Приямок', hatch: 'Люк', note: 'Подпись' };
 function objLabel(o) {
   if (o.type === 'fig') return figLabel(o);
+  if (o.type === 'sill') { const a = distMeas(o.ids[0], o.ids[1]), b = distMeas(o.ids[0], o.ids[3]); return (o.text || 'Подок.') + (a && b ? ' ' + fm(a.v) + '×' + fm(b.v) : ''); }
   if (o.type === 'hatch') { const a = distMeas(o.ids[0], o.ids[1]), b = distMeas(o.ids[1], o.ids[2]); return (o.text || 'Люк') + (a && b ? ' ' + fm(a.v) + '×' + fm(b.v) : ''); }
   if (o.text) return o.text;
   if (o.type === 'stair') return 'Лестница' + (o.steps ? ', ' + o.steps + ' ст.' : '');
@@ -4944,7 +4945,8 @@ function objGeom(o, PXf) { // всё в метрах модели: lines [[a,b,w
   else if (o.type === 'shaft') { if (nn === 4) { add(poly[0], poly[2], 0.18); add(poly[1], poly[3], 0.18); } else hatch(Math.PI / 4, Math.max(depth / 6, 0.05)); }
   else if (o.type === 'column') hatch(Math.PI / 4, Math.max(Math.min(depth, bl) / 8, 0.03));
   else if (o.type === 'pit') hatch(Math.PI / 4, Math.max(depth / 5, 0.1));
-  const lp = o.type === 'hatch' ? [c[0], Math.max(...poly.map(q => q[1])) + 0.22] : c;
+  if (o.type === 'sill' && nn === 4) add(poly[3], poly[2], 0.5); // лицевая кромка подоконника
+  const lp = o.type === 'hatch' ? [c[0], Math.max(...poly.map(q => q[1])) + 0.22] : o.type === 'sill' ? [c[0] + n[0] * (depth / 2 + 0.16), c[1] + n[1] * (depth / 2 + 0.16)] : c;
   return { lines: L, dots, arrow, label: { p: lp, s: objLabel(o) }, poly, u, n, depth };
 }
 function tieGeom(m, PXf) {
@@ -4961,6 +4963,35 @@ function promPoint(w) {
   const q = addPoint(w); q.free = true; adjust(); return q;
 }
 function nearestWall(w, px = 14) { let best = null, bd = px * HITK() / S.view.s, bt = 0; for (const e of M.edges) { if (e.obj) continue; const A = ptById(e.a), B = ptById(e.b); if (!A || !B) continue; const [d, t] = distSeg(w, PX(A), PX(B)); if (d < bd) { bd = d; best = e; bt = t; } } return best ? { e: best, t: bt } : null; }
+// ---------- подоконник: длина вдоль стены, привязка к углу стены, глубина в помещение ----------
+function wallCorner(e, fromId) { // идём от конца стены дальше по той же прямой до угла
+  let prev = fromId === e.a ? e.b : e.a, cur = fromId, guard = 0; const P = id => PX(ptById(id));
+  while (guard++ < 50) { const a = P(prev), c = P(cur), L = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1, d = [(c[0] - a[0]) / L, (c[1] - a[1]) / L];
+    const nx = M.edges.filter(x => !x.obj && (x.a === cur || x.b === cur) && (x.a !== prev && x.b !== prev)).map(x => x.a === cur ? x.b : x.a).filter(id => { const q = P(id), l = Math.hypot(q[0] - c[0], q[1] - c[1]) || 1; return ((q[0] - c[0]) * d[0] + (q[1] - c[1]) * d[1]) / l > Math.cos(5 * Math.PI / 180); });
+    if (nx.length !== 1) return cur; prev = cur; cur = nx[0]; }
+  return cur; }
+function createSill(w) {
+  const ed = nearestWall(w, 18); if (!ed) { stat('Подоконник: коснитесь стены с окном — со стороны помещения, у того края, от которого будете привязывать.'); return; }
+  tPush(); const e = ed.e, A = PX(ptById(e.a)), B = PX(ptById(e.b)), L = Math.hypot(B[0] - A[0], B[1] - A[1]) || 1, u = [(B[0] - A[0]) / L, (B[1] - A[1]) / L];
+  let n = [-u[1], u[0]]; { const sd = (w[0] - A[0]) * n[0] + (w[1] - A[1]) * n[1]; let flip = sd < 0;
+    if (Math.abs(sd) < 0.02) { const R = roomWith(e.a, e.b); if (R) { const C = R.ids.map(id => PX(ptById(id))), cx = C.reduce((s, q) => s + q[0], 0) / C.length, cy = C.reduce((s, q) => s + q[1], 0) / C.length; flip = (cx - A[0]) * n[0] + (cy - A[1]) * n[1] < 0; } }
+    if (flip) n = [-n[0], -n[1]]; }
+  const near = ed.t < 0.5 ? e.a : e.b, corner = wallCorner(e, near), Cp = PX(ptById(corner)), alongC = (Cp[0] - A[0]) * u[0] + (Cp[1] - A[1]) * u[1], sg = alongC <= ed.t * L ? 1 : -1; // от угла — в сторону касания
+  let s1, len; if (e.open && e.kind === 'window') { s1 = 0; len = L; } else { len = 1.0; s1 = ed.t * L - len / 2; }
+  let t0 = Math.min(s1, s1 + len), t1 = Math.max(s1, s1 + len); if (sg < 0) [t0, t1] = [t1, t0];
+  const dep = M.sillDep || 0.3, at = (t, k) => [A[0] + u[0] * t + n[0] * k, A[1] + u[1] * t + n[1] * k];
+  const P = [at(t0, 0), at(t1, 0), at(t1, dep), at(t0, dep)].map(q => { const p = addPoint(q); p.x = q[0]; p.y = q[1]; p.soft = true; return p.id; });
+  for (let i = 0; i < 4; i++) M.edges.push({ a: P[i], b: P[(i + 1) % 4] });
+  for (const id of [P[0], P[1]]) M.meas.push({ id: M.nextMeas++, type: 'line', a: e.a, b: e.b, p: id, on: true });
+  for (let i = 1; i < 4; i++) M.meas.push({ id: M.nextMeas++, type: 'right', a: P[i - 1], b: P[i], c: P[(i + 1) % 4], on: true });
+  const o = { id: (M.objs || []).reduce((m, x) => Math.max(m, x.id), 0) + 1, type: 'sill', ids: P, base: 0 };
+  (M.objs = M.objs || []).push(o); markObjEdges(); adjust(); draw(); renderTape();
+  const depth2 = () => { const m = distMeas(P[0], P[3]); if (m && !distMeas(P[1], P[2])) M.meas.push({ id: M.nextMeas++, type: 'dist', a: P[1], b: P[2], v: m.v, on: true, auto: true }); if (m) M.sillDep = m.v; adjust(); draw(); renderTape(); stat(`Подоконник готов${m ? ': ' + objLabel(o).replace('Подок.', '').trim() : ''}. Следующий — коснитесь другой стены. Поправить — долгое нажатие на подоконник.`); };
+  makePending({ type: 'dist', a: P[0], b: P[1], label: 'Подоконник — длина', after: () => {
+    if (corner !== P[0]) makePending({ type: 'dist', a: corner, b: P[0], label: `Подоконник — от угла ${pname(corner)}`, after: () => makePending({ type: 'dist', a: P[0], b: P[3], label: 'Подоконник — глубина', after: depth2 }) });
+    else makePending({ type: 'dist', a: P[0], b: P[3], label: 'Подоконник — глубина', after: depth2 }); } });
+  stat(`Подоконник у стены ${pname(e.a)}–${pname(e.b)}: замерьте длину, затем расстояние от угла ${pname(corner)} и глубину (DISTO или вручную).`);
+}
 function createHatch(w) {
   tPush(); let ang = M.axis || 0, bd = 6;
   for (const e of M.edges) { if (e.obj) continue; const A = ptById(e.a), B = ptById(e.b); if (!A || !B) continue; const a = PX(A), b = PX(B), [d] = distSeg(w, a, b); if (d < bd) { bd = d; ang = Math.atan2(b[1] - a[1], b[0] - a[0]); } }
@@ -6163,6 +6194,7 @@ function tapeDown(e, w) {
     uiAsk('Текст выноски (« / » — новая строка):', '').then(v => { if (!v || !v.trim()) { draw(); renderTape(); return; } tPush(); zoomNote(); n.text = v.trim(); (M.notes = M.notes || []).push(n); draw(); renderTape(); stat('Выноска добавлена. Долгое нажатие на неё — изменить или удалить; пальцем — передвинуть.'); });
     return;
   }
+  if (t === 'sill') { createSill(w); return; }
   if (t === 'hatch') {
     const inH = objAt(w);
     if (inH && inH.type === 'hatch') { T.hatch = inH.id; stat('Люк выбран. Коснитесь стены, к которой привязать его (сколько нужно стен).'); draw(); renderTape(); return; }
@@ -6525,14 +6557,15 @@ const TTOOLS = [['erase', 'Удалить (ластик)', 'коснитесь �
   TTOOLS.push(['gps', 'Исп GPS', 'точки съёмки GPS: коснитесь места пикета — введите его номер (как в приёмнике). Длины не спрашиваются. Следующая точка соединяется линией с предыдущей (касание последней точки ещё раз — разорвать линию). Касание существующей точки — сделать её пикетом. Потом в левой панели «📂 Загрузить PCO» — точки встанут по координатам, длины посчитаются сами']);
   TTOOLS.push(['span', 'Общий промер', 'увязка: коснитесь стены, потом противоположной стены того же помещения — и замерьте расстояние между ними (по перпендикуляру). Невязка обхода разойдётся по всем замерам — углы сойдутся']);
   TTOOLS.push(['gap', 'Проём', 'проём без двери: коснитесь отрезка стены — весь станет проёмом; или двух точек — краёв проёма. Касание по проёму — снова стена']);
+  TTOOLS.push(['sill', 'Подоконник', 'коснитесь стены с окном со стороны помещения (у того края, от которого привязываете) — затем замерьте длину подоконника, расстояние от угла стены и глубину. Подоконник нарисуется прямоугольником с размерами']);
   TTOOLS.push(['window', 'Окно', 'коснитесь отрезка стены — весь станет окном; или двух точек — краёв окна. Касание по окну: пустой проём → стена']); }
 // колонка: частое — одним касанием; родственные инструменты — в группах (касание группы включает последний из неё и показывает выбор)
 const RAIL = ['walk', 'G:meas', 'G:open', 'G:note', 'G:obj', '|', 'G:edit', 'check', 'erase']; // мерить · отметить · поправить и проверить
-const RGROUPS = { meas: { name: 'Промер', subs: ['meas', 'span', 'online', 'thick'] }, open: { name: 'Проём', subs: ['open', 'gap', 'window'] }, note: { name: 'Фото / скан', subs: ['photo', 'scan', 'rlab', 'note'] }, obj: { name: 'Ещё', subs: ['hatch', 'fig', 'obj', 'room', 'gps'] }, edit: { name: 'Правка', subs: ['select', 'drag', 'box'] } };
-const RHINT = { thick: 'толщина стены между соседними помещениями', gps: 'исполнительная съёмка: пикеты GPS по номерам', rlab: 'номер и название помещения', select: 'коснитесь точки, стены, размера — меню: перемерить, изменить, отвязать, удалить', drag: 'тащите точку или стену пальцем', box: 'рамка пальцем — выделить участок: выровнять 90°, повернуть, проверить', meas: 'размер между двумя местами: точки, стены, пустое место', online: 'новая точка на стене (угол, откос) — делит стену', span: 'общий промер стена — стена: увязать невязку обхода', open: 'дверь: касание стены или двух точек', gap: 'проём без двери: касание стены или двух точек', window: 'окно: касание стены или двух точек', hatch: 'люк, приступок — прямоугольник с размерами и привязками', fig: 'колонна, вентшахта, стояк, трап… (условные)', obj: 'лестница, пандус, шахта — по углам', room: 'контур помещения по точкам', note: 'выноска: стрелка и текст', photo: 'место и направление фото', scan: 'станция сканера' };
+const RGROUPS = { meas: { name: 'Промер', subs: ['meas', 'span', 'online', 'thick'] }, open: { name: 'Проём', subs: ['open', 'gap', 'window', 'sill'] }, note: { name: 'Фото / скан', subs: ['photo', 'scan', 'rlab', 'note'] }, obj: { name: 'Ещё', subs: ['hatch', 'fig', 'obj', 'room', 'gps'] }, edit: { name: 'Правка', subs: ['select', 'drag', 'box'] } };
+const RHINT = { sill: 'длина, привязка к углу стены, глубина', thick: 'толщина стены между соседними помещениями', gps: 'исполнительная съёмка: пикеты GPS по номерам', rlab: 'номер и название помещения', select: 'коснитесь точки, стены, размера — меню: перемерить, изменить, отвязать, удалить', drag: 'тащите точку или стену пальцем', box: 'рамка пальцем — выделить участок: выровнять 90°, повернуть, проверить', meas: 'размер между двумя местами: точки, стены, пустое место', online: 'новая точка на стене (угол, откос) — делит стену', span: 'общий промер стена — стена: увязать невязку обхода', open: 'дверь: касание стены или двух точек', gap: 'проём без двери: касание стены или двух точек', window: 'окно: касание стены или двух точек', hatch: 'люк, приступок — прямоугольник с размерами и привязками', fig: 'колонна, вентшахта, стояк, трап… (условные)', obj: 'лестница, пандус, шахта — по углам', room: 'контур помещения по точкам', note: 'выноска: стрелка и текст', photo: 'место и направление фото', scan: 'станция сканера' };
 function closeFly() { const f = document.getElementById('tfly'); if (f) f.remove(); document.removeEventListener('pointerdown', flyOut, true); }
 function flyOut(e) { const f = document.getElementById('tfly'); if (!f) { document.removeEventListener('pointerdown', flyOut, true); return; } if (f.contains(e.target) || (e.target.closest && e.target.closest('#trail [data-tg]'))) return; closeFly(); }
-const TORDER = ['walk', 'meas', 'online', 'thick', 'gps', '|', 'open', 'window', '|', 'room', 'rlab', 'hatch', 'fig', 'obj', '|', 'note', 'photo', 'scan', '|', 'box', 'drag', 'select', 'erase'];
+const TORDER = ['walk', 'meas', 'online', 'thick', 'gps', '|', 'open', 'window', 'sill', '|', 'room', 'rlab', 'hatch', 'fig', 'obj', '|', 'note', 'photo', 'scan', '|', 'box', 'drag', 'select', 'erase'];
 TTOOLS.sort((a, b) => TORDER.indexOf(a[0]) - TORDER.indexOf(b[0]));
 function renderTape() {
   if (AS.pid && !AS.restoring) asSoon();
@@ -6542,8 +6575,8 @@ function renderTape() {
   const R = T.result || {};
   const rows = M.meas.filter(m => m.type !== 'line' && m.type !== 'angle' && m.type !== 'right').slice().reverse();
   const warn = m => Math.abs(m.res || 0) > 0.015 ? 'bad' : Math.abs(m.res || 0) > 0.005 ? 'warn' : 'ok';
-  const TICON = { walk: '⬠', meas: '⟷', span: '⇹', online: '⊸', open: '🚪', gap: '▯', window: '🪟', thick: '▥', room: '▢', obj: '◆', hatch: '⊠', fig: '◉', gps: '🛰', note: '💬', photo: '📷', scan: '◬', rlab: '№', box: '⬚', drag: '✥', select: '✎' };
-  const TSHORT = { walk: 'Обход', meas: 'Промер', span: 'Общий', online: 'На стене', open: 'Дверь', gap: 'Проём', window: 'Окно', thick: 'Толщина', room: 'Помещ.', obj: 'Объект', hatch: 'Люк', fig: 'Фигуры', gps: 'Исп GPS', note: 'Выноска', photo: 'Фото', scan: 'Скан', rlab: '№ пом.', box: 'Выделить', drag: 'Двигать', select: 'Правка' };
+  const TICON = { walk: '⬠', meas: '⟷', span: '⇹', online: '⊸', open: '🚪', gap: '▯', window: '🪟', sill: '⊟', thick: '▥', room: '▢', obj: '◆', hatch: '⊠', fig: '◉', gps: '🛰', note: '💬', photo: '📷', scan: '◬', rlab: '№', box: '⬚', drag: '✥', select: '✎' };
+  const TSHORT = { walk: 'Обход', meas: 'Промер', span: 'Общий', online: 'На стене', open: 'Дверь', gap: 'Проём', window: 'Окно', sill: 'Подок.', thick: 'Толщина', room: 'Помещ.', obj: 'Объект', hatch: 'Люк', fig: 'Фигуры', gps: 'Исп GPS', note: 'Выноска', photo: 'Фото', scan: 'Скан', rlab: '№ пом.', box: 'Выделить', drag: 'Двигать', select: 'Правка' };
   // панель инструментов на чертеже — всегда под рукой
   let rail = document.getElementById('trail'); if (!rail) { rail = document.createElement('div'); rail.id = 'trail'; $('#main').appendChild(rail); }
   const gCur = g => { const G = RGROUPS[g]; if (G.subs.includes(T.tool)) return T.tool; let l = null; try { l = localStorage.getItem('rul_g_' + g); } catch (e) { } return G.subs.includes(l) ? l : G.subs[0]; };
