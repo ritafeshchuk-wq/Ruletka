@@ -288,7 +288,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 7.6 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 7.7 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -1855,6 +1855,10 @@ const SHEET = (() => {
         }
       }
     }
+    { // один и тот же отрезок — один размер: стена между двумя помещениями, проём, который уже есть в контуре, — не дублируем
+      const same = (d, e) => { const t = 0.015, m = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1]) < t; return (m(d.p1, e.p1) && m(d.p2, e.p2)) || (m(d.p1, e.p2) && m(d.p2, e.p1)); };
+      const keep = []; for (const d of dims) { if ((d.kind === 'contour' || d.kind === 'open') && keep.some(e => (e.kind === 'contour' || e.kind === 'open') && same(d, e))) continue; keep.push(d); }
+      dims.length = 0; dims.push(...keep); }
     if (show.overall) {
       let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
       const acc = p => { x0 = Math.min(x0, p[0]); y0 = Math.min(y0, p[1]); x1 = Math.max(x1, p[0]); y1 = Math.max(y1, p[1]); };
