@@ -288,7 +288,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 7.8 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 7.9 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -6574,7 +6574,7 @@ async function exportOverlayPdf(opt = {}) {
       if (srcDoc && !withWork.has(pg)) { if (copied) doc.addPage(copied.get(pg)); else { const [cp] = await doc.copyPages(srcDoc, [pg - 1]); doc.addPage(cp); } continue; } // лист без замеров — как в исходнике
       if (pages.length > 1 || pg !== curPg) { loadPageModel(pg); const d = PGS.data[pg]; if (d && d.u) Object.assign(U, { s: d.u.s, rot: d.u.rot, tx: d.u.tx, ty: d.u.ty, ptPerPx: d.u.ptPerPx, pw: d.u.pw, ph: d.u.ph }); U.srcPage = pg; adjust(); }
       await (async () => {
-    let W, H, toPt, page, wrapped = false;
+    let W, H, toPt, page, wrapped = false, uM = null, uPg = 0;
     if (U.img) {
       const ppx = U.ptPerPx || 0.75; W = (U.pw || U.img.width) * ppx; H = (U.ph || U.img.height) * ppx;
       toPt = (X, Y) => { const c = Math.cos(U.rot), sn = Math.sin(U.rot), dx = X - U.tx, dy = Y - U.ty; const x0 = c * dx + sn * dy, y0 = -sn * dx + c * dy; return [x0 / U.s * ppx, H + y0 / U.s * ppx]; };
@@ -6584,7 +6584,7 @@ async function exportOverlayPdf(opt = {}) {
         try {
           const pi = pg - 1, mb = srcDoc.getPage(pi).getMediaBox(), vp = (await U.pdf.getPage(pi + 1)).getViewport({ scale: 1 });
           const sx = W / vp.width, sy = H / vp.height; const [a, b, c, d, e, f] = vp.transform;
-          const m = [a * sx, -b * sy, c * sx, -d * sy, e * sx, H - f * sy]; void mb; // лист скопирован как есть: его координаты — исходные, без сдвига MediaBox
+          const m = [a * sx, -b * sy, c * sx, -d * sy, e * sx, H - f * sy]; void mb; uM = m; uPg = pi + 1; // лист скопирован как есть: его координаты — исходные, без сдвига MediaBox
           const det = m[0] * m[3] - m[1] * m[2]; const inv = [m[3] / det, -m[1] / det, -m[2] / det, m[0] / det, (m[2] * m[5] - m[3] * m[4]) / det, (m[1] * m[4] - m[0] * m[5]) / det];
           page = doc.addPage(copied.get(pg)); try { flattenAnnots(PL, doc, page); } catch (e) { console.warn('annots', e); }
           page.pushOperators(pushGraphicsState(), concatTransformationMatrix(...inv)); wrapped = true; drawn = true;
@@ -6597,7 +6597,7 @@ async function exportOverlayPdf(opt = {}) {
           const [emb] = await doc.embedPdf(src, [pi]); const mb = src.getPage(pi).getMediaBox();
           const vp = (await U.pdf.getPage(pi + 1)).getViewport({ scale: 1 });
           const sx = W / vp.width, sy = H / vp.height; const [a, b, c, d, e, f] = vp.transform;
-          let m = [a * sx, -b * sy, c * sx, -d * sy, e * sx, H - f * sy];
+          let m = [a * sx, -b * sy, c * sx, -d * sy, e * sx, H - f * sy]; uM = m; uPg = pi + 1;
           m = [m[0], m[1], m[2], m[3], m[0] * mb.x + m[2] * mb.y + m[4], m[1] * mb.x + m[3] * mb.y + m[5]];
           const nm = page.node.newXObject('Podl', emb.ref);
           page.pushOperators(pushGraphicsState(), concatTransformationMatrix(...m), drawObject(nm), popGraphicsState()); drawn = true;
@@ -6620,7 +6620,8 @@ async function exportOverlayPdf(opt = {}) {
     const zl = ((M.zoomLog && M.zoomLog.length ? M.zoomLog : T.zoomAll) || []).slice().sort((a, b) => a - b), zw = zl.length ? zl[Math.floor(zl.length / 2)] : null;
     const lensW = M.edges.filter(e => !e.obj).map(e => { const A = ptById(e.a), B = ptById(e.b); return A && B ? Math.hypot(PX(A)[0] - PX(B)[0], PX(A)[1] - PX(B)[1]) : 0; }).filter(v => v > 0.05).sort((a, b) => a - b), medW = lensW.length ? lensW[Math.floor(lensW.length / 2)] : null;
     const fsM = Math.max(0.04, Math.min(0.8, zw ? 13.5 / zw : 0.22, medW ? medW * 0.12 : 9)); void med;
-    const fs = Math.max(0.6, Math.min(16, ppm * fsM * (PDFSZ[pdfSz()] || PDFSZ.s).m)); const lw = Math.max(0.06, fs * 0.09);
+    const fs = Math.max(4.2, Math.min(9, ppm * fsM)) * (PDFSZ[pdfSz()] || PDFSZ.s).m; // на бумаге ~1,5–3 мм, независимо от увеличения при работе
+    const lw = Math.max(0.06, fs * 0.09);
     const sc = (x, d) => { const c = x && x.st && x.st.c; if (!c) return d; const n = parseInt(c.slice(1), 16); return rgb(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255); };
     const RED = rgb(0.80, 0.02, 0.10), BLUE = rgb(0.05, 0.25, 0.75), VIO = rgb(0.42, 0.20, 0.72), GRN = rgb(0.05, 0.55, 0.25), GRY = rgb(0.45, 0.48, 0.52);
     const text = (str, p, size, col, ang = 0, anchor = 'c') => { // вектор: буквы контурами, без встраивания шрифта
@@ -6647,22 +6648,35 @@ async function exportOverlayPdf(opt = {}) {
     // разместить подпись: первый свободный вариант; если свободных нет — keep: наименее занятый, иначе не рисовать
     const place = (str, col, ang, cands, keep = true) => {
       let best = null, bn = 1e9;
-      for (const k of cands) { const B = boxOf(str, k.size, k.c, ang); let n = 0; for (const o of OB) if (hit(o, B)) { n++; if (n >= bn) break; } if (n < bn) { bn = n; best = k; } if (!n) break; }
-      if (!best || (bn && !keep)) return false;
+      for (const k of cands) { const B = boxOf(str, k.size, k.c, ang); let n = k.lead ? 0.35 : 0; if (INK) n += Math.min(1, INK(B) * 3.5) * 0.8; for (const o of OB) if (hit(o, B)) { n += o.w || 1; if (n >= bn) break; } if (n < bn) { bn = n; best = k; } if (!n) break; }
+      if (!best || (bn >= 1 && !keep)) return false;
       textC(str, best.c, best.size, col, ang); if (best.lead) leader(best.lead, OB[OB.length - 1], col); return true; };
     // варианты для размера на отрезке a–b: над/под, сдвиг вдоль, мельче, затем сноска
     const segCands = (a, b, str, size0) => {
       const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1e-6, ang = segAng(a, b), r = ang * Math.PI / 180, up = upOf(ang), dir = [Math.cos(r), Math.sin(r)], mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-      const w0 = font.getAdvanceWidth(str, size0); let size = size0; if (w0 > 0.92 * L) size = Math.max(size0 * 0.55, size0 * 0.92 * L / w0);
+      const w0 = font.getAdvanceWidth(str, size0), fmin = Math.min(size0, Math.max(size0 * 0.72, 3.2)); let size = size0; if (w0 > 0.92 * L) size = Math.max(fmin, size0 * 0.92 * L / w0);
       const at = (k, t, sz) => [mid[0] + up[0] * k * sz + dir[0] * t, mid[1] + up[1] * k * sz + dir[1] * t];
       const C = [];
-      for (const sz of [size, Math.max(size0 * 0.55, size * 0.75)]) { const w = font.getAdvanceWidth(str, sz), sh = Math.max(0, (L - w) / 2 - sz * 0.2);
+      for (const sz of [size, Math.max(fmin, size * 0.8)]) { const w = font.getAdvanceWidth(str, sz), sh = Math.max(0, (L - w) / 2 - sz * 0.2);
         for (const t of sh > sz * 0.5 ? [0, -sh, sh] : [0]) for (const k of [0.68, -0.68]) C.push({ c: at(k, t, sz), size: sz }); }
       for (const k of [2.0, 3.0, 4.2, 5.6, 7.2]) for (const sg of [1, -1]) C.push({ c: at(sg * k, 0, size), size, lead: mid });
       return { ang, C };
     };
     // варианты вокруг точки (подписи без отрезка): со сноской, если рядом тесно
     const ptCands = (p, size, near = 0.9) => { const C = []; for (const rr of [near, near * 2.2, near * 3.6]) for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4 + Math.PI / 8; C.push({ c: [p[0] + Math.cos(a) * rr * size * 1.6, p[1] + Math.sin(a) * rr * size], size, lead: rr > near ? p : null }); } return C; };
+    // «чернила» подложки: номера, площади, размеры плана (в PDF это часто линии, а не текст) — свои подписи стараются на них не ложиться
+    let INK = null;
+    if (uM && U.pdf) try { const pp = await U.pdf.getPage(uPg), v1 = pp.getViewport({ scale: 1 }), k = Math.min(1.2, 6000 / Math.max(v1.width, v1.height)), vp = pp.getViewport({ scale: k });
+      const cv = document.createElement('canvas'); cv.width = Math.ceil(vp.width); cv.height = Math.ceil(vp.height); const cx = cv.getContext('2d', { willReadFrequently: true }); cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height);
+      await pp.render({ canvasContext: cx, viewport: vp }).promise; const gw = cv.width, gh = cv.height, px = cx.getImageData(0, 0, gw, gh).data, I = new Uint32Array((gw + 1) * (gh + 1));
+      for (let y = 0; y < gh; y++) { let row = 0; for (let x = 0; x < gw; x++) { const q = (y * gw + x) * 4; if (px[q] * 0.3 + px[q + 1] * 0.59 + px[q + 2] * 0.11 < 170) row++; I[(y + 1) * (gw + 1) + x + 1] = I[y * (gw + 1) + x + 1] + row; } }
+      cv.width = cv.height = 1; const sx = W / v1.width, sy = H / v1.height; // лист → пиксели: x = X/sx·k, y = (H−Y)/sy·k
+      const sum = (x0, y0, x1, y1) => { x0 = Math.max(0, Math.min(gw, x0 | 0)); x1 = Math.max(0, Math.min(gw, Math.ceil(x1))); y0 = Math.max(0, Math.min(gh, y0 | 0)); y1 = Math.max(0, Math.min(gh, Math.ceil(y1))); if (x1 <= x0 || y1 <= y0) return [0, 1];
+        return [I[y1 * (gw + 1) + x1] - I[y0 * (gw + 1) + x1] - I[y1 * (gw + 1) + x0] + I[y0 * (gw + 1) + x0], (x1 - x0) * (y1 - y0)]; };
+      INK = B => { const hh = B.hh * 0.8, n = Math.max(1, Math.round(B.hw / hh)); let ink = 0, ar = 0; // вдоль подписи — квадратиками, чтобы наклонная подпись не захватывала лишнего
+        for (let i = 0; i < n; i++) { const t = -B.hw + (i + 0.5) * 2 * B.hw / n, c = [B.c[0] + B.u[0] * t, B.c[1] + B.u[1] * t], X = c[0] / sx * k, Y = (H - c[1]) / sy * k, r = hh / sx * k; const [a, b] = sum(X - r, Y - r, X + r, Y + r); ink += a; ar += b; }
+        return ar ? ink / ar : 0; };
+    } catch (e) { console.warn('underlay ink', e); INK = null; }
     // занятые заранее: точки
     for (const p of M.pts) { if (p.soft) continue; const q = P2(p); OB.push(obb(q, 0, lw * 2.2, lw * 2.2)); }
     // объекты
