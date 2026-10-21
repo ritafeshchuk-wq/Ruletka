@@ -288,7 +288,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 8.6 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 8.7 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -1877,10 +1877,16 @@ const SHEET = (() => {
   // returns {lines:[{a,b,layer,w}], texts:[{p,h,rot,s,layer,anchor}], pts, polys}
   function primitives(plan, scale, show) {
     const k = scale / 1000; // 1 mm paper = k m
+    const fk = show.fontK || 1; // размер шрифта листа: мельче / обычный / крупнее
     const L = [], T = [], C = [];
     const line = (a, b, layer, w = 0.25) => L.push({ a, b, layer, w });
-    const text = (p, s, h, rot, layer, anchor = 'middle') => T.push({ p, s, h: h * k, rot, layer, anchor });
-    for (const s of plan.segs || []) { const [a, b] = segXY(s); line(a, b, 'STENY', 0.5); }
+    const text = (p, s, h, rot, layer, anchor = 'middle') => T.push({ p, s, h: h * k * fk, rot, layer, anchor });
+    // ---- раскладка надписей: прямоугольники заняты, новая подпись ищет свободное место ----
+    const OB = [], obb = (c, rotDeg, hw, hh, w = 1) => { const r = rotDeg * Math.PI / 180; return { c, u: [Math.cos(r), Math.sin(r)], hw, hh, w }; };
+    const hit = (A, B) => { const d = [B.c[0] - A.c[0], B.c[1] - A.c[1]]; for (const ax of [A.u, [-A.u[1], A.u[0]], B.u, [-B.u[1], B.u[0]]]) { const pr = O => O.hw * Math.abs(O.u[0] * ax[0] + O.u[1] * ax[1]) + O.hh * Math.abs(-O.u[1] * ax[0] + O.u[0] * ax[1]); if (Math.abs(d[0] * ax[0] + d[1] * ax[1]) > pr(A) + pr(B)) return false; } return true; };
+    const tBox = (t, pad = 0.4 * k) => { const r = t.rot * Math.PI / 180, up = [-Math.sin(r), Math.cos(r)], w = String(t.s).length * t.h * 0.56; const c = t.base === 'bottom' ? [t.p[0] + up[0] * t.h * 0.5, t.p[1] + up[1] * t.h * 0.5] : t.p; return obb(c, t.rot, w / 2 + pad, t.h / 2 + pad * 0.6); };
+    const cost = B => { let n = 0; for (const o of OB) if (hit(o, B)) n += o.w; return n; };
+    for (const s of plan.segs || []) { const [a, b] = segXY(s); line(a, b, 'STENY', 0.5); const Lg = Math.hypot(b[0] - a[0], b[1] - a[1]); if (Lg > 1e-6) OB.push(obb([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI, Lg / 2, 0.35 * k, 0.4)); }
     for (const o of plan.openings || []) { const [a, b] = opXY(o); line(a, b, 'PROEMY', 0.18); }
     for (const l of plan.extra || []) line(l.a, l.b, l.layer || 'OBJEKTY', l.w || 0.25);
     if (show.thick) for (const w of plan.walls || []) {
@@ -1898,15 +1904,22 @@ const SHEET = (() => {
       if (!R.poly) continue;
       for (let i = 0; i < R.poly.length; i++) line(R.poly[i], R.poly[(i + 1) % R.poly.length], 'POMESCH', 0.13);
       if (show.area) {
-        const p = R.label || labelPos(R.poly);
-        text([p[0], p[1] + 2.6 * k], String(R.num), 3.0, 0, 'TEKST');
-        C.push({ c: [p[0], p[1] + 2.6 * k], r: 2.8 * k, layer: 'TEKST' });
-        text([p[0], p[1] - 2.4 * k], fmtArea(R.area) + ' м²', 3.2, 0, 'TEKST'); // площадь — в центре помещения, крупнее размеров
+        const p0 = R.label || labelPos(R.poly), aS = fmtArea(R.area) + ' м²', blk = q => [obb([q[0], q[1] + 2.6 * k * fk], 0, 3.2 * k * fk, 3.2 * k * fk), obb([q[0], q[1] - 2.4 * k * fk], 0, aS.length * 3.2 * k * fk * 0.28 + 0.5 * k, 2.0 * k * fk)];
+        const fits = bs => bs.every(B => [[1, 1], [1, -1], [-1, 1], [-1, -1]].every(([sx, sy]) => inside(R.poly, B.c[0] + sx * B.hw, B.c[1] + sy * B.hh)));
+        const offs = [[0, 0], [0, 3], [0, -3], [4, 0], [-4, 0], [4, 3], [-4, 3], [4, -3], [-4, -3], [0, 6], [0, -6]];
+        let p = p0, bc = 1e9, small = false;
+        if (!R.label) { for (const [dx, dy] of offs) { const q = [p0[0] + dx * k * fk, p0[1] + dy * k * fk]; const bs = blk(q); if (!fits(bs)) continue; const c = bs.reduce((s2, B) => s2 + cost(B), 0); if (c < bc) { bc = c; p = q; } if (!c) break; }
+          if (bc === 1e9) { small = true; for (const [dx, dy] of offs) { const q = [p0[0] + dx * k * fk * 0.5, p0[1] + dy * k * fk * 0.5], B = obb(q, 0, 3.2 * k * fk, 3.2 * k * fk); if (!inside(R.poly, q[0], q[1])) continue; const c = cost(B) + (fits([B]) ? 0 : 1); if (c < bc) { bc = c; p = [q[0], q[1] - 2.6 * k * fk]; } } } } // помещение меньше подписи: только номер, площадь — в экспликации
+        if (small) { const q = [p[0], p[1] + 2.6 * k * fk]; text(q, String(R.num), 3.0, 0, 'TEKST'); C.push({ c: q, r: 2.8 * k * fk, layer: 'TEKST' }); OB.push(obb(q, 0, 3 * k * fk, 3 * k * fk, 2)); continue; }
+        text([p[0], p[1] + 2.6 * k * fk], String(R.num), 3.0, 0, 'TEKST');
+        C.push({ c: [p[0], p[1] + 2.6 * k * fk], r: 2.8 * k * fk, layer: 'TEKST' });
+        text([p[0], p[1] - 2.4 * k * fk], aS, 3.2, 0, 'TEKST'); // площадь — в центре помещения, крупнее размеров
+        for (const B of blk(p)) OB.push({ ...B, w: 2 });
       }
     }
     for (const t of plan.texts || []) text(t.p, t.s, t.h || 2.5, t.rot || 0, t.layer || 'TEKST');
     // dimensions
-    const dims = autoDims(plan, k, show);
+    const dims = autoDims(plan, k, show), DT = [];
     for (const d of dims) {
       const [a, b] = [d.p1, d.p2];
       const len = Math.hypot(b[0] - a[0], b[1] - a[1]); if (len < 1e-3) continue;
@@ -1914,7 +1927,7 @@ const SHEET = (() => {
       let n = d.n || [-uy, ux];
       const A = [a[0] + n[0] * d.off, a[1] + n[1] * d.off], B = [b[0] + n[0] * d.off, b[1] + n[1] * d.off];
       const ex = 1.5 * k, gap = 1 * k;
-      line(A.map((v, i) => v - [ux, uy][i] * ex * 0.8), B.map((v, i) => v + [ux, uy][i] * ex * 0.8), 'RAZMERY', 0.18);
+      line(A.map((v, i) => v - [ux, uy][i] * ex * 0.8), B.map((v, i) => v + [ux, uy][i] * ex * 0.8), 'RAZMERY', 0.18); OB.push(obb([(A[0] + B[0]) / 2, (A[1] + B[1]) / 2], Math.atan2(uy, ux) * 180 / Math.PI, len / 2 + ex * 0.8, 0.2 * k, 0.3));
       line([a[0] + n[0] * gap, a[1] + n[1] * gap], [A[0] + n[0] * ex, A[1] + n[1] * ex], 'RAZMERY', 0.13);
       line([b[0] + n[0] * gap, b[1] + n[1] * gap], [B[0] + n[0] * ex, B[1] + n[1] * ex], 'RAZMERY', 0.13);
       // 45° ticks
@@ -1925,7 +1938,7 @@ const SHEET = (() => {
       line([B[0] - dx, B[1] - dy], [B[0] + dx, B[1] + dy], 'RAZMERY', 0.35);
       let rot = Math.atan2(uy, ux) * 180 / Math.PI; if (rot > 90.5) rot -= 180; if (rot <= -89.5) rot += 180;
       const val = (d.val != null ? d.val : len).toFixed(3).replace('.', ',');
-      const h = d.kind === 'overall' ? 3.0 : 2.5;
+      const h = (d.kind === 'overall' ? 3.0 : 2.5) * fk;
       const tw = val.length * h * 0.6 * k;
       // text above line (on side away from object if possible): use normal direction
       const sgn = 1; const tOff = 0.8 * k + h * k * 0.0;
@@ -1933,9 +1946,16 @@ const SHEET = (() => {
       // keep text on +normal side readable: place text baseline offset along screen-up of rotated frame
       const r = rot * Math.PI / 180, upx = -Math.sin(r), upy = Math.cos(r);
       mid = [(A[0] + B[0]) / 2 + upx * 0.7 * k, (A[1] + B[1]) / 2 + upy * 0.7 * k];
-      if (tw > len * 0.9) mid = [B[0] + ux * (tw / 2 + 1.5 * k) + upx * 0.7 * k, B[1] + uy * (tw / 2 + 1.5 * k) + upy * 0.7 * k];
-      T.push({ p: mid, s: val, h: h * k, rot, layer: 'RAZMERY', anchor: 'middle', base: 'bottom' });
+      const C2 = []; const ofs = (t, up2) => [(A[0] + B[0]) / 2 + ux * t + upx * up2, (A[1] + B[1]) / 2 + uy * t + upy * up2];
+      if (tw <= len * 0.9) { C2.push({ p: mid }); const sh = (len - tw) / 2 - 0.3 * k; if (sh > 1 * k) C2.push({ p: ofs(-sh, 0.7 * k) }, { p: ofs(sh, 0.7 * k) }); }
+      C2.push({ p: ofs(len / 2 + tw / 2 + 1.5 * k, 0.7 * k) }, { p: ofs(-(len / 2 + tw / 2 + 1.5 * k), 0.7 * k) }); // за концом размерной линии
+      for (const st of [1, 2]) { const o2 = n[0] * upx + n[1] * upy >= 0 ? 1 : -1; C2.push({ p: ofs(0, 0.7 * k + o2 * st * (h + 1.2) * k), lead: true }); } // второй ряд со сноской
+      DT.push({ C: C2, s: val, h: h * k, rot, pr: d.kind === 'overall' ? 0 : d.kind === 'contour' ? 1 : 2, len, ab: [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2] });
     }
+    DT.sort((x, y) => x.pr - y.pr || y.len - x.len);
+    for (const t of DT) { let best = null, bc = 1e9; for (const c of t.C) { const B = tBox({ p: c.p, s: t.s, h: t.h, rot: t.rot, base: 'bottom' }); const v = cost(B) + (c.lead ? 0.3 : 0); if (v < bc) { bc = v; best = { c, B }; } if (!v) break; }
+      T.push({ p: best.c.p, s: t.s, h: t.h, rot: t.rot, layer: 'RAZMERY', anchor: 'middle', base: 'bottom' }); OB.push(best.B);
+      if (best.c.lead) { const r = t.rot * Math.PI / 180, up = [-Math.sin(r), Math.cos(r)], sg = Math.sign((t.ab[0] - best.B.c[0]) * up[0] + (t.ab[1] - best.B.c[1]) * up[1]) || 1; line(t.ab, [best.B.c[0] + up[0] * sg * best.B.hh, best.B.c[1] + up[1] * sg * best.B.hh], 'RAZMERY', 0.13); } }
     return { lines: L, texts: T, circles: C, dims };
   }
 
@@ -4151,6 +4171,9 @@ function panelSheet() {
   <div class="row"><button data-al="avg" class="${o.align !== 'long' ? 'on' : ''}" title="Стены в среднем — по сторонам листа">⊾ По всем стенам</button><button data-al="long" class="${o.align === 'long' ? 'on' : ''}" title="Самая длинная стена — ровно по листу">⊾ По длинной стене</button></div>
   <div class="row"><button data-rt="0.5">⟲ 0,5°</button><button data-rt="0.1">⟲ 0,1°</button><button data-rt="-0.1">⟳ 0,1°</button><button data-rt="-0.5">⟳ 0,5°</button><button data-rt="90">⟲ 90°</button><button id="rtAng">∠…</button><button id="rt0">сброс</button></div>
   <p class="hint">Доворот: ${String(Math.round((+o.rot || 0) * 10) / 10).replace('.', ',')}°. Меняет только лист и DXF — обмер не трогает. Если одно помещение стоит косо к другому — на обмере «▦ Выровнять 90°».</p>` : ''}
+  <h3>Шрифт на листе</h3>
+  <div class="row seg2">${[[0.8, 'Мельче'], [1, 'Обычный'], [1.25, 'Крупнее']].map(([v, t]) => `<button data-fk="${v}" class="${(+o.show.fontK || 1) === v ? 'on' : ''}">${t}</button>`).join('')}</div>
+  <p class="hint">Цифры размеров ${String(Math.round(2.5 * (+o.show.fontK || 1) * 10) / 10).replace('.', ',')} мм на бумаге. Тесно — цифра уходит за конец размерной линии или во второй ряд со сноской.</p>
   <h3>Что показывать</h3>
   ${chk('contour', 'Длины по контуру помещений')}${chk('openings', 'Проёмы и простенки')}${chk('thick', 'Толщины стен')}${chk('overall', 'Габаритные размеры')}${chk('area', 'Номера и площади')}${chk('expl', 'Экспликация (отдельный лист)')}${chk('points', 'Точки среза (подложка)')}
   <h3>Штамп</h3><div class="kv">${inf('object', 'Объект')}${inf('title', 'Лист')}${inf('org', 'Организация')}${inf('author', 'Разработал')}${inf('checker', 'Проверил')}${inf('date', 'Дата')}${inf('note', 'Примечание')}</div>
@@ -4161,6 +4184,7 @@ function panelSheet() {
   <p class="hint" id="sInfo"></p>`;
   $('#gSel').onchange = e => { S.sheetSrc = e.target.value === 'tape' ? 'tape' : +e.target.value; renderSheets(); };
   $('#fmt').onchange = e => { o.format = e.target.value; renderSheets(); };
+  side.querySelectorAll('[data-fk]').forEach(b => b.onclick = () => { o.show.fontK = +b.dataset.fk; try { asSoon(); } catch (e) { } panelSheet(); renderSheets(); });
   $('#ori').onchange = e => { o.portrait = e.target.value === '1'; renderSheets(); };
   $('#scl').onchange = e => { o.scale = e.target.value; renderSheets(); };
   $('#un').onchange = e => o.units = e.target.value;
