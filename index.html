@@ -286,7 +286,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 7.3 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 7.4 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -3185,6 +3185,7 @@ document.querySelectorAll('.modes button').forEach(b => b.onclick = () => setMod
 document.querySelectorAll('[data-go]').forEach(b => b.onclick = () => setMode(b.dataset.go));
 $('#brand').onclick = goHome;
 function setStep(st) {
+  if (st === 'sheet' && S.step !== 'sheet') { try { const r = findRooms(); if (r.n) { asSoon(); setTimeout(() => stat(`Помещений найдено: ${r.n} — площадь на листе.${r.joined ? ' Концы стен, почти совпавшие, соединены.' : ''}`), 50); } } catch (e) { } }
   S.step = st; S.lastStep = S.lastStep || {}; if (S.mode) S.lastStep[S.mode] = st;
   renderSteps();
   sheetsDiv.style.display = st === 'sheet' ? 'block' : 'none';
@@ -5517,6 +5518,12 @@ function autoRoom(a, b) { const adj = new Map(); for (const e of M.edges) { if (
   const key = [...path].sort((u, v) => u - v).join(); if (M.rooms.some(R => [...R.ids].sort((u, v) => u - v).join() === key)) return null;
   const P = path.map(id => PX(ptById(id))); let A = 0; for (let i = 0; i < P.length; i++) { const u = P[i], v = P[(i + 1) % P.length]; A += u[0] * v[1] - v[0] * u[1]; } if (Math.abs(A / 2) < 0.3) return null;
   const R = { num: M.rooms.reduce((m, r) => Math.max(m, +r.num || 0), 0) + 1, name: 'Помещение', ids: path }; M.rooms.push(R); return R; }
+// найти все замкнутые контуры стен, которые ещё не помещения; концы обхода, почти совпавшие (до 15 см, «не попал в точку»), соединяются стеной
+function findRooms() { let joined = 0; const deg = new Map(); for (const e of M.edges) { if (e.obj) continue; deg.set(e.a, (deg.get(e.a) || 0) + 1); deg.set(e.b, (deg.get(e.b) || 0) + 1); }
+  const ends = M.pts.filter(p => deg.get(p.id) === 1);
+  for (let i = 0; i < ends.length; i++) for (let j = i + 1; j < ends.length; j++) { const A = ends[i], B = ends[j]; if (deg.get(A.id) !== 1 || deg.get(B.id) !== 1) continue; const a = PX(A), b = PX(B); if (Math.hypot(a[0] - b[0], a[1] - b[1]) > 0.15 || hasEdge(A.id, B.id)) continue; M.edges.push({ a: A.id, b: B.id }); deg.set(A.id, 2); deg.set(B.id, 2); joined++; }
+  let n = 0; for (const e of M.edges.slice()) { if (e.obj) continue; const inR = M.rooms.some(R => { const k = R.ids.indexOf(e.a); return k >= 0 && (R.ids[(k + 1) % R.ids.length] === e.b || R.ids[(k - 1 + R.ids.length) % R.ids.length] === e.b); }); if (inR) continue; if (autoRoom(e.a, e.b)) n++; }
+  if (joined || n) adjust(); return { n, joined }; }
 function walkTo(p, w, e) { // провести стену от конца обхода к точке p (или к новой точке в w)
   const prev = T.chain[T.chain.length - 1];
     tPush(); zoomNote(); if (!M.chains.includes(T.chain)) M.chains.push(T.chain); walkChipOff();
@@ -6403,7 +6410,7 @@ function renderTape() {
   <div class="list" style="margin-top:6px">${rows.map(m => `<div class="item"><input type="checkbox" data-mon="${m.id}" ${m.on !== false ? 'checked' : ''}><span>${m.type === 'tie' ? 'люк ↔ ' : m.type === 'thick' ? 'δ ' : ''}${pname(m.a)}–${pname(m.type === 'thick' ? m.c : m.b)}</span><input type="text" data-mv="${m.id}" value="${fm(m.v)}" style="width:72px"><span class="q ${warn(m)}">${m.res != null ? (m.res > 0 ? '+' : '') + Math.round(m.res * 1000) + ' мм' : ''}</span><button data-mdel="${m.id}" style="padding:1px 6px">×</button></div>`).join('') || '<div class="hint" style="padding:6px">Замеров пока нет</div>'}</div>
   </details>
   <div class="row" style="display:none"><button id="tUndo"></button><button id="tRedo"></button></div>`;
-  { const rf = $('#rFind'); if (rf) rf.onclick = () => { tPush(); let n = 0; for (const e of M.edges.slice()) { if (e.obj) continue; const inR = M.rooms.some(R => { const k = R.ids.indexOf(e.a); return k >= 0 && (R.ids[(k + 1) % R.ids.length] === e.b || R.ids[(k - 1 + R.ids.length) % R.ids.length] === e.b); }); if (inR) continue; if (autoRoom(e.a, e.b)) n++; } adjust(); draw(); renderTape(); stat(n ? `Найдено помещений: ${n} — площадь на чертеже.` : 'Новых замкнутых контуров нет.'); }; }
+  { const rf = $('#rFind'); if (rf) rf.onclick = () => { tPush(); const r = findRooms(); draw(); renderTape(); stat(r.n ? `Найдено помещений: ${r.n} — площадь на чертеже.${r.joined ? ` Соединено почти совпавших концов стен: ${r.joined}.` : ''}` : 'Замкнутых контуров нет — проверьте, что последняя стена доведена до первой точки.'); }; }
   document.querySelectorAll('[data-rlb]').forEach(b => b.onclick = () => { const R = M.rooms.find(x => String(x.num) === b.dataset.rlb); if (!R) return; tPush(); R.hideLbl = !R.hideLbl; draw(); renderTape(); });
   $('#uLoad').onclick = () => $('#uFile').click();
   $('#uFile').onchange = e => e.target.files[0] && loadUnderlay(e.target.files[0]);
