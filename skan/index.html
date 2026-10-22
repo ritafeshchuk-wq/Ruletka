@@ -66,7 +66,7 @@ canvas.band{width:100%;height:32px;display:block;border-radius:6px;touch-action:
 <div id="main"></div>
 <div id="rotbar" title="Повернуть выбранный скан"><button id="bMulti" title="Выбрать несколько сканов: касание — добавить/убрать, рамка по пустому месту — выбрать все внутри">⬚ Несколько</button><button id="bR1">⟲ 1°</button><button id="bR01">⟲ 0,1°</button><button id="bRm01">⟳ 0,1°</button><button id="bRm1">⟳ 1°</button><button id="bR90">⟲ 90°</button></div>
 <div id="ubar"><button id="fUndo" disabled>↶ Отменить шаг</button><button id="fRedo" disabled>↷ Вернуть</button><button id="fDel">🗑 Удалить выбранное</button></div>
-<div id="foot"><span id="status"></span><span id="saved"></span><span id="ver">Скан 3.1 · © d1sco, 2026</span></div>
+<div id="foot"><span id="status"></span><span id="saved"></span><span id="ver">Скан 3.2 · © d1sco, 2026</span></div>
 <div id="busy" hidden><span>…</span></div>
 <input type="file" id="fileIn" multiple accept=".e57" hidden><input type="file" id="projIn" hidden>
 <div id="help" hidden><div class="lh"><h3>Как работать</h3><button id="helpX">✕</button></div>
@@ -86,7 +86,7 @@ canvas.band{width:100%;height:32px;display:block;border-radius:6px;touch-action:
 <li><b>Несколько сканов:</b> мышью — как в AutoCAD: щелчок добавляет, Shift + щелчок убирает, рамка слева направо — целиком внутри, справа налево — всё задетое. На планшете — «⬚ Несколько» внизу справа. Esc — снять выбор.</li>
 <li><b>⚓</b> в списке — опорный скан, стоит на месте.</li></ul>
 <h4>3 План — стены и проёмы</h4>
-<ul><li><b>Фон — тонкий срез</b> точек всех сканов на одной высоте (по умолчанию 1,2 м от пола, 6 см) — высота и толщина в карточке справа. В срезе сразу видно, сошлись ли стены разных сканов в одну линию.</li><li><b>⌇ Стена по точкам</b> — коснитесь стены в срезе: программа впишет прямую по точкам (сколько точек и разброс в мм — внизу), продлит вдоль стены и замкнёт угол с соседней. Так план собирается стена за стеной: решаете вы, точность — от точек.</li><li>Справа «🔎 Найти стены», правка стены касанием, «⌐ Замкнуть углы», «⊾ К осям», «⬇ DXF». Вверху <b>／ Стена</b> — нарисовать, <b>⌫ Удалить</b>.</li></ul>
+<ul><li><b>🏠 План по сканам</b> (справа) — готовый план сразу: стены — плоскости во всю высоту, помещения — по потолку (двери отделяют помещения перемычкой), двери и окна — дыры в стенах (окно — с низом выше пола и перемычкой), подоконник — горизонтальная полка у низа окна. Номера и площади помещений — на плане и в DXF. Шторы при съёмке откройте, иначе окна за ними не видны.</li><li><b>⬇ Для Рулетки</b> — файл проекта: помещения со сторонами, двери, окна, подоконники. В Рулетке «Открыть файл» — и домерьте на месте окна и подоконники.</li><li><b>Фон — тонкий срез</b> точек всех сканов на одной высоте (по умолчанию 1,2 м от пола, 6 см) — высота и толщина в карточке справа. В срезе сразу видно, сошлись ли стены разных сканов в одну линию.</li><li><b>⌇ Стена по точкам</b> — коснитесь стены в срезе: программа впишет прямую по точкам (сколько точек и разброс в мм — внизу), продлит вдоль стены и замкнёт угол с соседней. Так план собирается стена за стеной: решаете вы, точность — от точек.</li><li>Справа «🔎 Найти стены», правка стены касанием, «⌐ Замкнуть углы», «⊾ К осям», «⬇ DXF». Вверху <b>／ Стена</b> — нарисовать, <b>⌫ Удалить</b>.</li></ul>
 <h4>Всегда</h4>
 <ul><li>Внизу «↶ Отменить шаг / ↷ Вернуть». Колесо — масштаб, зажатое колесо — сдвиг вида, ⤢ — показать всё.</li></ul>
 </div>
@@ -668,9 +668,206 @@ const REG3D = (() => {
 })();
 
 </script>
+<script id="spsrc">
+// ===== План по сканам: стены — плоскостями во всю высоту, помещения — по потолку, проёмы — по дыркам в стенах =====
+// scans: [{P: Float32Array xyz в общей системе (z — над полом), cx, cy}] → {axis, H, walls, rooms, openings}
+function scanPlan(scans, opt = {}) {
+  const log = opt.log || (() => { });
+  // ---- все точки ----
+  let N = 0; for (const s of scans) N += s.P.length / 3;
+  const X = new Float32Array(N), Y = new Float32Array(N), Z = new Float32Array(N), SI = new Uint16Array(N);
+  { let k = 0; scans.forEach((s, si) => { const P = s.P; for (let i = 0; i < P.length; i += 3) { const dx = P[i] - s.cx, dy = P[i + 1] - s.cy, r2 = dx * dx + dy * dy; if (r2 > 100 || r2 < 0.16) continue; X[k] = P[i]; Y[k] = P[i + 1]; Z[k] = P[i + 2]; SI[k] = si; k++; } }); N = k; }
+  const CX = scans.map(s => s.cx), CY = scans.map(s => s.cy);
+  // высота потолка — 99-й процентиль
+  const zs = []; for (let i = 0; i < N; i += Math.max(1, Math.floor(N / 200000))) zs.push(Z[i]); zs.sort((a, b) => a - b); const H = zs[Math.floor(zs.length * 0.99)];
+  log('точек ' + N + ', потолок ' + H.toFixed(2));
+  // ---- «вертикальность»: ячейка 2 см, сколько 10-см слоёв по высоте занято ----
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; for (let i = 0; i < N; i++) { if (X[i] < x0) x0 = X[i]; if (X[i] > x1) x1 = X[i]; if (Y[i] < y0) y0 = Y[i]; if (Y[i] > y1) y1 = Y[i]; }
+  const g = 0.02, gw = Math.ceil((x1 - x0) / g) + 1, gh = Math.ceil((y1 - y0) / g) + 1, NB = Math.ceil(H / 0.1) + 1;
+  const bands = new Uint32Array(gw * gh), bands2 = new Uint32Array(gw * gh); // 64 слоя в двух словах
+  const cellOf = i => Math.floor((Y[i] - y0) / g) * gw + Math.floor((X[i] - x0) / g);
+  for (let i = 0; i < N; i++) { const b = Math.max(0, Math.min(NB - 1, Math.floor(Z[i] / 0.1))), c = cellOf(i); if (b < 32) bands[c] |= (1 << b) >>> 0; else bands2[c] |= (1 << (b - 32)) >>> 0; }
+  const pc = x => { x = x - ((x >>> 1) & 0x55555555); x = (x & 0x33333333) + ((x >>> 2) & 0x33333333); return (((x + (x >>> 4)) & 0x0F0F0F0F) * 0x01010101) >>> 24; };
+  const VERT = new Uint8Array(N); let nV = 0;
+  for (let i = 0; i < N; i++) { const c = cellOf(i); if (pc(bands[c]) + pc(bands2[c]) >= 6 && Z[i] > 0.05 && Z[i] < H - 0.05) { VERT[i] = 1; nV++; } }
+  // направление стены в ячейке: главная ось облака вертикальных точек в окрестности 10 см (нормаль — поперёк)
+  const cS = new Float64Array(gw * gh * 6); for (let i = 0; i < N; i++) { if (!VERT[i]) continue; const c = cellOf(i) * 6, x = X[i] - x0, y = Y[i] - y0; cS[c] += 1; cS[c + 1] += x; cS[c + 2] += y; cS[c + 3] += x * x; cS[c + 4] += x * y; cS[c + 5] += y * y; }
+  const cN = new Float32Array(gw * gh * 2).fill(NaN);
+  for (let cy = 2; cy < gh - 2; cy++) for (let cx = 2; cx < gw - 2; cx++) { const c0 = cy * gw + cx; if (!cS[c0 * 6]) continue; let n = 0, sx = 0, sy = 0, sxx = 0, sxy = 0, syy = 0;
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) { const c = (c0 + dy * gw + dx) * 6; n += cS[c]; sx += cS[c + 1]; sy += cS[c + 2]; sxx += cS[c + 3]; sxy += cS[c + 4]; syy += cS[c + 5]; }
+    if (n < 6) continue; const mx = sx / n, my = sy / n, a = sxx / n - mx * mx, b = sxy / n - mx * my, d = syy / n - my * my, ang = 0.5 * Math.atan2(2 * b, a - d); // главная ось
+    const l1 = (a + d) / 2 + Math.sqrt(((a - d) / 2) ** 2 + b * b), l2 = (a + d) / 2 - Math.sqrt(((a - d) / 2) ** 2 + b * b); if (l2 > 0.25 * l1) continue; // не линия (угол, мусор)
+    cN[c0 * 2] = -Math.sin(ang); cN[c0 * 2 + 1] = Math.cos(ang); }
+  // ---- ось здания: угол, при котором проекции стен самые «острые» ----
+  const smp = []; for (let i = 0, st = Math.max(1, Math.floor(nV / 60000)), c = 0; i < N; i++) if (VERT[i] && (c++ % st === 0)) smp.push(i);
+  const sharp = a => { const ca = Math.cos(a), sa = Math.sin(a); let sc = 0; for (const dir of [[ca, sa], [-sa, ca]]) { const m = new Map(); for (const i of smp) { const k = Math.round((X[i] * dir[0] + Y[i] * dir[1]) / 0.02); m.set(k, (m.get(k) || 0) + 1); } for (const v of m.values()) sc += v * v; } return sc; };
+  let best = 0, bs = -1; for (let d = 0; d < 90; d += 0.5) { const s = sharp(d * Math.PI / 180); if (s > bs) { bs = s; best = d; } }
+  for (let d = best - 0.5; d <= best + 0.5; d += 0.05) { const s = sharp(d * Math.PI / 180); if (s > bs) { bs = s; best = d; } }
+  const th = best * Math.PI / 180, U = [[Math.cos(th), Math.sin(th)], [-Math.sin(th), Math.cos(th)]];
+  log('ось ' + best.toFixed(2) + '°');
+  const Uu = new Float32Array(N), Vv = new Float32Array(N); for (let i = 0; i < N; i++) { Uu[i] = X[i] * U[0][0] + Y[i] * U[0][1]; Vv[i] = X[i] * U[1][0] + Y[i] * U[1][1]; }
+  const CU = CX.map((x, i) => x * U[0][0] + CY[i] * U[0][1]), CV = CX.map((x, i) => x * U[1][0] + CY[i] * U[1][1]);
+  // ---- плоскости стен ----
+  const walls = [];
+  for (let k = 0; k < 2; k++) {
+    const O = k === 0 ? Uu : Vv, Tt = k === 0 ? Vv : Uu, CO = k === 0 ? CU : CV;
+    for (const sg of [1, -1]) {
+      const dk = U[k], idx = []; for (let i = 0; i < N; i++) { if (!VERT[i] || (CO[SI[i]] - O[i]) * sg <= 0.05) continue; const c = cellOf(i) * 2, nxv = cN[c], nyv = cN[c + 1]; if (!(Math.abs(nxv * dk[0] + nyv * dk[1]) > 0.96)) continue; idx.push(i); }
+      if (idx.length < 100) continue;
+      let omin = Infinity, omax = -Infinity; for (const i of idx) { if (O[i] < omin) omin = O[i]; if (O[i] > omax) omax = O[i]; }
+      const bw = 0.005, nb = Math.ceil((omax - omin) / bw) + 6, hh = new Float32Array(nb); for (const i of idx) hh[Math.floor((O[i] - omin) / bw) + 3]++;
+      const sm = new Float32Array(nb); for (let i = 2; i < nb - 2; i++) sm[i] = hh[i - 2] + 2 * hh[i - 1] + 3 * hh[i] + 2 * hh[i + 1] + hh[i + 2];
+      const pk = []; for (let i = 2; i < nb - 2; i++) { let m = true; for (let j = i - 2; j <= i + 2; j++) if (sm[j] > sm[i]) m = false; if (m && sm[i] > (opt.peak || 160)) pk.push(i); }
+      pk.sort((a, b) => sm[b] - sm[a]); const used = new Uint8Array(N);
+      for (const p of pk) {
+        const o0 = omin + (p - 3 + 0.5) * bw; let inl = idx.filter(i => !used[i] && Math.abs(O[i] - o0) < 0.02); if (inl.length < 60) continue;
+        const ov = inl.map(i => O[i]).sort((a, b) => a - b); let o1 = ov[ov.length >> 1]; inl = idx.filter(i => !used[i] && Math.abs(O[i] - o1) < 0.012); if (inl.length < 40) continue;
+        o1 = inl.reduce((s, i) => s + O[i], 0) / inl.length; for (const i of inl) used[i] = 1;
+        let tmin = Infinity, tmax = -Infinity; for (const i of inl) { if (Tt[i] < tmin) tmin = Tt[i]; if (Tt[i] > tmax) tmax = Tt[i]; }
+        const b0 = Math.floor(tmin / 0.02), nbt = Math.floor(tmax / 0.02) - b0 + 1, occ = new Uint16Array(nbt), zmn = new Float32Array(nbt).fill(9), zmx = new Float32Array(nbt).fill(-9);
+        for (const i of inl) { const b = Math.floor(Tt[i] / 0.02) - b0; occ[b]++; if (Z[i] < zmn[b]) zmn[b] = Z[i]; if (Z[i] > zmx[b]) zmx[b] = Z[i]; }
+        const on = b => occ[b] >= 2 && zmx[b] - zmn[b] > 0.6;
+        for (let j = 0; j < nbt;) { if (!on(j)) { j++; continue; } let s = j, gap = 0, last = j; while (j < nbt && gap <= 3) { if (on(j)) { last = j; gap = 0; } else gap++; j++; }
+          const L = (last - s + 1) * 0.02; if (L < 0.06) continue; let n = 0, za = 9, zb = -9; for (let b = s; b <= last; b++) { n += occ[b]; if (occ[b]) { za = Math.min(za, zmn[b]); zb = Math.max(zb, zmx[b]); } }
+          walls.push({ ax: k, sg, o: o1, t0: (s + b0) * 0.02, t1: (last + 1 + b0) * 0.02, n, zr: [za, zb] }); }
+      }
+    }
+  }
+  log('стен-плоскостей ' + walls.length);
+  const full = walls.filter(w => w.zr[1] > H - 0.35 && w.zr[1] - w.zr[0] > 0.5);
+  // ---- проёмы: дыры в стенах до потолка ----
+  const lines = new Map(); for (const w of full) { const key = w.ax + '|' + w.sg + '|' + Math.round(w.o / 0.02); if (!lines.has(key)) lines.set(key, []); lines.get(key).push(w); }
+  const openings = [];
+  for (const ws of lines.values()) {
+    const ax = ws[0].ax, sg = ws[0].sg; const wsum = ws.reduce((s, w) => s + w.n, 0), o = ws.reduce((s, w) => s + w.o * w.n, 0) / wsum;
+    const t0 = Math.min(...ws.map(w => w.t0)), t1 = Math.max(...ws.map(w => w.t1)); if (t1 - t0 < 0.8) continue;
+    const S_ = ax === 0 ? Vv : Uu, O_ = ax === 0 ? Uu : Vv;
+    const nb = Math.floor((t1 - t0) / 0.02) + 1, nz = Math.floor(H / 0.05) + 1, Gon = new Uint8Array(nb * nz), Gbe = new Uint8Array(nb * nz);
+    const near = [];
+    for (let i = 0; i < N; i++) { const s = S_[i]; if (s < t0 - 0.4 || s > t1 + 0.4) continue; const h = (O_[i] - o) * sg; if (h < -1.2 || h > 0.6) continue; near.push(i);
+      const c = Math.floor((s - t0) / 0.02); if (c < 0 || c >= nb) continue; const zb = Math.max(0, Math.min(nz - 1, Math.floor(Z[i] / 0.05)));
+      if (Math.abs(h) < 0.025) Gon[c * nz + zb] = 1; else if (h < -0.06) Gbe[c * nz + zb] = 1; }
+    const colFrac = (G, c, a, b) => { let n = 0; for (let z = a; z < b; z++) n += G[c * nz + z]; return n / (b - a); };
+    const bA = Math.floor(1.0 / 0.05), bB = Math.floor(1.4 / 0.05), lA = Math.floor(0.15 / 0.05), lB = Math.floor(0.85 / 0.05);
+    const hole = new Uint8Array(nb); for (let c = 0; c < nb; c++) { const hw = 1 - colFrac(Gon, c, bA, bB) > 0.85, be = colFrac(Gbe, c, bA, bB) > 0.15, hd = hw && 1 - colFrac(Gon, c, lA, lB) > 0.85; hole[c] = hw && (be || hd) ? 1 : 0; }
+    for (let i = 0; i < nb;) { if (!hole[i]) { i++; continue; } let j = i; while (j < nb && (hole[j] || (j + 1 < nb && hole[j + 1]))) j++;
+      if ((j - i) * 0.02 >= 0.45) {
+        const a = t0 + i * 0.02, b = t0 + j * 0.02, tops = [], bots = [];
+        for (let c = i; c < j; c++) { let up = -1, dn = -1; for (let z = bB; z < nz; z++) if (Gon[c * nz + z]) { up = z; break; } for (let z = bA - 1; z >= 0; z--) if (Gon[c * nz + z]) { dn = z; break; } if (up >= 0) tops.push(up * 0.05); bots.push(dn >= 0 ? (dn + 1) * 0.05 : 0); }
+        const med = A => { const s = A.slice().sort((x, y) => x - y); return s[s.length >> 1]; };
+        if (tops.length >= 0.6 * (j - i)) { const zhi = med(tops), zlo = med(bots);
+          if (zhi < H - 0.15) { const kind = zlo < 0.25 ? 'door' : 'window', rec = { ax, sg, o, s0: a, s1: b, w: b - a, zlo, zhi, kind };
+            if (kind === 'window') { // подоконник: горизонтальная полка у низа проёма
+              const sl = near.filter(q => { const s = S_[q], h = (O_[q] - o) * sg; return s > a - 0.35 && s < b + 0.35 && Z[q] > zlo - 0.15 && Z[q] < zlo + 0.12 && h > -0.9 && h < 0.5; });
+              const cz = new Map(); for (const q of sl) { const zk = Math.round(Z[q] / 0.01); cz.set(zk, (cz.get(zk) || 0) + 1); } let zb = null, zc = 0; for (const [zk, c] of cz) if (c > zc) { zc = c; zb = zk * 0.01; }
+              if (zb != null && zc > 25) { const m2 = sl.filter(q => Math.abs(Z[q] - zb) < 0.025), ss = m2.map(q => S_[q]).sort((x, y) => x - y), hs = m2.map(q => (O_[q] - o) * sg).sort((x, y) => x - y), pq = (A, f) => A[Math.min(A.length - 1, Math.max(0, Math.floor(A.length * f)))];
+                if (m2.length > 40) rec.sill = { z: zb, s0: pq(ss, 0.01), s1: pq(ss, 0.99), front: pq(hs, 0.99), back: pq(hs, 0.01) }; }
+              const nb2 = near.filter(q => { const s = S_[q], h = (O_[q] - o) * sg; return s > a + 0.05 && s < b - 0.05 && Z[q] > zlo + 0.1 && Z[q] < zhi - 0.1 && h < -0.04 && h > -1.0; }).map(q => -(O_[q] - o) * sg).sort((x, y) => x - y);
+              if (nb2.length > 50) rec.niche = nb2[nb2.length >> 1]; }
+            openings.push(rec); } } }
+      i = j + 1; }
+  }
+  log('проёмов ' + openings.length);
+  // ---- помещения: потолок (горизонт выше 2,3 м), границы — стены до потолка; разрывы до 1,3 м на линии стены закрыты ----
+  let u0 = Infinity, v0 = Infinity, u1 = -Infinity, v1 = -Infinity; for (let i = 0; i < N; i++) { if (Uu[i] < u0) u0 = Uu[i]; if (Uu[i] > u1) u1 = Uu[i]; if (Vv[i] < v0) v0 = Vv[i]; if (Vv[i] > v1) v1 = Vv[i]; }
+  u0 -= 0.3; v0 -= 0.3; u1 += 0.3; v1 += 0.3; const R = 0.01, nx = Math.ceil((u1 - u0) / R) + 1, ny = Math.ceil((v1 - v0) / R) + 1;
+  const czmin = new Float32Array(nx * ny).fill(99), czmax = new Float32Array(nx * ny).fill(-99);
+  for (let i = 0; i < N; i++) { if (Z[i] < 2.3) continue; const c = Math.floor((Vv[i] - v0) / R) * nx + Math.floor((Uu[i] - u0) / R); if (Z[i] < czmin[c]) czmin[c] = Z[i]; if (Z[i] > czmax[c]) czmax[c] = Z[i]; }
+  let M = new Uint8Array(nx * ny); for (let c = 0; c < M.length; c++) if (czmax[c] > -99 && czmax[c] - czmin[c] < 0.05) M[c] = 1;
+  const morph = (A, r, dil) => { const B = new Uint8Array(A.length), T = new Uint8Array(A.length);
+    for (let y = 0; y < ny; y++) { let run = 0; const row = y * nx; // по строкам: скользящее окно
+      const pre = new Int32Array(nx + 1); for (let x = 0; x < nx; x++) pre[x + 1] = pre[x] + A[row + x];
+      for (let x = 0; x < nx; x++) { const a = Math.max(0, x - r), b = Math.min(nx, x + r + 1), s = pre[b] - pre[a]; T[row + x] = dil ? (s > 0 ? 1 : 0) : (s === b - a ? 1 : 0); } void run; }
+    const pre = new Int32Array(ny + 1); for (let x = 0; x < nx; x++) { for (let y = 0; y < ny; y++) pre[y + 1] = pre[y] + T[y * nx + x]; for (let y = 0; y < ny; y++) { const a = Math.max(0, y - r), b = Math.min(ny, y + r + 1), s = pre[b] - pre[a]; B[y * nx + x] = dil ? (s > 0 ? 1 : 0) : (s === b - a ? 1 : 0); } }
+    return B; };
+  M = morph(morph(M, 3, true), 3, false); M = morph(morph(M, 1, false), 1, true);
+  const Bar = new Uint8Array(nx * ny); const line = (ua, va, ub, vb) => { const n = Math.ceil(Math.hypot(ub - ua, vb - va) / (R * 0.5)) + 1; for (let s = 0; s <= n; s++) { const u = ua + (ub - ua) * s / n, v = va + (vb - va) * s / n, x = Math.round((u - u0) / R), y = Math.round((v - v0) / R); for (let dy = -1; dy <= 0; dy++) for (let dx = -1; dx <= 0; dx++) { const xx = x + dx, yy = y + dy; if (xx >= 0 && yy >= 0 && xx < nx && yy < ny) Bar[yy * nx + xx] = 1; } } };
+  const segUV = w => w.ax === 0 ? [w.o, w.t0, w.o, w.t1] : [w.t0, w.o, w.t1, w.o];
+  for (const w of full) line(...segUV(w));
+  // стык стены с потолком: в ячейке 2 см точки верхних 45 см по высоте занимают > 25 см — это стена/перемычка до потолка
+  { const zlo = new Float32Array(gw * gh).fill(99), zhi = new Float32Array(gw * gh).fill(-99);
+    for (let i = 0; i < N; i++) { if (Z[i] < H - 0.45 || Z[i] > H - 0.04) continue; const c = cellOf(i); if (Z[i] < zlo[c]) zlo[c] = Z[i]; if (Z[i] > zhi[c]) zhi[c] = Z[i]; }
+    let nb = 0; for (let c = 0; c < zlo.length; c++) { if (zhi[c] - zlo[c] < 0.25) continue; const xw = x0 + (c % gw + 0.5) * g, yw = y0 + (((c / gw) | 0) + 0.5) * g, u = xw * U[0][0] + yw * U[0][1], v = xw * U[1][0] + yw * U[1][1], x = Math.floor((u - u0) / R), y = Math.floor((v - v0) / R);
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, yy = y + dy; if (xx >= 0 && yy >= 0 && xx < nx && yy < ny) Bar[yy * nx + xx] = 1; } nb++; }
+    log('стык с потолком: ячеек ' + nb); }
+  { const grp = new Map(); for (const w of full) { const key = w.ax + '|' + Math.round(w.o / 0.03); if (!grp.has(key)) grp.set(key, []); grp.get(key).push(w); }
+    for (const ws of grp.values()) { ws.sort((a, b) => a.t0 - b.t0); let end = ws[0].t1; const o = ws.reduce((s, w) => s + w.o, 0) / ws.length, ax = ws[0].ax;
+      for (const w of ws.slice(1)) { const gp = w.t0 - end; if (gp > 0 && gp < 1.3) { if (ax === 0) line(o, end, o, w.t0); else line(end, o, w.t0, o); } end = Math.max(end, w.t1); } } }
+  // ниши окон — в помещение
+  for (const op of openings) { if (op.kind !== 'window' || !(op.niche > 0.05 && op.niche < 0.7)) continue; const a = op.o - op.sg * op.niche, b = op.o; const lo = Math.min(a, b), hi = Math.max(a, b);
+    for (let s = op.s0; s <= op.s1; s += R) for (let t = lo; t <= hi; t += R) { const u = op.ax === 0 ? t : s, v = op.ax === 0 ? s : t, x = Math.round((u - u0) / R), y = Math.round((v - v0) / R); if (x >= 0 && y >= 0 && x < nx && y < ny) M[y * nx + x] = 1; } }
+  const free = new Uint8Array(nx * ny); let sM = 0, sB = 0, sF = 0; for (let c = 0; c < free.length; c++) { free[c] = M[c] && !Bar[c] ? 1 : 0; sM += M[c]; sB += Bar[c]; sF += free[c]; } log('потолок ' + (sM * R * R).toFixed(1) + ' м², границы ' + (sB * R * R).toFixed(1) + ', свободно ' + (sF * R * R).toFixed(1));
+  const lab = new Int32Array(nx * ny), comps = []; let nl = 0; const q = new Int32Array(nx * ny);
+  for (let c0 = 0; c0 < free.length; c0++) { if (!free[c0] || lab[c0]) continue; nl++; let h = 0, t = 0; q[t++] = c0; lab[c0] = nl; let xmin = nx, xmax = 0, ymin = ny, ymax = 0, n = 0;
+    while (h < t) { const c = q[h++], x = c % nx, y = (c / nx) | 0; n++; if (x < xmin) xmin = x; if (x > xmax) xmax = x; if (y < ymin) ymin = y; if (y > ymax) ymax = y;
+      for (const d of [1, -1, nx, -nx]) { const e = c + d; if (e < 0 || e >= free.length || lab[e] || !free[e]) continue; if ((d === 1 && x === nx - 1) || (d === -1 && x === 0)) continue; lab[e] = nl; q[t++] = e; } }
+    if (n * R * R >= 0.1) comps.push({ id: nl, n, xmin, xmax, ymin, ymax }); }
+  // узкие полосы (за шторой, ниша, верх шкафа): средняя ширина < 45 см — присоединить к соседу через тонкую границу
+  { const byId = new Map(comps.map(c => [c.id, c])); comps.sort((a, b) => a.n - b.n); const isSl = c => { const L = Math.max(c.xmax - c.xmin + 1, c.ymax - c.ymin + 1) * R, A = c.n * R * R; return A <= 2.5 && A / L <= 0.45; };
+    for (const cp of comps) { const L = Math.max(cp.xmax - cp.xmin + 1, cp.ymax - cp.ymin + 1) * R, A = cp.n * R * R; if (A > 2.5 || A / L > 0.45) continue;
+      const cnt = new Map(); for (let y = cp.ymin; y <= cp.ymax; y++) for (let x = cp.xmin; x <= cp.xmax; x++) { const c = y * nx + x; if (lab[c] !== cp.id) continue;
+        for (const [ddx, ddy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (let k = 1; k <= 7; k++) { const xx = x + ddx * k, yy = y + ddy * k; if (xx < 0 || yy < 0 || xx >= nx || yy >= ny) break; const l = lab[yy * nx + xx]; if (l === cp.id) break; if (l && byId.has(l) && !isSl(byId.get(l))) { cnt.set(l, (cnt.get(l) || 0) + 1); break; } } }
+      let bt = 0, bc = 0; for (const [l, c] of cnt) if (c > bc && l !== cp.id) { bc = c; bt = l; } if (opt.dbg) log("полоса id" + cp.id + " uv " + [u0 + cp.xmin * R, v0 + cp.ymin * R, u0 + cp.xmax * R, v0 + cp.ymax * R].map(t => t.toFixed(2)).join(",") + " " + A.toFixed(2) + " L " + L.toFixed(2) + " контакт " + (bc * R).toFixed(2) + " " + JSON.stringify([...cnt])); if (!bt || bc * R < 0.5 * L) continue;
+      cp.to = bt; }
+    for (const cp of comps) { if (!cp.to) continue; let bt = cp.to; while (byId.get(bt) && byId.get(bt).to) bt = byId.get(bt).to; const A = cp.n * R * R;
+      const T = byId.get(bt); for (let y = cp.ymin; y <= cp.ymax; y++) for (let x = cp.xmin; x <= cp.xmax; x++) { const c = y * nx + x; if (lab[c] === cp.id) lab[c] = bt; }
+      T.n += cp.n; T.xmin = Math.min(T.xmin, cp.xmin); T.xmax = Math.max(T.xmax, cp.xmax); T.ymin = Math.min(T.ymin, cp.ymin); T.ymax = Math.max(T.ymax, cp.ymax); cp.dead = 1; if (opt.dbg) log('полоса ' + A.toFixed(2) + ' → к соседу'); } }
+  for (let i = comps.length - 1; i >= 0; i--) if (comps[i].dead || comps[i].n * R * R < 0.45) comps.splice(i, 1);
+  // контур компоненты: закрыть мелкие щели, обойти границу, упростить, сделать ортогональным, прижать к стенам
+  const rooms = [];
+  for (const cp of comps) {
+    const pad = 8, w = cp.xmax - cp.xmin + 1 + 2 * pad, h = cp.ymax - cp.ymin + 1 + 2 * pad; let m = new Uint8Array(w * h);
+    for (let y = cp.ymin; y <= cp.ymax; y++) for (let x = cp.xmin; x <= cp.xmax; x++) if (lab[y * nx + x] === cp.id) m[(y - cp.ymin + pad) * w + (x - cp.xmin + pad)] = 1;
+    m = closeLocal(m, w, h, 5);
+    const ctr = traceBoundary(m, w, h); if (opt.dbg) log("комп id" + cp.id + " uv " + [u0 + cp.xmin * R, v0 + cp.ymin * R, u0 + cp.xmax * R, v0 + cp.ymax * R].map(t => t.toFixed(2)).join(",") + " " + (cp.n * R * R).toFixed(2) + ' м², контур ' + ctr.length); if (ctr.length < 8) continue;
+    const simp = dpSimplify(ctr, 3).map(([x, y]) => [u0 + (x + cp.xmin - pad) * R, v0 + (y + cp.ymin - pad) * R]);
+    let E = orthoEdges(simp); if (opt.dbg) log('  упрощ ' + simp.length + ' рёбер ' + E.length); if (E.length < 4) continue;
+    let V = edgeVerts(E); const rp = interiorPoint(V);
+    for (let ei = 0; ei < E.length; ei++) { const e = E[ei], ax = e[0], c0 = e[1], kk = 1 - ax, inn = rp[1 - ax] > c0 ? 1 : -1, a = V[ei], b = V[(ei + 1) % E.length], lo = Math.min(a[ax], b[ax]), hi = Math.max(a[ax], b[ax]); let bst = null;
+      for (const wl of full) { if (wl.ax !== kk || wl.sg !== inn) continue; const out = (c0 - wl.o) * inn; if (out < -0.03 || out > 0.5) continue; const ov = Math.min(hi, wl.t1) - Math.max(lo, wl.t0); if (ov < 0.25 * (hi - lo) || ov < 0.05) continue; const sc = ov / Math.sqrt(0.02 + Math.abs(out)); if (!bst || sc > bst[0]) bst = [sc, wl.o]; }
+      if (bst) e[1] = bst[1]; }
+    V = edgeVerts(E); const A = Math.abs(polyArea(V)); if (opt.dbg) log('  площадь ' + A.toFixed(2)); if (A < 0.4) continue;
+    rooms.push({ V: V.map(([u, v]) => [u * U[0][0] + v * U[1][0], u * U[0][1] + v * U[1][1]]), area: A });
+  }
+  rooms.sort((a, b) => b.area - a.area);
+  log('помещений ' + rooms.length);
+  const toW = (u, v) => [u * U[0][0] + v * U[1][0], u * U[0][1] + v * U[1][1]];
+  const opW = openings.map(o => { const A = o.ax === 0 ? toW(o.o, o.s0) : toW(o.s0, o.o), B = o.ax === 0 ? toW(o.o, o.s1) : toW(o.s1, o.o), nIn = o.ax === 0 ? toW(o.sg, 0) : toW(0, o.sg);
+    return { kind: o.kind, a: A, b: B, w: o.w, zlo: o.zlo, zhi: o.zhi, nIn, niche: o.niche || null, sill: o.sill ? { ...o.sill, A: o.ax === 0 ? toW(o.o, o.sill.s0) : toW(o.sill.s0, o.o), B: o.ax === 0 ? toW(o.o, o.sill.s1) : toW(o.sill.s1, o.o) } : null }; });
+  return { axis: best, H, walls: walls.map(w => ({ ...w, A: w.ax === 0 ? toW(w.o, w.t0) : toW(w.t0, w.o), B: w.ax === 0 ? toW(w.o, w.t1) : toW(w.t1, w.o) })), rooms, openings: opW };
+}
+function closeLocal(m, w, h, r) { const dil = (A, d) => { const B = new Uint8Array(A.length); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let v = d ? 0 : 1; for (let dy = -r; dy <= r && (d ? !v : v); dy++) for (let dx = -r; dx <= r; dx++) { const xx = x + dx, yy = y + dy; const a = xx >= 0 && yy >= 0 && xx < w && yy < h ? A[yy * w + xx] : 0; if (d && a) { v = 1; break; } if (!d && !a) { v = 0; break; } } B[y * w + x] = v; } return B; }; return dil(dil(m, true), false); }
+function traceBoundary(m, w, h) { // Мур: внешний контур самой большой области
+  let s = -1; for (let i = 0; i < m.length; i++) if (m[i]) { s = i; break; } if (s < 0) return [];
+  const D = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]], at = (x, y) => x >= 0 && y >= 0 && x < w && y < h && m[y * w + x];
+  let x = s % w, y = (s / w) | 0, dir = 7; const out = [[x, y]], sx = x, sy = y; let guard = 0;
+  do { let found = false; for (let k = 0; k < 8; k++) { const d = (dir + 6 + k) % 8, nx = x + D[d][0], ny = y + D[d][1]; if (at(nx, ny)) { x = nx; y = ny; dir = d; found = true; break; } } if (!found) break; out.push([x, y]); } while ((x !== sx || y !== sy) && ++guard < 2e6);
+  return out; }
+function dpSimplify(P0, eps) { // замкнутый контур: делим в самой дальней от начала точке и упрощаем обе половины
+  let P = P0.slice(); if (P.length > 2 && P[0][0] === P[P.length - 1][0] && P[0][1] === P[P.length - 1][1]) P.pop(); if (P.length < 4) return P;
+  let far = 0, fd = -1; for (let i = 1; i < P.length; i++) { const d = (P[i][0] - P[0][0]) ** 2 + (P[i][1] - P[0][1]) ** 2; if (d > fd) { fd = d; far = i; } }
+  const A = dpOpen(P.slice(0, far + 1), eps), B = dpOpen(P.slice(far).concat([P[0]]), eps); return A.concat(B.slice(1, -1)); }
+function dpOpen(P, eps) { if (P.length < 3) return P; const keep = new Uint8Array(P.length); keep[0] = keep[P.length - 1] = 1; const st = [[0, P.length - 1]];
+  while (st.length) { const [a, b] = st.pop(); let md = -1, mi = -1; const [ax, ay] = P[a], [bx, by] = P[b], L = Math.hypot(bx - ax, by - ay) || 1e-9; for (let i = a + 1; i < b; i++) { const d = Math.abs((bx - ax) * (ay - P[i][1]) - (ax - P[i][0]) * (by - ay)) / L; if (d > md) { md = d; mi = i; } } if (md > eps) { keep[mi] = 1; st.push([a, mi], [mi, b]); } }
+  return P.filter((_, i) => keep[i]); }
+function orthoEdges(V) { const E = [];
+  for (let i = 0; i < V.length; i++) { const a = V[i], b = V[(i + 1) % V.length], du = b[0] - a[0], dv = b[1] - a[1], ax = Math.abs(du) >= Math.abs(dv) ? 1 : 0, L = Math.abs(ax ? du : dv), c = ax ? (a[1] + b[1]) / 2 : (a[0] + b[0]) / 2; // ax=1: ребро v=c, ax=0: ребро u=c
+    if (E.length && E[E.length - 1][0] === ax) { const e = E[E.length - 1], ww = e[2] + L; e[1] = (e[1] * e[2] + c * L) / (ww || 1); e[2] = ww; } else E.push([ax, c, L]); }
+  if (E.length > 1 && E[0][0] === E[E.length - 1][0]) { const e = E.pop(), ww = E[0][2] + e[2]; E[0][1] = (E[0][1] * E[0][2] + e[1] * e[2]) / ww; E[0][2] = ww; }
+  // мелкие уступы (< 4 см) — убрать
+  for (let it = 0; it < 50 && E.length > 4; it++) { const V2 = edgeVerts(E); let done = true; for (let i = 0; i < E.length; i++) { const a = V2[i], b = V2[(i + 1) % E.length]; if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 0.04) { const j = (i - 1 + E.length) % E.length, k = (i + 1) % E.length; if (E[j][0] === E[k][0]) { const ww = E[j][2] + E[k][2]; E[j][1] = (E[j][1] * E[j][2] + E[k][1] * E[k][2]) / ww; E[j][2] = ww; const rm = [i, k].sort((x, y) => y - x); for (const r of rm) E.splice(r, 1); done = false; break; } } } if (done) break; }
+  return E; }
+function edgeVerts(E) { const V = []; for (let i = 0; i < E.length; i++) { const e0 = E[(i - 1 + E.length) % E.length], e1 = E[i]; V.push(e0[0] === 1 ? [e1[1], e0[1]] : [e0[1], e1[1]]); } return V; } // вершина i — между рёбрами i-1 и i
+function polyArea(V) { let s = 0; for (let i = 0; i < V.length; i++) { const a = V[i], b = V[(i + 1) % V.length]; s += a[0] * b[1] - b[0] * a[1]; } return s / 2; }
+function interiorPoint(V) { let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity; for (const p of V) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }
+  const inside = (x, y) => { let c = false; for (let i = 0, j = V.length - 1; i < V.length; j = i++) { const a = V[i], b = V[j]; if ((a[1] > y) !== (b[1] > y) && x < (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0]) c = !c; } return c; };
+  let best = null, bd = -1; const st = Math.max(x1 - x0, y1 - y0) / 25; for (let x = x0 + st / 2; x < x1; x += st) for (let y = y0 + st / 2; y < y1; y += st) if (inside(x, y)) { let d = 1e9; for (let i = 0; i < V.length; i++) { const a = V[i], b = V[(i + 1) % V.length], dx = b[0] - a[0], dy = b[1] - a[1], L = dx * dx + dy * dy || 1e-9; let t = ((x - a[0]) * dx + (y - a[1]) * dy) / L; t = Math.max(0, Math.min(1, t)); d = Math.min(d, Math.hypot(a[0] + t * dx - x, a[1] + t * dy - y)); } if (d > bd) { bd = d; best = [x, y]; } }
+  return best || [(x0 + x1) / 2, (y0 + y1) / 2]; }
+</script>
 <script id="wsrc" type="text/plain">// фоновое чтение E57: прореживание, пол/потолок, гистограмма высот
 self.onmessage = e => {
   if (e.data.cmd === 'auto') return autoJob(e.data);
+  if (e.data.cmd === 'scanplan') { const job = e.data.job; try { const r = scanPlan(e.data.scans, { log: t => self.postMessage({ job, prog: 0.5, stage: t }) }); self.postMessage({ job, done: true, res: r }); } catch (err) { self.postMessage({ job, error: String(err && err.message || err) }); } return; }
   if (e.data.cmd === 'refine') return refineJob(e.data);
   if (e.data.cmd === 'spheres') return sphereJob(e.data);
   const { job, name, buf, voxel } = e.data;
@@ -1074,7 +1271,7 @@ async function restore() {
 
 // ---------- загрузка E57 ----------
 let worker = null;
-function getWorker() { if (worker) return worker; const src = document.getElementById('e57src').textContent + '\n' + document.getElementById('wsrc').textContent; worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' }))); return worker; }
+function getWorker() { if (worker) return worker; const src = document.getElementById('e57src').textContent + '\n' + document.getElementById('spsrc').textContent + '\n' + document.getElementById('wsrc').textContent; worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' }))); return worker; }
 function readOne(file, voxel) { return new Promise((res, rej) => { file.arrayBuffer().then(buf => { const w = getWorker(), job = Math.random(); const on = e => { const d = e.data; if (d.job !== job) return; if (d.prog != null) { busy(`Читаю ${file.name}… ${Math.round(d.prog * 100)}%`); return; } w.removeEventListener('message', on); if (d.error) rej(new Error(d.error)); else res(d.scans); }; w.addEventListener('message', on); w.postMessage({ job, name: file.name.replace(/\.e57$/i, ''), buf, voxel }, [buf]); }, rej); }); }
 async function loadFiles(files) {
   files = [...files].filter(f => /\.e57$/i.test(f.name)); if (!files.length) { uiAlert('Нужны файлы .e57 (сканы FARO пересохраняются в E57 файлом fls_to_e57.bat).'); return; }
@@ -1477,6 +1674,74 @@ function buildWalls() {
   } catch (e) { busy(''); console.error(e); uiAlert('Не получилось найти стены: ' + e.message); } }, 30);
 }
 
+// --- план по сканам: стены во всю высоту, помещения по потолку, проёмы — дыры в стенах (алгоритм в spsrc) ---
+const ROOMCOL = ['rgba(37,99,235,.10)', 'rgba(234,88,12,.10)', 'rgba(22,163,74,.11)', 'rgba(219,39,119,.09)', 'rgba(124,58,237,.10)', 'rgba(202,138,4,.12)', 'rgba(8,145,178,.11)'];
+function runScanPlan(scans) { return new Promise((res, rej) => { const w = getWorker(), job = Math.random(); const on = e => { const d = e.data; if (d.job !== job) return; if (d.prog != null && !d.done) { busy('План по сканам: ' + (d.stage || '…').replace(/\s*\(.*$/, '')); return; } w.removeEventListener('message', on); if (d.error) rej(new Error(d.error)); else res(d.res); }; w.addEventListener('message', on);
+  w.postMessage({ cmd: 'scanplan', job, scans }, scans.map(q => q.P.buffer)); }); }
+async function planFromScans() {
+  const L = S.scans.filter(s => s.vis); if (!L.length) { uiAlert('Нет видимых сканов.'); return; }
+  busy('План по сканам: собираю точки…'); await new Promise(r => setTimeout(r, 30));
+  try {
+    const scans = [];
+    for (const s of L) { const P = s.pts, c = Math.cos(s.pose.a), sn = Math.sin(s.pose.a), cg = s.cg, er = cg && cg.er, out = new Float32Array(P.length); let n = 0;
+      for (let i = 0; i < P.length; i += 3) { const x = P[i], y = P[i + 1];
+        if (er) { const u = Math.floor((x - cg.x0) / cg.res), v = Math.floor((cg.y1 - y) / cg.res); if (u >= 0 && v >= 0 && u < cg.w && v < cg.h && er[v * cg.w + u]) continue; }
+        out[n++] = c * x - sn * y + s.pose.x; out[n++] = sn * x + c * y + s.pose.y; out[n++] = P[i + 2] - s.floor; }
+      scans.push({ P: out.slice(0, n), cx: s.pose.x, cy: s.pose.y }); }
+    const r = await runScanPlan(scans); applyScanPlan(r);
+  } catch (e) { busy(''); console.error(e); uiAlert('Не получилось построить план: ' + e.message); }
+}
+const polyA = V => { let a = 0; for (let i = 0; i < V.length; i++) { const p = V[i], q = V[(i + 1) % V.length]; a += p[0] * q[1] - q[0] * p[1]; } return a / 2; };
+function applyScanPlan(r) {
+  const pl = PL(); pushUndo(); pl.walls = []; pl.ops = []; pl.nextW = 1; pl.nextO = 1; pl.rooms = [];
+  r.rooms.forEach((rm, ri) => { const V = rm.V, ccw = polyA(V) > 0, num = ri + 1; pl.rooms.push({ num }); let k = 0;
+    for (let i = 0; i < V.length; i++) { const a = V[i], b = V[(i + 1) % V.length]; if (len(sub(b, a)) < 0.01) continue; pl.walls.push({ id: pl.nextW++, a: [a[0], a[1]], b: [b[0], b[1]], room: num, k: k++, inL: ccw }); } });
+  let nD = 0, nW = 0, nS = 0;
+  for (const o of r.openings) { const u = unit(sub(o.b, o.a)), nIn = o.nIn; let face = null, back = null;
+    for (const w of pl.walls) { const v = wDir(w); if (Math.abs(u[0] * v[1] - u[1] * v[0]) > 0.05) continue; const dn = dot(sub(w.a, o.a), nIn), Lw = wLen(w);
+      const ta = dot(sub(o.a, w.a), v), tb = dot(sub(o.b, w.a), v), t0 = Math.max(0, Math.min(ta, tb)), t1 = Math.min(Lw, Math.max(ta, tb)); if (t1 - t0 < Math.max(0.3, 0.6 * o.w)) continue;
+      if (Math.abs(dn) < 0.08) { if (!face || Math.abs(dn) < face.d) face = { w, t0, t1, d: Math.abs(dn) }; }
+      else if (o.kind === 'door' && dn < -0.04 && dn > -0.5) { if (!back || -dn < back.d) back = { w, t0, t1, d: -dn }; } }
+    if (!face && !back) continue; const kind = o.kind === 'door' ? 'door' : 'window'; kind === 'door' ? nD++ : nW++;
+    for (const f of [face, back]) { if (!f) continue; const op = { id: pl.nextO++, w: f.w.id, t0: f.t0, t1: f.t1, kind, zlo: +o.zlo.toFixed(2), zhi: +o.zhi.toFixed(2) };
+      if (f === face && o.sill && o.sill.front > 0.02) { const v = wDir(f.w), sa = dot(sub(o.sill.A, f.w.a), v), sb = dot(sub(o.sill.B, f.w.a), v), L = wLen(f.w); op.sill = { t0: Math.max(0, Math.min(sa, sb)), t1: Math.min(L, Math.max(sa, sb)), front: +o.sill.front.toFixed(3), dep: +(o.sill.front - o.sill.back).toFixed(3), z: +o.sill.z.toFixed(2) }; nS++; }
+      pl.ops.push(op); } }
+  busy(''); S.planSel = null; S._slice = null; setView('plan'); saveSoon();
+  const R = roomPolys(); stat(`План по сканам: помещений ${R.length} (${R.map(q => nf(q.area, 2)).join(' · ')} м²), дверей ${nD}, окон ${nW}, подоконников ${nS}. Проверьте по срезу; окна и подоконники лучше домерить Рулеткой — «⬇ Для Рулетки».`);
+}
+function roomPolys() { const pl = PL(), out = []; for (const rm of pl.rooms || []) { const W = pl.walls.filter(w => w.room === rm.num).sort((a, b) => a.k - b.k); if (W.length < 3) continue;
+    const V = W.map((w, i) => { const p = W[(i - 1 + W.length) % W.length]; const X = lineX(p.a, p.b, w.a, w.b); const e = w.inL === false ? w.b : w.a, s0 = w.inL === false ? w.a : w.b; void s0; return X && len(sub(X, e)) < 0.6 ? X : e; });
+    const A = Math.abs(polyA(V)); if (A < 0.2) continue; let c = [0, 0]; try { c = interiorPoint(V); } catch (e) { c = V.reduce((s, p) => addv(s, mul(p, 1 / V.length)), [0, 0]); }
+    out.push({ num: rm.num, V, W, area: A, c }); } return out; }
+// --- файл проекта для Рулетки: помещения — контуры с замерами сторон, проёмы на сторонах, подоконники ---
+function exportRuletka() {
+  const R = roomPolys(); if (!R.length) { uiAlert('Сначала «🏠 План по сканам» — нужны помещения.'); return; }
+  let mx = 1e9, my = 1e9; for (const r of R) for (const p of r.V) { mx = Math.min(mx, p[0]); my = Math.min(my, p[1]); }
+  const T = p => [+(p[0] - mx).toFixed(4), +(p[1] - my).toFixed(4)];
+  const pts = [], meas = [], edges = [], rooms = [], objs = []; let nid = 1, nm = 1;
+  const addp = (v, soft) => { const q = T(v), p = { id: nid++, x0: q[0], y0: q[1], x: q[0], y: q[1] }; if (soft) p.soft = true; pts.push(p); return p.id; };
+  const addm = (a, b, L) => meas.push({ id: nm++, type: 'dist', a, b, v: +L.toFixed(4), on: true, src: 'scan' });
+  for (const r of R) { const n = r.V.length, ccw = polyA(r.V) > 0, VV = [], fl = new Map(), sills = [];
+    for (let i = 0; i < n; i++) { const a = r.V[i], b = r.V[(i + 1) % n], w = r.W[i], d = sub(b, a), L = len(d); if (L < 0.005) continue; const u = mul(d, 1 / L), nIn = ccw ? [-u[1], u[0]] : [u[1], -u[0]];
+      VV.push(a); const tOf = t => dot(sub(addv(w.a, mul(wDir(w), t)), a), u); // параметр стены → вдоль стороны помещения
+      const cuts = PL().ops.filter(o => o.w === w.id).map(o => { const p = tOf(o.t0), q = tOf(o.t1); return { t0: Math.max(0, Math.min(p, q)), t1: Math.min(L, Math.max(p, q)), o }; }).filter(c => c.t1 - c.t0 > 0.1).sort((x, y) => x.t0 - y.t0); let last = 0;
+      for (const c of cuts) { if (c.t0 < last + 0.02) continue; const q0 = addv(a, mul(u, c.t0)), q1 = addv(a, mul(u, c.t1)); if (c.t0 > 0.005) VV.push(q0); else VV[VV.length - 1] = q0; fl.set(VV.length - 1, c.o); if (L - c.t1 > 0.005) VV.push(q1); last = c.t1;
+        if (c.o.sill) { const s = c.o.sill, p = tOf(s.t0), q = tOf(s.t1), s0 = Math.min(p, q), s1 = Math.max(p, q); sills.push({ W1: addv(a, mul(u, s0)), W2: addv(a, mul(u, s1)), nIn, s }); } } }
+    const ids = [], V2 = []; VV.forEach((v, i) => { if (V2.length && len(sub(v, V2[V2.length - 1])) < 0.005) { if (fl.has(i)) fl.set(V2.length - 1, fl.get(i)); return; } if (fl.has(i) && V2.length !== i) { fl.set(V2.length, fl.get(i)); fl.delete(i); } V2.push(v); });
+    if (V2.length > 1 && len(sub(V2[0], V2[V2.length - 1])) < 0.005) V2.pop();
+    for (const v of V2) ids.push(addp(v));
+    for (let i = 0; i < ids.length; i++) { const L = len(sub(V2[(i + 1) % V2.length], V2[i])), e = { a: ids[i], b: ids[(i + 1) % ids.length] }, o = fl.get(i); if (o) { e.open = true; e.kind = o.kind === 'door' ? 'door' : o.kind === 'window' ? 'window' : 'gap'; } edges.push(e); if (L > 0.02) addm(e.a, e.b, L); }
+    rooms.push({ num: r.num, name: 'Помещение', ids });
+    for (const sl of sills) { const { W1, W2, nIn, s } = sl, S2 = addv(W2, mul(nIn, s.front)), S1 = addv(W1, mul(nIn, s.front)), q = [W1, W2, S2, S1].map(p => addp(p, true));
+      for (let i = 0; i < 4; i++) edges.push({ a: q[i], b: q[(i + 1) % 4] }); for (let i = 1; i < 4; i++) meas.push({ id: nm++, type: 'right', a: q[i - 1], b: q[i], c: q[(i + 1) % 4], on: true });
+      addm(q[3], q[2], len(sub(W2, W1))); addm(q[3], q[0], s.front); objs.push({ id: objs.length + 1, type: 'sill', ids: q, base: 0, dep: s.dep }); } }
+  const M = { pts, meas, edges, rooms, chains: [], objs, notes: [], marks: [], nextId: nid, nextMeas: nm, cond: false, ortho: true, axis: null, snap90: true, lastNum: {}, zoomLog: [], gpsHidden: [], scaleFit: false, scaleAsked: true };
+  const name = ((pjCur() && pjCur().name) || 'План') + ' — по сканам';
+  const j = { app: 'scan2plan', v: 1, creator: 'Скан → План по сканам', pname: name, scans: [], groups: [], plans: {}, sheetOpt: null, tape: { zl: [], M, pages: {} } };
+  const blob = new Blob([JSON.stringify(j)], { type: 'application/json' }), a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name.replace(/[\\/:*?"<>|]/g, '_') + '.scanplan.json'; document.body.appendChild(a); a.click(); a.remove();
+  stat(`Файл для Рулетки сохранён: помещений ${rooms.length}, подоконников ${objs.length}. В Рулетке: «📁 Проект → Открыть файл».`);
+}
+
 // --- правка ---
 const JOIN = 0.015;
 function joinedAt(w, end) { const P = w[end], out = []; for (const o of PL().walls) { if (o === w) continue; for (const e of ['a', 'b']) if (len(sub(o[e], P)) < JOIN) out.push({ w: o, end: e }); } return out; }
@@ -1520,6 +1785,9 @@ function drawPlan() {
   if (S.planBg === 'scans') { for (const sc of S.scans) if (sc.vis) drawScan(ctx, sc, V, W, H, 0.45); }
   else if (S.planBg !== false) drawSlice(ctx, V, W, H);
   const sel = S.planSel;
+  for (const r of roomPolys()) { const P = r.V.map(toS); ctx.fillStyle = ROOMCOL[(r.num - 1) % ROOMCOL.length]; ctx.beginPath(); P.forEach((p, i) => i ? ctx.lineTo(...p) : ctx.moveTo(...p)); ctx.closePath(); ctx.fill();
+    const c = toS(r.c); ctx.fillStyle = '#334'; ctx.textAlign = 'center'; ctx.font = `bold ${13 * d}px system-ui`; ctx.fillText(String(r.num), c[0], c[1] - 3 * d); ctx.font = `${12 * d}px system-ui`; ctx.fillText(nf(r.area, 2) + ' м²', c[0], c[1] + 12 * d); }
+  for (const o of PL().ops) if (o.sill) { const w = wById(o.w); if (!w) continue; const u = wDir(w), n = mul([-u[1], u[0]], w.inL === false ? -1 : 1), A = addv(w.a, mul(u, o.sill.t0)), B = addv(w.a, mul(u, o.sill.t1)); ctx.save(); ctx.strokeStyle = '#7c3aed'; ctx.lineWidth = 1.5 * d; ctx.beginPath(); [A, addv(A, mul(n, o.sill.front)), addv(B, mul(n, o.sill.front)), B].map(toS).forEach((p, i) => i ? ctx.lineTo(...p) : ctx.moveTo(...p)); ctx.stroke(); ctx.restore(); }
   for (const w of PL().walls) { const A = toS(w.a), B = toS(w.b), isSel = sel && sel.w === w.id; const ops = PL().ops.filter(o => o.w === w.id).sort((p, q) => p.t0 - q.t0), u = wDir(w);
     ctx.strokeStyle = isSel ? '#2563eb' : '#111'; ctx.lineWidth = (isSel ? 4 : 3) * d; ctx.lineCap = 'round';
     let t = 0; const L = wLen(w); const seg = (t0, t1) => { if (t1 - t0 <= 0) return; ctx.beginPath(); ctx.moveTo(...toS(addv(w.a, mul(u, t0)))); ctx.lineTo(...toS(addv(w.a, mul(u, t1)))); ctx.stroke(); };
@@ -1590,10 +1858,11 @@ function wallByPoints(w0) {
 // --- карточка выбранного: длина числом, проёмы, действия ---
 function renderPlanCard() {
   let el = $('#pcard'); const sel = S.planSel; if (!el) { el = document.createElement('div'); el.id = 'pcard'; $('#main').appendChild(el); }
-  if (!sel) { el.innerHTML = `<div class="pc-h">План: стен ${PL().walls.length}, проёмов ${PL().ops.length}</div><div class="pc-r"><button id="pcBuild" class="pri">${PL().walls.length ? '⟳ Найти стены заново' : '🔎 Найти стены по сканам'}</button></div><div class="pc-r"><button id="pcClose">⌐ Замкнуть углы</button><button id="pcSq">⊾ К осям</button></div><div class="pc-r"><label>Фон:</label><button data-bg="slice" class="${S.planBg !== false && S.planBg !== 'scans' ? 'on' : ''}">Срез</button><button data-bg="scans" class="${S.planBg === 'scans' ? 'on' : ''}">Сканы</button><button data-bg="off" class="${S.planBg === false ? 'on' : ''}">Нет</button></div><div class="pc-r"><label>Срез на высоте</label><input id="slH" inputmode="decimal" value="${nf(S.slice.h, 2)}"><label>м, толщина</label><input id="slT" inputmode="decimal" style="width:60px" value="${Math.round(S.slice.t * 100)}"><label>см</label></div><div class="pc-r"><button id="pcDxf">⬇ DXF</button></div><div class="pc-s">⌇ Стена по точкам (вверху) — коснитесь стены в срезе: прямая впишется по точкам, угол с соседней замкнётся. Касание стены — выбрать. Оранжевые точки — незамкнутые углы.</div>`;
+  if (!sel) { el.innerHTML = `<div class="pc-h">План: стен ${PL().walls.length}, проёмов ${PL().ops.length}</div><div class="pc-r"><button id="pcRooms" class="pri" title="Стены во всю высоту, помещения по потолку, двери, окна и подоконники — сразу готовый план">🏠 План по сканам</button><button id="pcBuild" title="Только линии стен по срезу">${PL().walls.length ? '⟳ Стены заново' : '🔎 Только стены'}</button></div>${(PL().rooms || []).length ? `<div class="pc-s">${roomPolys().map(r => `<b>${r.num}</b>&nbsp;${nf(r.area, 2)}&nbsp;м²`).join(' · ')}</div>` : ''}<div class="pc-r"><button id="pcClose">⌐ Замкнуть углы</button><button id="pcSq">⊾ К осям</button></div><div class="pc-r"><label>Фон:</label><button data-bg="slice" class="${S.planBg !== false && S.planBg !== 'scans' ? 'on' : ''}">Срез</button><button data-bg="scans" class="${S.planBg === 'scans' ? 'on' : ''}">Сканы</button><button data-bg="off" class="${S.planBg === false ? 'on' : ''}">Нет</button></div><div class="pc-r"><label>Срез на высоте</label><input id="slH" inputmode="decimal" value="${nf(S.slice.h, 2)}"><label>м, толщина</label><input id="slT" inputmode="decimal" style="width:60px" value="${Math.round(S.slice.t * 100)}"><label>см</label></div><div class="pc-r"><button id="pcDxf">⬇ DXF</button><button id="pcRul" title="Файл проекта для Рулетки: помещения, проёмы, подоконники — домерить на месте">⬇ Для Рулетки</button></div><div class="pc-s">⌇ Стена по точкам (вверху) — коснитесь стены в срезе: прямая впишется по точкам, угол с соседней замкнётся. Касание стены — выбрать. Оранжевые точки — незамкнутые углы.</div>`;
     $('#pcBuild').onclick = async () => { if (PL().walls.length && !(await uiDialog({ title: 'Найти стены заново?', text: 'Текущие стены и правки заменятся найденными. Вернуть — «↶».', ok: 'Найти', cancel: 'Отмена' }))) return; buildWalls(); };
     $('#pcClose').onclick = () => closeCorners(false); $('#pcSq').onclick = squareAll; el.querySelectorAll('[data-bg]').forEach(b => b.onclick = () => { S.planBg = b.dataset.bg === 'off' ? false : b.dataset.bg; drawPlan(); });
-    const slc = () => { const h = parseFloat($('#slH').value.replace(',', '.')), t = parseFloat($('#slT').value.replace(',', '.')) / 100; if (h > 0 && h < 6) S.slice.h = h; if (t >= 0.01 && t <= 0.5) S.slice.t = t; S._slice = null; drawPlan(); }; $('#slH').onchange = slc; $('#slT').onchange = slc; $('#pcDxf').onclick = exportDXF; return; }
+    const slc = () => { const h = parseFloat($('#slH').value.replace(',', '.')), t = parseFloat($('#slT').value.replace(',', '.')) / 100; if (h > 0 && h < 6) S.slice.h = h; if (t >= 0.01 && t <= 0.5) S.slice.t = t; S._slice = null; drawPlan(); }; $('#slH').onchange = slc; $('#slT').onchange = slc; $('#pcDxf').onclick = exportDXF; $('#pcRul').onclick = exportRuletka;
+    $('#pcRooms').onclick = async () => { if (PL().walls.length && !(await uiDialog({ title: 'Построить план по сканам заново?', text: 'Текущие стены и правки заменятся. Вернуть — «↶».', ok: 'Построить', cancel: 'Отмена' }))) return; planFromScans(); }; return; }
   const w = wById(sel.w); if (!w) { S.planSel = null; return renderPlanCard(); }
   if (sel.o) { const o = PL().ops.find(q => q.id === sel.o); if (!o) { S.planSel = { w: w.id }; return renderPlanCard(); }
     el.innerHTML = `<div class="pc-h">Проём на стене ${nf(wLen(w), 3)} м</div>
@@ -1604,7 +1873,7 @@ function renderPlanCard() {
     const num = v => { const x = parseFloat(String(v).replace(',', '.')); return isFinite(x) ? (x > 20 ? x / 1000 : x) : null; };
     $('#opW').onchange = e => { const v = num(e.target.value); if (!v) return; pushUndo(); o.t1 = Math.min(wLen(w), o.t0 + v); drawPlan(); saveSoon(); };
     $('#opT').onchange = e => { const v = num(e.target.value); if (v == null) return; pushUndo(); const Wd = o.t1 - o.t0; o.t0 = Math.max(0, Math.min(wLen(w) - Wd, v)); o.t1 = o.t0 + Wd; drawPlan(); saveSoon(); };
-    const fl = $('#opFlip'); if (fl) fl.onclick = () => { pushUndo(); const L = wLen(w); [w.a, w.b] = [w.b, w.a]; for (const q of PL().ops) if (q.w === w.id) { const a = L - q.t1, b = L - q.t0; q.t0 = a; q.t1 = b; } drawPlan(); saveSoon(); };
+    const fl = $('#opFlip'); if (fl) fl.onclick = () => { pushUndo(); const L = wLen(w); [w.a, w.b] = [w.b, w.a]; if (w.room) w.inL = !w.inL; for (const q of PL().ops) if (q.w === w.id) { const a = L - q.t1, b = L - q.t0; q.t0 = a; q.t1 = b; } drawPlan(); saveSoon(); };
     $('#opDel').onclick = () => { pushUndo(); PL().ops = PL().ops.filter(q => q !== o); S.planSel = { w: w.id }; drawPlan(); saveSoon(); }; $('#opBack').onclick = () => { S.planSel = { w: w.id }; drawPlan(); };
     return; }
   const ang = Math.atan2(w.b[1] - w.a[1], w.b[0] - w.a[0]) * 180 / Math.PI;
@@ -1690,6 +1959,7 @@ function exportDXF() {
       text(addv(mul(addv(A, B), 0.5), mul(n, -0.12)), 0.08, nf(o.t1 - o.t0, 3), Math.atan2(u[1], u[0]) * 180 / Math.PI, 'RAZMERY'); }
     if (Lw > t) line(addv(w.a, mul(u, t)), w.b, 'STENY');
     let ang = Math.atan2(u[1], u[0]) * 180 / Math.PI; if (ang > 90) ang -= 180; if (ang <= -90) ang += 180; text(addv(mul(addv(w.a, w.b), 0.5), mul(n, 0.1)), 0.1, nf(Lw, 3), ang, 'RAZMERY'); }
+  for (const r of roomPolys()) { text(r.c, 0.15, String(r.num), 0, 'RAZMERY'); text(addv(r.c, [0, -0.22]), 0.12, nf(r.area, 2) + ' м2', 0, 'RAZMERY'); }
   for (const s of S.scans) if (s.vis) text([s.pose.x, s.pose.y], 0.15, s.name, 0, 'SKANY');
   g(0, 'ENDSEC'); g(0, 'EOF');
   const str = L.join('\r\n') + '\r\n', out = []; for (const ch of str) { const c = ch.codePointAt(0); out.push(c < 128 ? c : (CP1251[c] || 63)); }
