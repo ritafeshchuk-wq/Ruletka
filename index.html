@@ -288,7 +288,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 9.1 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 9.2 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -6098,7 +6098,7 @@ async function connectDisto() {
     T.btName = dev.name || 'DISTO'; T.wantBt = true;
     if (!dev._s2p) { dev._s2p = 1; dev.addEventListener('gattserverdisconnected', onBtLost); }
     T.bt = dev; await gattStart(dev);
-  } catch (e) { T.btState = T.bt && T.bt.gatt && T.bt.gatt.connected ? 'подключена' : 'нет'; if (!/cancel|chooser|abort/i.test(e.message || '')) uiAlert('DISTO: ' + (e.message || e)); renderTape(); }
+  } catch (e) { T.btState = T.bt && T.bt.gatt && T.bt.gatt.connected ? 'подключена' : 'нет'; if (!/cancel|chooser|abort/i.test(e.message || '')) uiAlert('DISTO: ' + (e.message || e) + (/service|characteristic|GATT|not found|No Services/i.test(e.message || '') ? '\n\nПохоже, на рулетке Bluetooth не в режиме для приложений. На D810: Настройки → Bluetooth® Settings → режим App (не Text и не Spreadsheet), затем подключите снова. Если D810 подключён к iPad как клавиатура — «Настройки» iPad → Bluetooth → «Забыть это устройство».' : '')); renderTape(); }
 }
 // ---------- другая рулетка (проба): подключиться к любой, показать, что присылает, и принять замер, если это число ----------
 const BT_SVCS = ['0000ffe0-0000-1000-8000-00805f9b34fb', '0000fff0-0000-1000-8000-00805f9b34fb', '0000ffb0-0000-1000-8000-00805f9b34fb', '0000ff00-0000-1000-8000-00805f9b34fb', '0000ffd0-0000-1000-8000-00805f9b34fb', '0000fee7-0000-1000-8000-00805f9b34fb', '0000fe59-0000-1000-8000-00805f9b34fb',
@@ -6124,6 +6124,9 @@ async function connectOther(all) {
   if (!navigator.bluetooth) { uiAlert('В этом браузере нет Bluetooth. На iPad — Bluefy.'); return; }
   if (all !== true) { const k = await ask3('Другая рулетка', 'Включите Bluetooth на рулетке. Сначала программа покажет только устройства с понятными названиями рулеток (Leica, CONDTROL, Bosch, Mileseey, Hilti…). Leica DISTO лучше подключать основной кнопкой «Подключить DISTO».', [['f', 'Показать рулетки', 'pri'], ['a', 'Все устройства (если рулетки нет в списке)', ''], ['x', 'Отмена', '']]); if (k === 'x' || !k) return; if (k === 'a') all = true; }
   let dev; try { dev = await navigator.bluetooth.requestDevice(all === true ? { acceptAllDevices: true, optionalServices: BT_SVCS.concat([DISTO_SVC]) } : { filters: BT_NAMES.map(n => ({ namePrefix: n })), optionalServices: BT_SVCS.concat([DISTO_SVC]) }); } catch (e) { if (!/cancel|chooser|abort/i.test(e.message || '')) uiAlert('Bluetooth: ' + (e.message || e)); return; }
+  const toDisto = async () => { const pb = document.getElementById('btprobe'); if (pb) pb.remove(); T.btName = dev.name || 'DISTO'; T.wantBt = true; if (!dev._s2p) { dev._s2p = 1; dev.addEventListener('gattserverdisconnected', onBtLost); } T.bt = dev; T.btState = 'подключение…'; renderTape(); await gattStart(dev); stat('Это Leica DISTO — подключена как обычно, замеры идут в карточку.'); };
+  if (/^(disto|leica)/i.test(dev.name || '')) { try { await toDisto(); } catch (e) { T.btState = 'нет'; renderTape(); uiAlert('DISTO: ' + (e.message || e)); } return; } // Leica DISTO (D2, D810…) — обычный режим, без журнала
+  try { const sv = await (await dev.gatt.connect()).getPrimaryService(DISTO_SVC); if (sv) { await toDisto(); return; } } catch (e) { } // служба DISTO без «DISTO» в имени
   BTP.dev = dev; BTP.log = []; btpShow(); btpLog('устройство: ' + (dev.name || 'без имени') + ' · id ' + (dev.id || '').slice(0, 12));
   try { const srv = await dev.gatt.connect(); btpLog('подключено');
     let svcs = []; try { svcs = await srv.getPrimaryServices(); } catch (e) { btpLog('службы не прочитаны: ' + e.message); }
