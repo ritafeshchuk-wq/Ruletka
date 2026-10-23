@@ -5,7 +5,7 @@
 <meta name="author" content="d1sco">
 <meta name="copyright" content="© d1sco, 2026">
 <meta charset="utf-8"><meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Рулетка — обмер DISTO</title>
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
 <style>
@@ -263,6 +263,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 #pgbar button:disabled{opacity:.35}
 .pp-th{position:relative}.pp-mark{position:absolute;left:6px;top:6px;background:#1E8A55;color:#fff;font-size:12px;font-weight:600;padding:2px 7px;border-radius:7px}
 #mcard{top:58px}
+html,body{touch-action:manipulation;-webkit-text-size-adjust:100%}
 </style>
 </head>
 <body>
@@ -288,7 +289,7 @@ header .modes,#bOpen,.homein .lead{display:none!important}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 9.2 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 9.3 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -6051,12 +6052,15 @@ async function changePage() {
 async function rasterPdfPage(pg) {
   const page = await U.pdf.getPage(pg);
   const vp0 = page.getViewport({ scale: 1 });
-  const z = Math.min(8, Math.sqrt(15e6 / (vp0.width * vp0.height)), 8000 / Math.max(vp0.width, vp0.height));
-  const vp = page.getViewport({ scale: z });
-  const c = document.createElement('canvas'); c.width = Math.round(vp.width); c.height = Math.round(vp.height);
-  const cx = c.getContext('2d', { alpha: false }); cx.fillStyle = '#fff'; cx.fillRect(0, 0, c.width, c.height);
-  await page.render({ canvasContext: cx, viewport: vp }).promise;
-  return { c, z, page };
+  let mp = IOS ? 8e6 : 15e6;
+  for (let tr = 0; ; tr++) { // если холст не получился (на iPad кончилась память холстов) — меньше
+    const z = Math.min(8, Math.sqrt(mp / (vp0.width * vp0.height)), (IOS ? 5000 : 8000) / Math.max(vp0.width, vp0.height));
+    const vp = page.getViewport({ scale: z });
+    const c = document.createElement('canvas'); c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+    const cx = c.getContext('2d', { alpha: false }); let ok = !!cx;
+    if (ok) { cx.fillStyle = '#fff'; cx.fillRect(0, 0, c.width, c.height); await page.render({ canvasContext: cx, viewport: vp }).promise; ok = !cvLost(c); }
+    if (ok || tr >= 3) return { c, z, page };
+    c.width = 0; c.height = 0; mp /= 2.5; await new Promise(r => setTimeout(r, 50)); }
 }
 async function renderPdfPage() { applyRaster(await rasterPdfPage(U.page)); }
 function applyRaster({ c, z, page }) {
@@ -6431,7 +6435,7 @@ function tapeDelete() {
 // ---------- drawing ----------
 // уменьшенные копии подложки: при отдалении рисуем маленькую — быстро и без муара
 function mipFor(ss) {
-  if (U.mipSrc !== U.img) { U.mip = [U.img]; U.mipSrc = U.img; }
+  if (U.mipSrc !== U.img) { for (const c of (U.mip || []).slice(1)) freeCv(c); U.mip = [U.img]; U.mipSrc = U.img; }
   let L = 0; while (ss * (1 << (L + 1)) <= 1 && L < 6) L++;
   while (U.mip.length <= L) {
     const p = U.mip[U.mip.length - 1], w = Math.max(1, p.width >> 1), h = Math.max(1, p.height >> 1);
@@ -6441,10 +6445,13 @@ function mipFor(ss) {
   return Math.min(L, U.mip.length - 1);
 }
 const HQ = { c: null, img: null, u0: 0, v0: 0, k: 1, task: null, t: 0, want: '' };
-function hqReset() { if (HQ.task) try { HQ.task.cancel(); } catch (e) { } Object.assign(HQ, { c: null, img: null, task: null, want: '' }); }
+// холст отдать сразу: на iPad память холстов общая и маленькая — при переполнении подложка становится пустой
+function freeCv(c) { try { if (c && c.getContext && c !== U.img) { c.width = 0; c.height = 0; } } catch (e) { } }
+function hqReset() { if (HQ.task) try { HQ.task.cancel(); } catch (e) { } freeCv(HQ.c); Object.assign(HQ, { c: null, img: null, task: null, want: '' }); }
 function hqSchedule(ss) {
   clearTimeout(HQ.t); if (!U.pdfPage || !U.img || ss <= 1.05) return;
-  HQ.t = setTimeout(() => hqRender(ss), 220);
+  // пока пальцы на экране — не рисуем резкий фрагмент (это тяжело и дёргает перемещение)
+  HQ.t = setTimeout(function go() { if (TP.pts.size || TP.pen != null) { HQ.t = setTimeout(go, 250); return; } hqRender(ss); }, IOS ? 400 : 220);
 }
 async function hqRender(ss) {
   if (!U.pdfPage || !U.img) return; const dpr = devicePixelRatio, Wd = cv.width, Hd = cv.height;
@@ -6455,7 +6462,7 @@ async function hqRender(ss) {
   let u1 = Math.min(U.img.width, Math.ceil(Math.max(...q.map(a => a[0])))), v1 = Math.min(U.img.height, Math.ceil(Math.max(...q.map(a => a[1]))));
   if (u1 <= u0 || v1 <= v0) return;
   let k = Math.min(ss, 24); // пикс. фрагмента на пиксель базы
-  const lim = 12e6; if ((u1 - u0) * (v1 - v0) * k * k > lim) k = Math.sqrt(lim / ((u1 - u0) * (v1 - v0)));
+  const lim = IOS ? 4e6 : 12e6; if ((u1 - u0) * (v1 - v0) * k * k > lim) k = Math.sqrt(lim / ((u1 - u0) * (v1 - v0)));
   if (k <= 1.05) return;
   const key = [U.img.width, u0, v0, u1, v1, k.toFixed(3)].join(',');
   if (HQ.want === key || (HQ.img === U.img && HQ.c && HQ.k >= k * 0.98 && HQ.u0 <= u0 && HQ.v0 <= v0 && HQ.u1 >= u1 && HQ.v1 >= v1)) return;
@@ -6465,9 +6472,9 @@ async function hqRender(ss) {
   const x = c.getContext('2d', { alpha: false }); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
   const vp = page.getViewport({ scale: z, offsetX: -u0 * k, offsetY: -v0 * k });
   const task = page.render({ canvasContext: x, viewport: vp }); HQ.task = task;
-  try { await task.promise; } catch (e) { if (HQ.task === task) { HQ.task = null; HQ.want = ''; } return; }
-  if (HQ.task !== task || U.img !== img) return;
-  Object.assign(HQ, { c, img, u0, v0, u1, v1, k, task: null }); draw();
+  try { await task.promise; } catch (e) { freeCv(c); if (HQ.task === task) { HQ.task = null; HQ.want = ''; } return; }
+  if (HQ.task !== task || U.img !== img) { freeCv(c); return; }
+  const old = HQ.c; Object.assign(HQ, { c, img, u0, v0, u1, v1, k, task: null }); if (old !== c) freeCv(old); draw();
 }
 function drawTape() {
   const dpr = devicePixelRatio;
@@ -7170,9 +7177,23 @@ async function upgradeUnderlay() {
       const k = img0.width / bmp.width; if (U._imgKeyFor === img0 && U._data) { U._imgKeyFor = bmp; U._data = { url: U._data.url, k: U._data.k * k }; U._dataFor = bmp; }
       U.s *= k; if (U.ptPerPx) U.ptPerPx *= k; U.img = bmp; U.pw = bmp.width; U.ph = bmp.height;
     }
-    hqReset(); draw(); renderTape();
+    hqReset(); if (img0 !== U.img) { if (img0.getContext) { img0.width = 0; img0.height = 0; } else if (img0.close) try { img0.close(); } catch (e) { } } draw(); renderTape();
   } catch (e) { console.warn('upgradeUnderlay', e); }
 }
+// iPad при нехватке памяти или после сворачивания может «потерять» холст подложки — он становится пустым.
+// Раз в несколько секунд проверяем середину листа; пустая — перерисовываем подложку из исходника (положение и масштаб те же).
+function underlayLost() { return cvLost(U.img); }
+function cvLost(c) { if (!c) return false; try { if (!c.width || !c.height) return true; if (!c.getContext) return false; const x = c.getContext('2d'); if (!x || (x.isContextLost && x.isContextLost())) return true;
+    const d = x.getImageData(c.width >> 1, c.height >> 1, 1, 1).data; return d[3] === 0; } catch (e) { return false; } }
+let _ulFix = false;
+async function underlayWatch() { if (_ulFix || document.visibilityState !== 'visible' || S.step !== 'tape' || !U.img || !U.src || AS.hold) return; if (!underlayLost()) return;
+  if ((U._ulTries = (U._ulTries || 0) + 1) > 3) return; // не мучить iPad: три попытки за открытие
+  _ulFix = true; try { for (const c of (U.mip || []).slice(1)) freeCv(c); U.mip = null; U.mipSrc = null; hqReset(); await upgradeUnderlay();
+    if (underlayLost() && U._data && U._data.url) { const img = new Image(); img.src = U._data.url; await img.decode(); const bmp = await createImageBitmap(img), k = 1 / (U._data.k || 1); if (U._imgKeyFor === U.img) U._imgKeyFor = bmp; U.s *= k; if (U.ptPerPx) U.ptPerPx *= k; U.img = bmp; U.pw = bmp.width; U.ph = bmp.height; U.pdfPage = null; U._dataFor = bmp; U._data = { url: U._data.url, k: U._data.k * k }; draw(); }
+    stat(underlayLost() ? 'Подложка не помещается в память iPad — закройте другие вкладки и откройте проект заново.' : 'Подложка восстановлена (iPad освобождал память).'); } finally { _ulFix = false; } }
+setInterval(underlayWatch, 4000); document.addEventListener('visibilitychange', () => setTimeout(underlayWatch, 600));
+cv.addEventListener('contextrestored', () => { draw(); setTimeout(underlayWatch, 300); });
+document.addEventListener('gesturestart', e => e.preventDefault()); document.addEventListener('gesturechange', e => e.preventDefault()); // не масштабировать всю страницу щипком
 async function tapeRestore(j) {
   if (!j) return;
   AS.epoch = (AS.epoch || 0) + 1; T.zoomAll = Array.isArray(j.zl) ? j.zl.slice() : []; Object.assign(M, { cond: false, snap90: true, ortho: true, scaleFit: false, scaleAsked: false, axis: null, zoomLog: [], gpsHidden: [] }, j.M); M.objs = M.objs || []; M.notes = M.notes || []; M.marks = M.marks || []; markObjEdges(); T.undo = []; T.redo = []; T.pending = null; T.chain = null; T.sel = null; T.selSet = null; PGS.data = j.pages || {};
