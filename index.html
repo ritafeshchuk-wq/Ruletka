@@ -292,7 +292,7 @@ html,body{touch-action:manipulation;-webkit-text-size-adjust:100%}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 9.3 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 9.4 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -6062,7 +6062,7 @@ async function rasterPdfPage(pg) {
   const vp0 = page.getViewport({ scale: 1 });
   let mp = IOS ? 8e6 : 15e6;
   for (let tr = 0; ; tr++) { // если холст не получился (на iPad кончилась память холстов) — меньше
-    const z = Math.min(8, Math.sqrt(mp / (vp0.width * vp0.height)), (IOS ? 5000 : 8000) / Math.max(vp0.width, vp0.height));
+    const z = Math.min(8, Math.sqrt(mp / (vp0.width * vp0.height)), (IOS ? 8192 : 8192) / Math.max(vp0.width, vp0.height));
     const vp = page.getViewport({ scale: z });
     const c = document.createElement('canvas'); c.width = Math.round(vp.width); c.height = Math.round(vp.height);
     const cx = c.getContext('2d', { alpha: false }); let ok = !!cx;
