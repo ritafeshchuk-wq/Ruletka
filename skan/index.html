@@ -40,7 +40,7 @@ canvas.band{width:100%;height:32px;display:block;border-radius:6px;touch-action:
 .bt{display:flex;flex-wrap:wrap;gap:3px;align-items:center;font-size:12px;margin-top:4px}.bt span{flex:1 1 100%;color:var(--mute)}.bt button{padding:2px 7px;font-size:12px}
 .hints{background:#fff;border:1px solid var(--line);border-radius:10px;padding:7px;margin-bottom:8px}.hint{display:block;width:100%;text-align:left;font-size:12.5px;margin:3px 0;border-left:4px solid #d97706;background:#fffaf0}.hint.s3{border-left-color:#c81e1e;background:#fff5f5}
 .res{display:flex;flex-wrap:wrap;gap:4px}.res span{background:#fff;border:1px solid var(--line);border-radius:8px;padding:2px 6px;cursor:pointer}.res span em{background:var(--lc)}
-.empty{max-width:640px;margin:60px auto;padding:20px;background:#fff;border-radius:16px;border:1px solid var(--line)}.empty h2{margin-top:0}.empty .h{color:var(--mute)}button.big{font-size:16px;padding:11px 18px}
+.steps3{padding-left:18px;margin:10px 0}.steps3 li{margin:6px 0;line-height:1.45}.empty{max-width:640px;margin:60px auto;padding:20px;background:#fff;border-radius:16px;border:1px solid var(--line)}.empty h2{margin-top:0}.empty .h{color:var(--mute)}button.big{font-size:16px;padding:11px 18px}
 .dlg{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;z-index:50}.dlg-b{background:#fff;border-radius:14px;padding:16px;max-width:460px;width:calc(100% - 32px)}.dlg-t{font-weight:700;font-size:15px}.dlg-x{color:var(--mute);margin:8px 0}.row.r{display:flex;gap:6px;justify-content:flex-end;margin-top:12px}.dlg-in{width:100%;margin-top:8px;padding:8px;font:inherit}
 .lpick{position:fixed;z-index:40;background:#fff;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.25);padding:10px;max-width:360px}.lp-h{font-weight:600;font-size:13px}.lp-s{color:var(--mute);font-size:12px;margin:6px 0}.lp-c{display:flex;flex-wrap:wrap;gap:5px}
 .lp-c button{border:2px solid var(--lc);font-weight:700;color:var(--lc);display:flex;flex-direction:column;align-items:flex-start;padding:5px 9px}.lp-c button small{font-weight:400;color:var(--mute);font-size:11px}.lp-c button.new{background:var(--lc);color:#fff}
@@ -55,6 +55,7 @@ canvas.band{width:100%;height:32px;display:block;border-radius:6px;touch-action:
   <div class="grp ctx" data-for="grid"><button id="bAdd" class="pri">＋ Сканы</button></div>
   <div class="grp ctx" data-for="grid"><button data-tool="line" title="Метка-линия вдоль стены, края проёма">／ Линия</button><button data-tool="point" title="Метка-точка: угол, колонна">• Точка</button><button data-tool="erase" title="Удалить метку касанием">⌫ Метка</button></div>
   <div class="grp ctx" data-for="asm"><button id="bAuto" class="pri" title="Сшить с нуля: программа сама найдёт общие места">🤖 Автосшивка</button><button id="bRefine" title="Точно подогнать от нынешнего положения — после автосшивки и ручной правки">🎯 Уточнить</button><button id="bStitch" title="Сшить по вашим меткам (буквам)">🧩 По меткам</button></div>
+  <div class="grp ctx" data-for="asm"><button data-tool="gfit" title="Линия для плана: коснитесь стены — прямая впишется по точкам. План по сканам пройдёт точно по ней (стены за мебелью, косые стены)">⌇ Линия стены</button><button data-tool="gline" title="Нарисовать линию для плана: тянуть от точки до точки">／ Линия</button><button data-tool="gpt" title="Угол для плана: коснитесь угла — план пройдёт через эту точку">⌖ Угол плана</button><button data-tool="gdel" title="Удалить линию или угол плана касанием">⌫</button></div>
   <div class="grp ctx" data-for="asm"><button id="bSph" title="Найти шары на сканах: они держат длинные однотипные объекты (тоннель, коллектор)">⚪ Шары</button><button data-tool="corner" title="Общий угол, видный на нескольких сканах">⌖ Общий угол</button></div>
   <div class="grp ctx" data-for="grid asm"><button data-tool="brush" title="Стереть мебель, людей, двери">🧹 Стереть</button><button data-tool="keep" title="Отметить нужное: стены, колонны">✏ Нужное</button></div>
   <div class="grp ctx" data-for="plan"><button data-tool="wfit" title="Коснитесь стены в срезе — программа впишет прямую по точкам и сама замкнёт угол с соседней">⌇ Стена по точкам</button><button data-tool="line" title="Нарисовать стену вручную">／ Стена</button><button data-tool="erase" title="Удалить стену или проём касанием">⌫ Удалить</button></div>
@@ -66,7 +67,7 @@ canvas.band{width:100%;height:32px;display:block;border-radius:6px;touch-action:
 <div id="main"></div>
 <div id="rotbar" title="Повернуть выбранный скан"><button id="bMulti" title="Выбрать несколько сканов: касание — добавить/убрать, рамка по пустому месту — выбрать все внутри">⬚ Несколько</button><button id="bR1">⟲ 1°</button><button id="bR01">⟲ 0,1°</button><button id="bRm01">⟳ 0,1°</button><button id="bRm1">⟳ 1°</button><button id="bR90">⟲ 90°</button></div>
 <div id="ubar"><button id="fUndo" disabled>↶ Отменить шаг</button><button id="fRedo" disabled>↷ Вернуть</button><button id="fDel">🗑 Удалить выбранное</button></div>
-<div id="foot"><span id="status"></span><span id="saved"></span><span id="ver">Скан 3.2 · © d1sco, 2026</span></div>
+<div id="foot"><span id="status"></span><span id="saved"></span><span id="ver">Скан 3.3 · © d1sco, 2026</span></div>
 <div id="busy" hidden><span>…</span></div>
 <input type="file" id="fileIn" multiple accept=".e57" hidden><input type="file" id="projIn" hidden>
 <div id="help" hidden><div class="lh"><h3>Как работать</h3><button id="helpX">✕</button></div>
@@ -86,7 +87,7 @@ canvas.band{width:100%;height:32px;display:block;border-radius:6px;touch-action:
 <li><b>Несколько сканов:</b> мышью — как в AutoCAD: щелчок добавляет, Shift + щелчок убирает, рамка слева направо — целиком внутри, справа налево — всё задетое. На планшете — «⬚ Несколько» внизу справа. Esc — снять выбор.</li>
 <li><b>⚓</b> в списке — опорный скан, стоит на месте.</li></ul>
 <h4>3 План — стены и проёмы</h4>
-<ul><li><b>🏠 План по сканам</b> (справа) — готовый план сразу: стены — плоскости во всю высоту, помещения — по потолку (двери отделяют помещения перемычкой), двери и окна — дыры в стенах (окно — с низом выше пола и перемычкой), подоконник — горизонтальная полка у низа окна. Номера и площади помещений — на плане и в DXF. Шторы при съёмке откройте, иначе окна за ними не видны.</li><li><b>⬇ Для Рулетки</b> — файл проекта: помещения со сторонами, двери, окна, подоконники. В Рулетке «Открыть файл» — и домерьте на месте окна и подоконники.</li><li><b>Фон — тонкий срез</b> точек всех сканов на одной высоте (по умолчанию 1,2 м от пола, 6 см) — высота и толщина в карточке справа. В срезе сразу видно, сошлись ли стены разных сканов в одну линию.</li><li><b>⌇ Стена по точкам</b> — коснитесь стены в срезе: программа впишет прямую по точкам (сколько точек и разброс в мм — внизу), продлит вдоль стены и замкнёт угол с соседней. Так план собирается стена за стеной: решаете вы, точность — от точек.</li><li>Справа «🔎 Найти стены», правка стены касанием, «⌐ Замкнуть углы», «⊾ К осям», «⬇ DXF». Вверху <b>／ Стена</b> — нарисовать, <b>⌫ Удалить</b>.</li></ul>
+<ul><li><b>🏠 План по сканам</b> (справа) — готовый план сразу: стены — плоскости во всю высоту, помещения — по потолку (двери отделяют помещения перемычкой), двери и окна — дыры в стенах (окно — с низом выше пола и перемычкой), подоконник — горизонтальная полка у низа окна. Косые стены программа находит сама: стороны идут по направлениям стен, не только под 90°. Номера и площади помещений — на плане и в DXF. Шторы при съёмке откройте, иначе окна за ними не видны.</li><li><b>Линии и углы для плана</b> — на шаге «2 Сборка»: <b>⌇ Линия стены</b> (касание стены — прямая по точкам), <b>／ Линия</b> (нарисовать, где стену не видно — за шкафом, за шторой), <b>⌖ Угол плана</b>, <b>⌫</b> — удалить. «🏠 План по сканам» проводит стороны помещений точно по этим линиям и через эти углы; линия ещё и разделяет помещения.</li><li><b>⬇ Для Рулетки</b> — файл проекта: помещения со сторонами, двери, окна, подоконники. В Рулетке «Открыть файл» — и домерьте на месте окна и подоконники.</li><li><b>Фон — тонкий срез</b> точек всех сканов на одной высоте (по умолчанию 1,2 м от пола, 6 см) — высота и толщина в карточке справа. В срезе сразу видно, сошлись ли стены разных сканов в одну линию.</li><li><b>⌇ Стена по точкам</b> — коснитесь стены в срезе: программа впишет прямую по точкам (сколько точек и разброс в мм — внизу), продлит вдоль стены и замкнёт угол с соседней. Так план собирается стена за стеной: решаете вы, точность — от точек.</li><li>Справа «🔎 Найти стены», правка стены касанием, «⌐ Замкнуть углы», «⊾ К осям», «⬇ DXF». Вверху <b>／ Стена</b> — нарисовать, <b>⌫ Удалить</b>.</li></ul>
 <h4>Всегда</h4>
 <ul><li>Внизу «↶ Отменить шаг / ↷ Вернуть». Колесо — масштаб, зажатое колесо — сдвиг вида, ⤢ — показать всё.</li></ul>
 </div>
@@ -508,14 +509,17 @@ const REG3D = (() => {
   // point-to-plane ICP, 4 DoF; pose maps B-local -> A-local
   function icp(A, B, p) {
     let { a, tx, ty, tz } = p; const C = B.C, n = C.length / 3; let rms = 0, cnt = 0, lastM = null;
-    for (const md of [0.45, 0.35, 0.25, 0.15, 0.1, 0.07, 0.05, 0.04, 0.03, 0.03, 0.03]) {
+    let lim = 0; for (const md of [0.45, 0.35, 0.25, 0.15, 0.1, 0.07, 0.05, 0.04, 0.03, 0.03, 0.03]) {
       const c = Math.cos(a), s = Math.sin(a); const M = new Float64Array(16), g = new Float64Array(4); let se = 0; cnt = 0;
       const step = md > 0.12 ? 9 : 2, GG = md > 0.1 ? A.G : A.Gf;
       for (let i = 0; i < n; i += step) {
         const x = c * C[3 * i] - s * C[3 * i + 1] + tx, y = s * C[3 * i] + c * C[3 * i + 1] + ty, z = C[3 * i + 2] + tz;
         const j = nearest(GG, x, y, z, md); if (j < 0) continue;
         const nx = A.N[3 * j], ny = A.N[3 * j + 1], nz = A.N[3 * j + 2];
+        // та же сторона поверхности: нормали обоих сканов (к своему сканеру) смотрят в одну сторону — иначе это другая грань стены
+        if (B.N) { const bx = B.N[3 * i], by = B.N[3 * i + 1], bz = B.N[3 * i + 2]; if (nx * (c * bx - s * by) + ny * (s * bx + c * by) + nz * bz < 0.7) continue; }
         const r = (A.C[3 * j] - x) * nx + (A.C[3 * j + 1] - y) * ny + (A.C[3 * j + 2] - z) * nz;
+        if (lim && Math.abs(r) > lim) continue; // выбросы (мебель, люди, разные грани) не тянут
         const J = [nx * -y + ny * x, nx, ny, nz];
         for (let u = 0; u < 4; u++) { g[u] += J[u] * r; for (let v = 0; v < 4; v++) M[u * 4 + v] += J[u] * J[v]; }
         se += r * r; cnt++;
@@ -526,7 +530,7 @@ const REG3D = (() => {
       lastM = M;
       const c2 = Math.cos(x[0]), s2 = Math.sin(x[0]);
       a += x[0]; const ntx = c2 * tx - s2 * ty + x[1], nty = s2 * tx + c2 * ty + x[2]; tx = ntx; ty = nty; tz += x[3];
-      rms = Math.sqrt(se / cnt);
+      rms = Math.sqrt(se / cnt); lim = md <= 0.1 ? Math.max(0.015, 2.5 * rms) : 0;
     }
     // uncertainty: covariance ~ rms^2 * (J'J)^-1, worst horizontal direction (every 2nd point used -> x2)
     let unc = 0;
@@ -706,13 +710,34 @@ function scanPlan(scans, opt = {}) {
   const th = best * Math.PI / 180, U = [[Math.cos(th), Math.sin(th)], [-Math.sin(th), Math.cos(th)]];
   log('ось ' + best.toFixed(2) + '°');
   const Uu = new Float32Array(N), Vv = new Float32Array(N); for (let i = 0; i < N; i++) { Uu[i] = X[i] * U[0][0] + Y[i] * U[0][1]; Vv[i] = X[i] * U[1][0] + Y[i] * U[1][1]; }
+  // ---- направления стен: две главные оси + косые стены (пики нормалей, не совпадающие с осями) ----
+  const DIRS = [{ n: U[0], t: U[1] }, { n: U[1], t: U[0] }];
+  { const NBIN = 360, hist = new Float64Array(NBIN); // 0,5° по углу нормали mod 180°
+    for (let c = 0; c < gw * gh; c++) { const nx_ = cN[c * 2]; if (!(nx_ === nx_)) continue; const w = cS[c * 6]; let a = Math.atan2(cN[c * 2 + 1], nx_); if (a < 0) a += Math.PI; if (a >= Math.PI) a -= Math.PI; hist[Math.floor(a / Math.PI * NBIN) % NBIN] += w; }
+    const sm = new Float64Array(NBIN); for (let i = 0; i < NBIN; i++) for (let d = -3; d <= 3; d++) sm[i] += hist[(i + d + NBIN) % NBIN] * (4 - Math.abs(d));
+    const ad = (a, b) => { let d = Math.abs(a - b) % Math.PI; return Math.min(d, Math.PI - d); };
+    const axA = [th % Math.PI, (th + Math.PI / 2) % Math.PI]; let mx = 0; for (let i = 0; i < NBIN; i++) if (sm[i] > mx) mx = sm[i];
+    const pk = []; for (let i = 0; i < NBIN; i++) { let m = true; for (let d = -6; d <= 6; d++) if (d && sm[(i + d + NBIN) % NBIN] > sm[i]) m = false; if (m && sm[i] > 0.06 * mx) pk.push(i); }
+    pk.sort((a, b) => sm[b] - sm[a]);
+    for (const i of pk) { const a = (i + 0.5) / NBIN * Math.PI; if (axA.some(b => ad(a, b) < 7 * Math.PI / 180) || DIRS.slice(2).some(D => ad(a, D.a) < 7 * Math.PI / 180)) continue;
+      // уточнить угол: самая «острая» проекция вертикальных точек
+      const sh1 = b => { const ca = Math.cos(b), sa = Math.sin(b), m = new Map(); let sc = 0; for (const q of smp) { const k = Math.round((X[q] * ca + Y[q] * sa) / 0.02); m.set(k, (m.get(k) || 0) + 1); } for (const v of m.values()) sc += v * v; return sc; };
+      let bb = a, bs = -1; for (let d = -1.5; d <= 1.5; d += 0.1) { const v = sh1(a + d * Math.PI / 180); if (v > bs) { bs = v; bb = a + d * Math.PI / 180; } }
+      DIRS.push({ a: bb, n: [Math.cos(bb), Math.sin(bb)], t: [-Math.sin(bb), Math.cos(bb)] }); if (DIRS.length >= 8) break; }
+    const GU = (opt.userWalls || []).filter(g => Math.hypot(g.b[0] - g.a[0], g.b[1] - g.a[1]) > 0.1);
+    for (const g of GU) { let t = Math.atan2(g.b[1] - g.a[1], g.b[0] - g.a[0]), a = t - Math.PI / 2; a = ((a % Math.PI) + Math.PI) % Math.PI; if ([th, th + Math.PI / 2].concat(DIRS.slice(2).map(D => D.a)).some(b => ad(a, b) < 2 * Math.PI / 180)) continue; DIRS.push({ a, n: [Math.cos(a), Math.sin(a)], t: [-Math.sin(a), Math.cos(a)], user: true }); }
+    log('направлений стен ' + DIRS.length + (DIRS.length > 2 ? ' (косые: ' + DIRS.slice(2).map(D => ((D.a - th) * 180 / Math.PI).toFixed(1) + '°').join(', ') + ')' : '')); }
+  const PO = [], PT = []; DIRS.forEach((D, di) => { if (di === 0) { PO.push(Uu); PT.push(Vv); return; } if (di === 1) { PO.push(Vv); PT.push(Uu); return; }
+    const a = new Float32Array(N), b = new Float32Array(N); for (let i = 0; i < N; i++) { a[i] = X[i] * D.n[0] + Y[i] * D.n[1]; b[i] = X[i] * D.t[0] + Y[i] * D.t[1]; } PO.push(a); PT.push(b); });
+  const Wp = (di, o, t) => { const D = DIRS[di]; return [o * D.n[0] + t * D.t[0], o * D.n[1] + t * D.t[1]]; };
+  const UVp = p => [p[0] * U[0][0] + p[1] * U[0][1], p[0] * U[1][0] + p[1] * U[1][1]];
   const CU = CX.map((x, i) => x * U[0][0] + CY[i] * U[0][1]), CV = CX.map((x, i) => x * U[1][0] + CY[i] * U[1][1]);
   // ---- плоскости стен ----
   const walls = [];
-  for (let k = 0; k < 2; k++) {
-    const O = k === 0 ? Uu : Vv, Tt = k === 0 ? Vv : Uu, CO = k === 0 ? CU : CV;
+  for (let k = 0; k < DIRS.length; k++) {
+    const O = PO[k], Tt = PT[k], CO = CX.map((x, i) => x * DIRS[k].n[0] + CY[i] * DIRS[k].n[1]);
     for (const sg of [1, -1]) {
-      const dk = U[k], idx = []; for (let i = 0; i < N; i++) { if (!VERT[i] || (CO[SI[i]] - O[i]) * sg <= 0.05) continue; const c = cellOf(i) * 2, nxv = cN[c], nyv = cN[c + 1]; if (!(Math.abs(nxv * dk[0] + nyv * dk[1]) > 0.96)) continue; idx.push(i); }
+      const dk = DIRS[k].n, idx = []; for (let i = 0; i < N; i++) { if (!VERT[i] || (CO[SI[i]] - O[i]) * sg <= 0.05) continue; const c = cellOf(i) * 2, nxv = cN[c], nyv = cN[c + 1]; if (!(Math.abs(nxv * dk[0] + nyv * dk[1]) > 0.96)) continue; idx.push(i); }
       if (idx.length < 100) continue;
       let omin = Infinity, omax = -Infinity; for (const i of idx) { if (O[i] < omin) omin = O[i]; if (O[i] > omax) omax = O[i]; }
       const bw = 0.005, nb = Math.ceil((omax - omin) / bw) + 6, hh = new Float32Array(nb); for (const i of idx) hh[Math.floor((O[i] - omin) / bw) + 3]++;
@@ -741,7 +766,7 @@ function scanPlan(scans, opt = {}) {
   for (const ws of lines.values()) {
     const ax = ws[0].ax, sg = ws[0].sg; const wsum = ws.reduce((s, w) => s + w.n, 0), o = ws.reduce((s, w) => s + w.o * w.n, 0) / wsum;
     const t0 = Math.min(...ws.map(w => w.t0)), t1 = Math.max(...ws.map(w => w.t1)); if (t1 - t0 < 0.8) continue;
-    const S_ = ax === 0 ? Vv : Uu, O_ = ax === 0 ? Uu : Vv;
+    const S_ = PT[ax], O_ = PO[ax];
     const nb = Math.floor((t1 - t0) / 0.02) + 1, nz = Math.floor(H / 0.05) + 1, Gon = new Uint8Array(nb * nz), Gbe = new Uint8Array(nb * nz);
     const near = [];
     for (let i = 0; i < N; i++) { const s = S_[i]; if (s < t0 - 0.4 || s > t1 + 0.4) continue; const h = (O_[i] - o) * sg; if (h < -1.2 || h > 0.6) continue; near.push(i);
@@ -782,8 +807,9 @@ function scanPlan(scans, opt = {}) {
     return B; };
   M = morph(morph(M, 3, true), 3, false); M = morph(morph(M, 1, false), 1, true);
   const Bar = new Uint8Array(nx * ny); const line = (ua, va, ub, vb) => { const n = Math.ceil(Math.hypot(ub - ua, vb - va) / (R * 0.5)) + 1; for (let s = 0; s <= n; s++) { const u = ua + (ub - ua) * s / n, v = va + (vb - va) * s / n, x = Math.round((u - u0) / R), y = Math.round((v - v0) / R); for (let dy = -1; dy <= 0; dy++) for (let dx = -1; dx <= 0; dx++) { const xx = x + dx, yy = y + dy; if (xx >= 0 && yy >= 0 && xx < nx && yy < ny) Bar[yy * nx + xx] = 1; } } };
-  const segUV = w => w.ax === 0 ? [w.o, w.t0, w.o, w.t1] : [w.t0, w.o, w.t1, w.o];
+  const segUV = w => [...UVp(Wp(w.ax, w.o, w.t0)), ...UVp(Wp(w.ax, w.o, w.t1))];
   for (const w of full) line(...segUV(w));
+  for (const g of (opt.userWalls || [])) line(...UVp(g.a), ...UVp(g.b)); // линии, отмеченные в «Сборке», — тоже стены
   // стык стены с потолком: в ячейке 2 см точки верхних 45 см по высоте занимают > 25 см — это стена/перемычка до потолка
   { const zlo = new Float32Array(gw * gh).fill(99), zhi = new Float32Array(gw * gh).fill(-99);
     for (let i = 0; i < N; i++) { if (Z[i] < H - 0.45 || Z[i] > H - 0.04) continue; const c = cellOf(i); if (Z[i] < zlo[c]) zlo[c] = Z[i]; if (Z[i] > zhi[c]) zhi[c] = Z[i]; }
@@ -792,10 +818,10 @@ function scanPlan(scans, opt = {}) {
     log('стык с потолком: ячеек ' + nb); }
   { const grp = new Map(); for (const w of full) { const key = w.ax + '|' + Math.round(w.o / 0.03); if (!grp.has(key)) grp.set(key, []); grp.get(key).push(w); }
     for (const ws of grp.values()) { ws.sort((a, b) => a.t0 - b.t0); let end = ws[0].t1; const o = ws.reduce((s, w) => s + w.o, 0) / ws.length, ax = ws[0].ax;
-      for (const w of ws.slice(1)) { const gp = w.t0 - end; if (gp > 0 && gp < 1.3) { if (ax === 0) line(o, end, o, w.t0); else line(end, o, w.t0, o); } end = Math.max(end, w.t1); } } }
+      for (const w of ws.slice(1)) { const gp = w.t0 - end; if (gp > 0 && gp < 1.3) line(...UVp(Wp(ax, o, end)), ...UVp(Wp(ax, o, w.t0))); end = Math.max(end, w.t1); } } }
   // ниши окон — в помещение
   for (const op of openings) { if (op.kind !== 'window' || !(op.niche > 0.05 && op.niche < 0.7)) continue; const a = op.o - op.sg * op.niche, b = op.o; const lo = Math.min(a, b), hi = Math.max(a, b);
-    for (let s = op.s0; s <= op.s1; s += R) for (let t = lo; t <= hi; t += R) { const u = op.ax === 0 ? t : s, v = op.ax === 0 ? s : t, x = Math.round((u - u0) / R), y = Math.round((v - v0) / R); if (x >= 0 && y >= 0 && x < nx && y < ny) M[y * nx + x] = 1; } }
+    for (let s = op.s0; s <= op.s1; s += R) for (let t = lo; t <= hi; t += R) { const [u, v] = UVp(Wp(op.ax, t, s)), x = Math.round((u - u0) / R), y = Math.round((v - v0) / R); if (x >= 0 && y >= 0 && x < nx && y < ny) M[y * nx + x] = 1; } }
   const free = new Uint8Array(nx * ny); let sM = 0, sB = 0, sF = 0; for (let c = 0; c < free.length; c++) { free[c] = M[c] && !Bar[c] ? 1 : 0; sM += M[c]; sB += Bar[c]; sF += free[c]; } log('потолок ' + (sM * R * R).toFixed(1) + ' м², границы ' + (sB * R * R).toFixed(1) + ', свободно ' + (sF * R * R).toFixed(1));
   const lab = new Int32Array(nx * ny), comps = []; let nl = 0; const q = new Int32Array(nx * ny);
   for (let c0 = 0; c0 < free.length; c0++) { if (!free[c0] || lab[c0]) continue; nl++; let h = 0, t = 0; q[t++] = c0; lab[c0] = nl; let xmin = nx, xmax = 0, ymin = ny, ymax = 0, n = 0;
@@ -820,21 +846,36 @@ function scanPlan(scans, opt = {}) {
     for (let y = cp.ymin; y <= cp.ymax; y++) for (let x = cp.xmin; x <= cp.xmax; x++) if (lab[y * nx + x] === cp.id) m[(y - cp.ymin + pad) * w + (x - cp.xmin + pad)] = 1;
     m = closeLocal(m, w, h, 5);
     const ctr = traceBoundary(m, w, h); if (opt.dbg) log("комп id" + cp.id + " uv " + [u0 + cp.xmin * R, v0 + cp.ymin * R, u0 + cp.xmax * R, v0 + cp.ymax * R].map(t => t.toFixed(2)).join(",") + " " + (cp.n * R * R).toFixed(2) + ' м², контур ' + ctr.length); if (ctr.length < 8) continue;
-    const simp = dpSimplify(ctr, 3).map(([x, y]) => [u0 + (x + cp.xmin - pad) * R, v0 + (y + cp.ymin - pad) * R]);
-    let E = orthoEdges(simp); if (opt.dbg) log('  упрощ ' + simp.length + ' рёбер ' + E.length); if (E.length < 4) continue;
-    let V = edgeVerts(E); const rp = interiorPoint(V);
-    for (let ei = 0; ei < E.length; ei++) { const e = E[ei], ax = e[0], c0 = e[1], kk = 1 - ax, inn = rp[1 - ax] > c0 ? 1 : -1, a = V[ei], b = V[(ei + 1) % E.length], lo = Math.min(a[ax], b[ax]), hi = Math.max(a[ax], b[ax]); let bst = null;
-      for (const wl of full) { if (wl.ax !== kk || wl.sg !== inn) continue; const out = (c0 - wl.o) * inn; if (out < -0.03 || out > 0.5) continue; const ov = Math.min(hi, wl.t1) - Math.max(lo, wl.t0); if (ov < 0.25 * (hi - lo) || ov < 0.05) continue; const sc = ov / Math.sqrt(0.02 + Math.abs(out)); if (!bst || sc > bst[0]) bst = [sc, wl.o]; }
-      if (bst) e[1] = bst[1]; }
-    V = edgeVerts(E); const A = Math.abs(polyArea(V)); if (opt.dbg) log('  площадь ' + A.toFixed(2)); if (A < 0.4) continue;
-    rooms.push({ V: V.map(([u, v]) => [u * U[0][0] + v * U[1][0], u * U[0][1] + v * U[1][1]]), area: A });
+    let pa = 0; for (const v of m) pa += v; pa *= R * R; // площадь пятна
+    const okP = E => { if (E.length < 3) return false; const V = edgeVertsL(E), A = Math.abs(polyArea(V)); if (A < 0.7 * pa || A > 1.35 * pa) return false; return !selfX(V); };
+    let E = null, simp = null; // eslint-disable-line
+    for (const [eps, ds, nz] of [[8, DIRS, false], [8, DIRS, true], [4, DIRS, true], [4, DIRS.slice(0, 2), true], [3, DIRS.slice(0, 2), true]]) {
+      simp = dpSimplify(ctr, eps).map(([x, y]) => [u0 + (x + cp.xmin - pad) * R, v0 + (y + cp.ymin - pad) * R]);
+      const simpW = simp.map(([u, v]) => [u * U[0][0] + v * U[1][0], u * U[0][1] + v * U[1][1]]), E1 = lineEdges(simpW, ds, nz); if (!E) E = E1; if (opt.dbg && cp.id === 74) { const V1 = edgeVertsL(E1); log('   eps ' + eps + ' nz ' + nz + ' рёбер ' + E1.length + ' A ' + Math.abs(polyArea(V1)).toFixed(2) + ' pa ' + pa.toFixed(2) + ' X ' + selfX(V1)); } if (okP(E1)) { E = E1; break; } }
+    if (opt.dbg) log('  упрощ ' + simp.length + ' рёбер ' + E.length); if (E.length < 3) continue;
+    let V = edgeVertsL(E); const rp = interiorPoint(V);
+    // прижать каждую сторону к стене во всю высоту того же направления (наружу до 0,5 м)
+    for (let ei = 0; ei < E.length; ei++) { const e = E[ei]; if (e.di == null) continue; const D = DIRS[e.di], c0 = e.p[0] * D.n[0] + e.p[1] * D.n[1], inn = (rp[0] * D.n[0] + rp[1] * D.n[1]) > c0 ? 1 : -1;
+      const a = V[ei], b = V[(ei + 1) % E.length], ta = a[0] * D.t[0] + a[1] * D.t[1], tb = b[0] * D.t[0] + b[1] * D.t[1], lo = Math.min(ta, tb), hi = Math.max(ta, tb); let bst = null;
+      for (const wl of full) { if (wl.ax !== e.di || wl.sg !== inn) continue; const out = (c0 - wl.o) * inn; if (out < -0.03 || out > 0.5) continue; const ov = Math.min(hi, wl.t1) - Math.max(lo, wl.t0); if (ov < 0.25 * (hi - lo) || ov < 0.05) continue; const sc = ov / Math.sqrt(0.02 + Math.abs(out)); if (!bst || sc > bst[0]) bst = [sc, wl.o]; }
+      if (bst) { const d = bst[1] - c0, old = e.p; e.p = [e.p[0] + d * D.n[0], e.p[1] + d * D.n[1]]; if (!okP(E)) e.p = old; else V = edgeVertsL(E); } } // прижатие не должно ломать контур
+    // линии пользователя: сторона, идущая рядом (≤ 40 см, ≤ 5°), ложится точно на линию; углы — на отмеченные точки (≤ 30 см)
+    for (const e of E) { let bst = null; for (const g of (opt.userWalls || [])) { const d = [g.b[0] - g.a[0], g.b[1] - g.a[1]], L = Math.hypot(d[0], d[1]); if (L < 0.1) continue; let ga = Math.atan2(d[1], d[0]); if (ga < 0) ga += Math.PI; if (ga >= Math.PI) ga -= Math.PI;
+        const da = Math.min(Math.abs(ga - e.a), Math.PI - Math.abs(ga - e.a)); if (da > 5 * Math.PI / 180) continue; const nr = [-d[1] / L, d[0] / L], off = Math.abs((e.p[0] - g.a[0]) * nr[0] + (e.p[1] - g.a[1]) * nr[1]); if (off > 0.4) continue;
+        const tt = (e.p[0] - g.a[0]) * d[0] / L + (e.p[1] - g.a[1]) * d[1] / L; if (tt < -e.L / 2 - 0.3 || tt > L + e.L / 2 + 0.3) continue; const sc = off + da; if (!bst || sc < bst[0]) bst = [sc, ga, g.a]; }
+      if (bst) { e.a = bst[1]; e.p = bst[2].slice(); e.user = true; } }
+    if ((opt.userPts || []).length) { V = edgeVertsL(E); for (const up of opt.userPts) { let bi = -1, bd = 0.3; V.forEach((v, i) => { const dd = Math.hypot(v[0] - up.p[0], v[1] - up.p[1]); if (dd < bd) { bd = dd; bi = i; } }); if (bi < 0) continue;
+        for (const e of [E[(bi - 1 + E.length) % E.length], E[bi]]) if (!e.user) e.p = up.p.slice(); } }
+    if (E.some(e => e.user) || (opt.userPts || []).length) { const E2 = lineEdges(edgeVertsL(E), DIRS, true); if (E2.length >= 3 && !selfX(edgeVertsL(E2))) E = E2; }
+    V = edgeVertsL(E); const A = Math.abs(polyArea(V)); if (opt.dbg) log('  площадь ' + A.toFixed(2)); if (A < 0.4) continue;
+    rooms.push({ V, area: A });
   }
   rooms.sort((a, b) => b.area - a.area);
   log('помещений ' + rooms.length);
   const toW = (u, v) => [u * U[0][0] + v * U[1][0], u * U[0][1] + v * U[1][1]];
-  const opW = openings.map(o => { const A = o.ax === 0 ? toW(o.o, o.s0) : toW(o.s0, o.o), B = o.ax === 0 ? toW(o.o, o.s1) : toW(o.s1, o.o), nIn = o.ax === 0 ? toW(o.sg, 0) : toW(0, o.sg);
-    return { kind: o.kind, a: A, b: B, w: o.w, zlo: o.zlo, zhi: o.zhi, nIn, niche: o.niche || null, sill: o.sill ? { ...o.sill, A: o.ax === 0 ? toW(o.o, o.sill.s0) : toW(o.sill.s0, o.o), B: o.ax === 0 ? toW(o.o, o.sill.s1) : toW(o.sill.s1, o.o) } : null }; });
-  return { axis: best, H, walls: walls.map(w => ({ ...w, A: w.ax === 0 ? toW(w.o, w.t0) : toW(w.t0, w.o), B: w.ax === 0 ? toW(w.o, w.t1) : toW(w.t1, w.o) })), rooms, openings: opW };
+  void toW; const opW = openings.map(o => { const D = DIRS[o.ax], A = Wp(o.ax, o.o, o.s0), B = Wp(o.ax, o.o, o.s1), nIn = [D.n[0] * o.sg, D.n[1] * o.sg];
+    return { kind: o.kind, a: A, b: B, w: o.w, zlo: o.zlo, zhi: o.zhi, nIn, niche: o.niche || null, sill: o.sill ? { ...o.sill, A: Wp(o.ax, o.o, o.sill.s0), B: Wp(o.ax, o.o, o.sill.s1) } : null }; });
+  return { axis: best, H, dirs: DIRS.map(D => Math.atan2(D.t[1], D.t[0])), walls: walls.map(w => ({ ...w, A: Wp(w.ax, w.o, w.t0), B: Wp(w.ax, w.o, w.t1) })), rooms, openings: opW };
 }
 function closeLocal(m, w, h, r) { const dil = (A, d) => { const B = new Uint8Array(A.length); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let v = d ? 0 : 1; for (let dy = -r; dy <= r && (d ? !v : v); dy++) for (let dx = -r; dx <= r; dx++) { const xx = x + dx, yy = y + dy; const a = xx >= 0 && yy >= 0 && xx < w && yy < h ? A[yy * w + xx] : 0; if (d && a) { v = 1; break; } if (!d && !a) { v = 0; break; } } B[y * w + x] = v; } return B; }; return dil(dil(m, true), false); }
 function traceBoundary(m, w, h) { // Мур: внешний контур самой большой области
@@ -850,6 +891,36 @@ function dpSimplify(P0, eps) { // замкнутый контур: делим в
 function dpOpen(P, eps) { if (P.length < 3) return P; const keep = new Uint8Array(P.length); keep[0] = keep[P.length - 1] = 1; const st = [[0, P.length - 1]];
   while (st.length) { const [a, b] = st.pop(); let md = -1, mi = -1; const [ax, ay] = P[a], [bx, by] = P[b], L = Math.hypot(bx - ax, by - ay) || 1e-9; for (let i = a + 1; i < b; i++) { const d = Math.abs((bx - ax) * (ay - P[i][1]) - (ax - P[i][0]) * (by - ay)) / L; if (d > md) { md = d; mi = i; } } if (md > eps) { keep[mi] = 1; st.push([a, mi], [mi, b]); } }
   return P.filter((_, i) => keep[i]); }
+// стороны помещения по любым направлениям: близкие к направлению стен (≤ 12°) — точно по нему, остальные — как есть
+function lineEdges(V, DIRS, noZig) {
+  const ang = v => { let a = Math.atan2(v[1], v[0]); if (a < 0) a += Math.PI; if (a >= Math.PI) a -= Math.PI; return a; }, ad = (a, b) => { const d = Math.abs(a - b) % Math.PI; return Math.min(d, Math.PI - d); };
+  const DA = DIRS.map(D => ang(D.t)); let E = [];
+  for (let i = 0; i < V.length; i++) { const a = V[i], b = V[(i + 1) % V.length], d = [b[0] - a[0], b[1] - a[1]], L = Math.hypot(d[0], d[1]); if (L < 1e-6) continue;
+    const al = ang(d); let di = null, bd = (L < 0.5 ? 50 : 12) * Math.PI / 180; DA.forEach((x, k) => { const q = ad(al, x); if (q < bd) { bd = q; di = k; } }); // короткие кривые куски (мебель) — к ближайшему направлению
+    E.push({ di, a: di == null ? al : DA[di], p: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], L }); }
+  const merge = (e, f) => { const w = e.L + f.L, a = e.di != null ? e.a : f.di != null ? f.a : (() => { let fa = f.a; if (fa - e.a > Math.PI / 2) fa -= Math.PI; if (e.a - fa > Math.PI / 2) fa += Math.PI; return (e.a * e.L + fa * f.L) / w; })();
+    const nrm = [-Math.sin(a), Math.cos(a)], c = ((e.p[0] * nrm[0] + e.p[1] * nrm[1]) * e.L + (f.p[0] * nrm[0] + f.p[1] * nrm[1]) * f.L) / w, tt = [Math.cos(a), Math.sin(a)], m = ((e.p[0] * tt[0] + e.p[1] * tt[1]) * e.L + (f.p[0] * tt[0] + f.p[1] * tt[1]) * f.L) / w;
+    return { di: e.di != null ? e.di : f.di, a, p: [nrm[0] * c + tt[0] * m, nrm[1] * c + tt[1] * m], L: w }; };
+  const same = (e, f) => (e.di != null && e.di === f.di) || ((e.di == null || f.di == null) && ad(e.a, f.a) < 5 * Math.PI / 180) || ad(e.a, f.a) < 1.5 * Math.PI / 180;
+  for (let it = 0; it < 400 && E.length > 3; it++) { let ch = false;
+    for (let i = 0; i < E.length && E.length > 3; i++) { const j = (i + 1) % E.length; if (same(E[i], E[j])) { const m = merge(E[i], E[j]); E.splice(Math.max(i, j), 1); E[Math.min(i, j)] = m; ch = true; break; } }
+    if (ch) continue;
+    // зубчики: 1–3 короткие стороны (вместе < 40 см) между двумя сторонами одной линии (сдвиг < 6 см) — убрать, а эти стороны слить
+    if (!noZig) { const Vz = edgeVertsL(E), n = E.length, len = k => { const a = Vz[k % n], b = Vz[(k + 1) % n]; return Math.hypot(b[0] - a[0], b[1] - a[1]); };
+      outer: for (let h = 0; h < n && n > 4; h++) for (let k = 2; k <= 4; k++) { const j = (h + k) % n; if (j === h || !(E[h].di != null && E[h].di === E[j].di)) continue; let L = 0; for (let q = 1; q < k; q++) L += len(h + q); if (L > 0.4) continue;
+        const nr = [-Math.sin(E[h].a), Math.cos(E[h].a)]; if (Math.abs((E[h].p[0] - E[j].p[0]) * nr[0] + (E[h].p[1] - E[j].p[1]) * nr[1]) > 0.06) continue;
+        const m = merge(E[h], E[j]); const rm = []; for (let q = 1; q <= k; q++) rm.push((h + q) % n); E[h] = m; rm.sort((x, y) => y - x).forEach(r => E.splice(r, 1)); ch = true; break outer; } }
+    if (ch) continue;
+    // короткие стороны (< 5 см) — убрать, соседи сойдутся в угол
+    const Vx = edgeVertsL(E); for (let i = 0; i < E.length && E.length > 3; i++) { const a = Vx[i], b = Vx[(i + 1) % E.length]; if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 0.08) { E.splice(i, 1); ch = true; break; } }
+    if (!ch) break; }
+  return E; }
+function selfX(V) { const n = V.length, cr = (a, b, c) => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+  for (let i = 0; i < n; i++) for (let j = i + 2; j < n; j++) { if (i === 0 && j === n - 1) continue; const a = V[i], b = V[(i + 1) % n], c = V[j], d = V[(j + 1) % n];
+    if (cr(a, b, c) * cr(a, b, d) < 0 && cr(c, d, a) * cr(c, d, b) < 0) return true; } return false; }
+function lineX2(e, f) { const d1 = [Math.cos(e.a), Math.sin(e.a)], d2 = [Math.cos(f.a), Math.sin(f.a)], den = d1[0] * d2[1] - d1[1] * d2[0]; if (Math.abs(den) < 1e-6) return [(e.p[0] + f.p[0]) / 2, (e.p[1] + f.p[1]) / 2];
+  const t = ((f.p[0] - e.p[0]) * d2[1] - (f.p[1] - e.p[1]) * d2[0]) / den; return [e.p[0] + d1[0] * t, e.p[1] + d1[1] * t]; }
+function edgeVertsL(E) { const V = []; for (let i = 0; i < E.length; i++) V.push(lineX2(E[(i - 1 + E.length) % E.length], E[i])); return V; } // вершина i — между сторонами i-1 и i
 function orthoEdges(V) { const E = [];
   for (let i = 0; i < V.length; i++) { const a = V[i], b = V[(i + 1) % V.length], du = b[0] - a[0], dv = b[1] - a[1], ax = Math.abs(du) >= Math.abs(dv) ? 1 : 0, L = Math.abs(ax ? du : dv), c = ax ? (a[1] + b[1]) / 2 : (a[0] + b[0]) / 2; // ax=1: ребро v=c, ax=0: ребро u=c
     if (E.length && E[E.length - 1][0] === ax) { const e = E[E.length - 1], ww = e[2] + L; e[1] = (e[1] * e[2] + c * L) / (ww || 1); e[2] = ww; } else E.push([ax, c, L]); }
@@ -867,7 +938,7 @@ function interiorPoint(V) { let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1
 <script id="wsrc" type="text/plain">// фоновое чтение E57: прореживание, пол/потолок, гистограмма высот
 self.onmessage = e => {
   if (e.data.cmd === 'auto') return autoJob(e.data);
-  if (e.data.cmd === 'scanplan') { const job = e.data.job; try { const r = scanPlan(e.data.scans, { log: t => self.postMessage({ job, prog: 0.5, stage: t }) }); self.postMessage({ job, done: true, res: r }); } catch (err) { self.postMessage({ job, error: String(err && err.message || err) }); } return; }
+  if (e.data.cmd === 'scanplan') { const job = e.data.job; try { const r = scanPlan(e.data.scans, { userWalls: e.data.guides || [], userPts: e.data.gpts || [], log: t => self.postMessage({ job, prog: 0.5, stage: t }) }); self.postMessage({ job, done: true, res: r }); } catch (err) { self.postMessage({ job, error: String(err && err.message || err) }); } return; }
   if (e.data.cmd === 'refine') return refineJob(e.data);
   if (e.data.cmd === 'spheres') return sphereJob(e.data);
   const { job, name, buf, voxel } = e.data;
@@ -904,7 +975,7 @@ function refineJob({ job, scans, poses, pairs, fixed, spheres }) {
       const r = REG3D.icp(D[i], D[j], init); if (!r) { bad.push([i, j, 'мало общего']); continue; }
       const da = Math.abs(Math.atan2(Math.sin(r.a - init.a), Math.cos(r.a - init.a))), dt = Math.hypot(r.tx - init.tx, r.ty - init.ty);
       if (dt > 0.5 || da > 5 * Math.PI / 180) { bad.push([i, j, 'далеко']); continue; }
-      const e = REG3D.evidence(D[i], D[j], r); if (!REG3D.good(e) && !(e.ratio >= 0.6 && e.ag >= 1200)) { bad.push([i, j, 'не сходится']); continue; }
+      const e = REG3D.evidence(D[i], D[j], r); if (!REG3D.good(e) && !(e.ratio >= 0.6 && e.ag >= 1200 && dt < 0.06 && da < 0.6 * Math.PI / 180)) { bad.push([i, j, 'не сходится']); continue; }
       // информация стыка: J'J / σ² (точки соседние — не независимы, поэтому с запасом ×0.05)
       const sg = Math.max(r.rms, 0.003), I = new Float64Array(16); if (r.M) for (let u = 0; u < 16; u++) I[u] = r.M[u] / (sg * sg) * 0.05;
       const ev = eig2(I[5], I[6], I[10]), weak = ev.lmax > 0 && ev.lmin / ev.lmax < 0.02; // по одному направлению в плане стык почти не держится
@@ -1290,7 +1361,7 @@ async function loadFiles(files) {
     } catch (e) { err.push(f.name + ': ' + e.message); }
   }
   busy(''); renderAll(); saveSoon(); fitAsm();
-  stat(`Загружено сканов: ${n}.${err.length ? ' Не получилось: ' + err.join('; ') : ''} Отметьте на соседних сканах одинаковые линии (стены, края проёмов, колонны) — одной буквой.`);
+  stat(`Загружено сканов: ${n}.${err.length ? ' Не получилось: ' + err.join('; ') : ''} Дальше — шаг «2 Сборка» → «🤖 Автосшивка».`);
 }
 
 // ---------- диалоги ----------
@@ -1360,6 +1431,7 @@ function drawAsm() {
   if (S.drawing && S.drawing.where === 'asm') { const D = S.drawing, sc = scanById(D.sid); ctx.strokeStyle = '#111'; ctx.setLineDash([6 * dpr(), 4 * dpr()]); ctx.lineWidth = 2 * dpr(); ctx.beginPath(); ctx.moveTo(...w2s(V, W, H, L2W(sc, D.a))); ctx.lineTo(...w2s(V, W, H, L2W(sc, D.b))); ctx.stroke(); ctx.setLineDash([]); }
   for (const sc of S.scans) if (sc.vis && (S.tool === 'keep' || S.tool === 'brush')) drawCleanOverlay(ctx, p => w2s(V, W, H, L2W(sc, p)), sc);
   drawCleanLive(ctx, V, W, H, 'asm');
+  drawGuides(ctx, p => w2s(V, W, H, p));
   scaleBar(ctx, V, W, H);
 }
 function scanBBoxW(sc) { const [x0, y0, x1, y1] = sc.core; return [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].map(p => L2W(sc, p)); }
@@ -1373,7 +1445,11 @@ function renderBar() { $('#rotbar').hidden = S.view !== 'asm'; { const bm = $('#
 }
 function renderMain() {
   const main = $('#main');
-  if (!S.scans.length) { main.innerHTML = `<div class="empty"><h2>Сшивка сканов по меткам</h2><p>Загрузите сканы E57 (кнопка «＋ Сканы» или перетащите файлы сюда). Затем на соседних сканах отметьте <b>одинаковые линии</b> — стену, край проёма, грань колонны — одной и той же буквой. Программа подгонит каждую линию по точкам скана и сошьёт сканы по этим меткам.</p><p class="h">Для каждого скана можно выбрать полосу высот: где-то лучше видно у пола, где-то у потолка.</p><button class="pri big" onclick="$('#fileIn').click()">＋ Загрузить сканы E57</button></div>`; return; }
+  if (!S.scans.length) { main.innerHTML = `<div class="empty"><h2>Скан: от сканов FARO до плана</h2>
+<ol class="steps3"><li><b>1 Сканы</b> — загрузите E57 (кнопка «＋ Сканы» или перетащите файлы сюда). Сканы FARO .fls пересохраняются в E57 файлом <a href="fls_to_e57.bat" download>fls_to_e57.bat</a> (нужен бесплатный CloudCompare).</li>
+<li><b>2 Сборка</b> — «🤖 Автосшивка»: программа сама найдёт общие места соседних сканов и сошьёт их; «🎯 Уточнить» — точная подгонка. Где не сошлось — поправить вручную или метками.</li>
+<li><b>3 План</b> — «🏠 План по сканам»: стены, помещения с площадями, двери, окна и подоконники. Выгрузка — DXF и файл для Рулетки (домерить на месте).</li></ol>
+<p class="h">Совет при съёмке: шторы открыть, двери в помещения открыть — так программа видит окна и проёмы.</p><button class="pri big" onclick="$('#fileIn').click()">＋ Загрузить сканы E57</button></div>`; return; }
   if (S.view === 'grid') {
     const vis = S.scans.filter(s => s.vis);
     main.innerHTML = `<div id="grid" style="grid-template-columns:repeat(${S.cols},minmax(0,1fr))">${vis.map(s => `<div class="tile ${S.sel === s.id ? 'sel' : ''}" id="tile-${s.id}"><div class="th"><i style="background:${s.color}"></i><b>${escH(s.name)}</b><span>${S.marks.filter(m => m.sid === s.id).map(m => `<em style="background:${labColor(m.lab)}">${escH(m.lab)}</em>`).join('')}</span><button data-solo="${s.id}" title="Сравнить: только этот и выбранный">⇄</button></div><canvas></canvas></div>`).join('')}</div>`;
@@ -1455,6 +1531,7 @@ function bindCanvas(cv, ctxInfo) {
       if (onSel) pushUndo(); return; }
     if (P.size > 2) return;
     const w = toW(e);
+    if (ctxInfo.kind === 'asm' && GU_TOOLS.includes(S.tool)) { if (S.tool === 'gline') { g = { kind: 'guDraw', a: w }; S.guDraw = { a: w, b: w }; return; } g = { kind: 'pan', x: e.clientX, y: e.clientY, v0: { ...V() }, tap: true, gu: w }; return; }
     if (ctxInfo.kind === 'tile') { S.sel = ctxInfo.sid; $$('.tile').forEach(t => t.classList.toggle('sel', t.id === 'tile-' + ctxInfo.sid)); $$('.si').forEach(t => t.classList.toggle('sel', +t.dataset.sid === ctxInfo.sid)); }
     const right = e.button === 2;
     if (S.tool === 'corner' || S.tool === 'brush' || S.tool === 'keep') { g = cleanDown(CC, e, w); return; }
@@ -1494,6 +1571,7 @@ function bindCanvas(cv, ctxInfo) {
       if (g.grp) { for (const q of g.grp) { const r2 = rot([q.pose0.x - g.wm0[0], q.pose0.y - g.wm0[1]], da); q.sc.pose = { x: wm[0] + r2[0], y: wm[1] + r2[1], a: normA(q.pose0.a + da) }; } drawAsm(); return; } const rel = rot([p0.x - g.wm0[0], p0.y - g.wm0[1]], da); sc.pose = { x: wm[0] + rel[0], y: wm[1] + rel[1], a: normA(p0.a + da) }; drawAsm(); return; }
     if (g.kind === 'pan') { const k = v.s; v.cx = g.v0.cx - (e.clientX - g.x) / k; v.cy = g.v0.cy + (e.clientY - g.y) / k; if (Math.hypot(e.clientX - g.x, e.clientY - g.y) > 6) g.tap = false; redrawOne(); return; }
     const w = toW(e);
+    if (g.kind === 'guDraw') { let b = w; const pl = PL(); for (const q of [...(pl.gpts || []).map(x => x.p), ...(pl.guides || []).flatMap(x => [x.a, x.b])]) if (len(sub(q, w)) < 12 / v.s) b = q; S.guDraw.b = b; drawAsm(); return; }
     if (g.kind && g.kind.startsWith('c_')) { cleanMove(CC, g, w, e); redrawOne(); return; }
     if (g.kind === 'draw') { const sc = scanById(g.sid); S.drawing.b = S.tool === 'point' ? S.drawing.a : local(sc, w); redrawOne(); return; }
     if (g.kind === 'mEnd') { const l = local(g.sc, w); g.m[g.end] = l; g.m.edited = true; redrawOne(); return; }
@@ -1509,6 +1587,8 @@ function bindCanvas(cv, ctxInfo) {
     P.delete(e.pointerId); if (!g) return;
     if ((g.kind === 'pinch' || g.kind === 'twist') && P.size) return;
     const was = g; g = null;
+    if (was.kind === 'pan' && was.tap && was.gu) { guideTap(was.gu, cv); return; }
+    if (was.kind === 'guDraw') { const D = S.guDraw; S.guDraw = null; if (D && len(sub(D.b, D.a)) > 0.1) { pushUndo(); const pl = guides(); pl.guides.push({ id: pl.nextG++, a: D.a, b: D.b }); saveSoon(); stat('Линия плана нарисована: ' + nf(len(sub(D.b, D.a)), 2) + ' м.'); } drawAsm(); return; }
     if (was.kind && was.kind.startsWith('c_')) { cleanEnd(CC, was, e); return; }
     if (was.kind === 'draw') { const D = S.drawing; S.drawing = null; finishMark(was.sid, D.a, S.tool === 'point' ? null : D.b, e.clientX, e.clientY); return; }
     if (was.kind === 'mEnd' || was.kind === 'mMove') { if (was.kind === 'mMove' && !was.moved) { S.undo.pop(); renderMarkCard(); return; } const m = was.m; if (m.kind === 'line' && m.snap !== false) { const f = fitLine(was.sc, m.a, m.b); if (f) { m.a = f.a; m.b = f.b; m.fit = { n: f.n, rms: f.rms }; } else m.fit = null; } S.lastSolve = null; redraw(); renderList(); renderMarkCard(); saveSoon(); return; }
@@ -1583,7 +1663,7 @@ async function openProjectFile(f) { let j; try { j = JSON.parse(await f.text());
 
 // ---------- вид ----------
 function setView(v) { const reset = S.view !== v && S.tool !== 'hand'; if (reset) { S.tool = 'hand'; stat('Обзор: тянуть — сдвиг вида, колесо — масштаб.'); } S.view = v; if (v !== 'plan') S.planSel = null; renderAll(); if ((v === 'asm' || v === 'plan') && !S.asmFitted) { S.asmFitted = true; fitAsm(); if (v === 'plan') drawPlan(); } }
-function setTool(t) { const cl = x => x === 'brush' || x === 'keep', was = S.tool; S.tool = t; renderBar(); if (cl(t) !== cl(was)) renderList(); stat({ hand: 'Обзор: тянуть — сдвиг вида, два пальца — масштаб. В «Сборке»: тянуть скан — сдвиг, ↻ или два пальца на скане — поворот, правая кнопка мыши — поворот.', line: 'Линия: проведите вдоль стены или края на скане — программа подгонит линию по точкам. Затем выберите букву: на соседнем скане та же стена — та же буква.', point: 'Точка: коснитесь угла, центра колонны, стояка — и выберите букву. Линии точнее точек.', erase: 'Удалить метку: коснитесь её.', corner: 'Общий угол: в «Сборке» коснитесь угла, видного на нескольких сканах, — общая точка встанет на каждом. На рамке — точка в угол этого скана.', wfit: 'Стена по точкам: коснитесь стены в срезе — программа впишет прямую по точкам (видно, по скольким и с каким разбросом), продлит вдоль стены и замкнёт угол с соседней. Высота и толщина среза — в карточке справа.', brush: 'Стереть: проведите кистью по мебели, дверям, людям. Размер кисти — слева в «Чистке».', keep: 'Нужное: набросок по стене (продлится сам) или касание — колонна, угол. «Только нужное» скрывает остальное.' }[t]); }
+function setTool(t) { const cl = x => x === 'brush' || x === 'keep', was = S.tool; S.tool = t; renderBar(); if (cl(t) !== cl(was)) renderList(); stat({ gfit: '⌇ Линия стены: коснитесь стены на сканах — прямая впишется по точкам среза. По этим линиям «🏠 План по сканам» проведёт стороны помещений (стены за мебелью, косые стены).', gline: '／ Линия: тяните от точки до точки — линия для плана там, где стену не видно.', gpt: '⌖ Угол плана: коснитесь угла — ближайший угол помещения пройдёт через эту точку. Рядом с пересечением линий липнет к нему.', gdel: '⌫ Коснитесь линии или угла плана — удалить.', hand: 'Обзор: тянуть — сдвиг вида, два пальца — масштаб. В «Сборке»: тянуть скан — сдвиг, ↻ или два пальца на скане — поворот, правая кнопка мыши — поворот.', line: 'Линия: проведите вдоль стены или края на скане — программа подгонит линию по точкам. Затем выберите букву: на соседнем скане та же стена — та же буква.', point: 'Точка: коснитесь угла, центра колонны, стояка — и выберите букву. Линии точнее точек.', erase: 'Удалить метку: коснитесь её.', corner: 'Общий угол: в «Сборке» коснитесь угла, видного на нескольких сканах, — общая точка встанет на каждом. На рамке — точка в угол этого скана.', wfit: 'Стена по точкам: коснитесь стены в срезе — программа впишет прямую по точкам (видно, по скольким и с каким разбросом), продлит вдоль стены и замкнёт угол с соседней. Высота и толщина среза — в карточке справа.', brush: 'Стереть: проведите кистью по мебели, дверям, людям. Размер кисти — слева в «Чистке».', keep: 'Нужное: набросок по стене (продлится сам) или касание — колонна, угол. «Только нужное» скрывает остальное.' }[t]); }
 
 window.addEventListener('resize', () => { if (S.view === 'grid') { sizeTiles(); redraw(); } else { const cv = $('#asm') || $('#plan'); if (cv) { sizeCanvas(cv); redraw(); } } });
 document.addEventListener('keydown', e => { if (e.target.closest('input')) return; if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }
@@ -1677,7 +1757,7 @@ function buildWalls() {
 // --- план по сканам: стены во всю высоту, помещения по потолку, проёмы — дыры в стенах (алгоритм в spsrc) ---
 const ROOMCOL = ['rgba(37,99,235,.10)', 'rgba(234,88,12,.10)', 'rgba(22,163,74,.11)', 'rgba(219,39,119,.09)', 'rgba(124,58,237,.10)', 'rgba(202,138,4,.12)', 'rgba(8,145,178,.11)'];
 function runScanPlan(scans) { return new Promise((res, rej) => { const w = getWorker(), job = Math.random(); const on = e => { const d = e.data; if (d.job !== job) return; if (d.prog != null && !d.done) { busy('План по сканам: ' + (d.stage || '…').replace(/\s*\(.*$/, '')); return; } w.removeEventListener('message', on); if (d.error) rej(new Error(d.error)); else res(d.res); }; w.addEventListener('message', on);
-  w.postMessage({ cmd: 'scanplan', job, scans }, scans.map(q => q.P.buffer)); }); }
+  w.postMessage({ cmd: 'scanplan', job, scans, guides: (PL().guides || []).map(g => ({ a: g.a, b: g.b })), gpts: (PL().gpts || []).map(q => ({ p: q.p })) }, scans.map(q => q.P.buffer)); }); }
 async function planFromScans() {
   const L = S.scans.filter(s => s.vis); if (!L.length) { uiAlert('Нет видимых сканов.'); return; }
   busy('План по сканам: собираю точки…'); await new Promise(r => setTimeout(r, 30));
@@ -1706,9 +1786,13 @@ function applyScanPlan(r) {
     for (const f of [face, back]) { if (!f) continue; const op = { id: pl.nextO++, w: f.w.id, t0: f.t0, t1: f.t1, kind, zlo: +o.zlo.toFixed(2), zhi: +o.zhi.toFixed(2) };
       if (f === face && o.sill && o.sill.front > 0.02) { const v = wDir(f.w), sa = dot(sub(o.sill.A, f.w.a), v), sb = dot(sub(o.sill.B, f.w.a), v), L = wLen(f.w); op.sill = { t0: Math.max(0, Math.min(sa, sb)), t1: Math.min(L, Math.max(sa, sb)), front: +o.sill.front.toFixed(3), dep: +(o.sill.front - o.sill.back).toFixed(3), z: +o.sill.z.toFixed(2) }; nS++; }
       pl.ops.push(op); } }
-  busy(''); S.planSel = null; S._slice = null; setView('plan'); saveSoon();
+  busy(''); S.planSel = null; S._slice = null; setView('plan'); saveSoon(); fitPlanRooms();
   const R = roomPolys(); stat(`План по сканам: помещений ${R.length} (${R.map(q => nf(q.area, 2)).join(' · ')} м²), дверей ${nD}, окон ${nW}, подоконников ${nS}. Проверьте по срезу; окна и подоконники лучше домерить Рулеткой — «⬇ Для Рулетки».`);
 }
+function fitPlanRooms() { // весь план — в свободную часть экрана, слева от карточки
+  const cv = $('#plan'); if (!cv) return; const R = roomPolys(); if (!R.length) return; let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; for (const r of R) for (const p of r.V) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }
+  const card = $('#pcard'), cw = card ? card.getBoundingClientRect().width + 24 : 0, W = cv.width / dpr(), H = cv.height / dpr(), aw = Math.max(200, W - cw - 40), ah = H - 120;
+  const sc = Math.min(aw / Math.max(0.5, x1 - x0), ah / Math.max(0.5, y1 - y0)); S.asmV.s = sc; S.asmV.cx = (x0 + x1) / 2 + (cw / 2) / sc; S.asmV.cy = (y0 + y1) / 2 - 10 / sc; drawPlan(); }
 function roomPolys() { const pl = PL(), out = []; for (const rm of pl.rooms || []) { const W = pl.walls.filter(w => w.room === rm.num).sort((a, b) => a.k - b.k); if (W.length < 3) continue;
     const V = W.map((w, i) => { const p = W[(i - 1 + W.length) % W.length]; const X = lineX(p.a, p.b, w.a, w.b); const e = w.inL === false ? w.b : w.a, s0 = w.inL === false ? w.a : w.b; void s0; return X && len(sub(X, e)) < 0.6 ? X : e; });
     const A = Math.abs(polyA(V)); if (A < 0.2) continue; let c = [0, 0]; try { c = interiorPoint(V); } catch (e) { c = V.reduce((s, p) => addv(s, mul(p, 1 / V.length)), [0, 0]); }
@@ -1741,6 +1825,40 @@ function exportRuletka() {
   const blob = new Blob([JSON.stringify(j)], { type: 'application/json' }), a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name.replace(/[\\/:*?"<>|]/g, '_') + '.scanplan.json'; document.body.appendChild(a); a.click(); a.remove();
   stat(`Файл для Рулетки сохранён: помещений ${rooms.length}, подоконников ${objs.length}. В Рулетке: «📁 Проект → Открыть файл».`);
 }
+
+// --- линии и углы для плана, отмеченные в «Сборке» (по ним «🏠 План по сканам» строит стороны помещений) ---
+const GU_TOOLS = ['gfit', 'gline', 'gpt', 'gdel'];
+function guides() { const pl = PL(); pl.guides = pl.guides || []; pl.gpts = pl.gpts || []; pl.nextG = pl.nextG || 1; return pl; }
+function fitSliceLine(w0) { // прямая по точкам среза у касания: RANSAC + уточнение вдоль всей стены
+  const P = slicePts().P, n = P.length / 2; if (n < 50) return 'В срезе мало точек — поменяйте высоту среза на шаге «3 План».';
+  const loc = []; for (let i = 0; i < n; i++) { const dx = P[2 * i] - w0[0], dy = P[2 * i + 1] - w0[1]; if (dx * dx + dy * dy < 0.16) loc.push(i); }
+  if (loc.length < 20) return 'Рядом с касанием мало точек — коснитесь ближе к стене.';
+  let best = null; for (let it = 0; it < 400; it++) { const a = loc[(Math.random() * loc.length) | 0], b = loc[(Math.random() * loc.length) | 0]; if (a === b) continue;
+    const ax = P[2 * a], ay = P[2 * a + 1], ux0 = P[2 * b] - ax, uy0 = P[2 * b + 1] - ay, L = Math.hypot(ux0, uy0); if (L < 0.08) continue; const ux = ux0 / L, uy = uy0 / L;
+    if (Math.abs((w0[0] - ax) * -uy + (w0[1] - ay) * ux) > 0.2) continue; let cnt = 0; for (const i of loc) if (Math.abs((P[2 * i] - ax) * -uy + (P[2 * i + 1] - ay) * ux) < 0.01) cnt++;
+    if (!best || cnt > best.cnt) best = { cnt, ax, ay, ux, uy }; }
+  if (!best || best.cnt < 15) return 'Не нашлось прямой стены рядом с касанием.';
+  let { ax, ay, ux, uy } = best, sel = [], rms = 0;
+  for (let round = 0; round < 3; round++) { const cand = []; for (let i = 0; i < n; i++) { const dx = P[2 * i] - ax, dy = P[2 * i + 1] - ay; if (Math.abs(dx * -uy + dy * ux) < 0.015) cand.push([dx * ux + dy * uy, i]); }
+    cand.sort((p, q) => p[0] - q[0]); const t0 = (w0[0] - ax) * ux + (w0[1] - ay) * uy; let k0 = 0; for (let k = 0; k < cand.length; k++) if (Math.abs(cand[k][0] - t0) < Math.abs(cand[k0][0] - t0)) k0 = k;
+    let lo = k0, hi = k0; while (lo > 0 && cand[lo][0] - cand[lo - 1][0] < 0.25) lo--; while (hi < cand.length - 1 && cand[hi + 1][0] - cand[hi][0] < 0.25) hi++;
+    sel = cand.slice(lo, hi + 1).map(c => c[1]); if (sel.length < 15) return 'Слишком короткий кусок стены.';
+    let mx = 0, my = 0; for (const i of sel) { mx += P[2 * i]; my += P[2 * i + 1]; } mx /= sel.length; my /= sel.length; let sxx = 0, sxy = 0, syy = 0; for (const i of sel) { const a = P[2 * i] - mx, b = P[2 * i + 1] - my; sxx += a * a; sxy += a * b; syy += b * b; }
+    const th = 0.5 * Math.atan2(2 * sxy, sxx - syy); ux = Math.cos(th); uy = Math.sin(th); ax = mx; ay = my; let se = 0; for (const i of sel) { const r = (P[2 * i] - ax) * -uy + (P[2 * i + 1] - ay) * ux; se += r * r; } rms = Math.sqrt(se / sel.length); }
+  let tmin = 1e9, tmax = -1e9; for (const i of sel) { const t = (P[2 * i] - ax) * ux + (P[2 * i + 1] - ay) * uy; tmin = Math.min(tmin, t); tmax = Math.max(tmax, t); }
+  return { a: [ax + ux * tmin, ay + uy * tmin], b: [ax + ux * tmax, ay + uy * tmax], n: sel.length, rms }; }
+function guideTap(w, cv) { const pl = guides(), k = S.asmV.s;
+  if (S.tool === 'gdel') { let best = null, bd = 16 / k; for (const g of pl.guides) { const d = distSeg(w, g.a, g.b).d; if (d < bd) { bd = d; best = ['l', g]; } } for (const q of pl.gpts) { const d = len(sub(q.p, w)); if (d < bd) { bd = d; best = ['p', q]; } }
+    if (!best) { stat('Рядом нет линии или угла плана.'); return; } pushUndo(); if (best[0] === 'l') pl.guides = pl.guides.filter(g => g !== best[1]); else pl.gpts = pl.gpts.filter(q => q !== best[1]); drawAsm(); saveSoon(); stat('Удалено. «↶ Отменить шаг» — вернуть.'); return; }
+  if (S.tool === 'gfit') { const f = fitSliceLine(w); if (typeof f === 'string') { stat(f); return; } pushUndo(); pl.guides.push({ id: pl.nextG++, a: f.a, b: f.b }); drawAsm(); saveSoon(); stat(`Линия плана: ${nf(len(sub(f.b, f.a)), 2)} м по ${f.n} точкам среза, разброс ±${Math.round(f.rms * 1000)} мм. «🏠 План по сканам» (шаг 3) проведёт сторону помещения по ней.`); return; }
+  if (S.tool === 'gpt') { let p = w, bd = 14 / k; // липнет к пересечению линий плана
+    for (let i = 0; i < pl.guides.length; i++) for (let j = i + 1; j < pl.guides.length; j++) { const X = lineX(pl.guides[i].a, pl.guides[i].b, pl.guides[j].a, pl.guides[j].b); if (X && len(sub(X, w)) < bd) { bd = len(sub(X, w)); p = X; } }
+    pushUndo(); pl.gpts.push({ id: pl.nextG++, p }); drawAsm(); saveSoon(); stat('Угол плана поставлен — ближайший угол помещения пройдёт через него.'); } }
+function drawGuides(ctx, toS) { const pl = PL(), d = dpr(); if (!(pl.guides || []).length && !(pl.gpts || []).length && !S.guDraw) return; ctx.save(); ctx.strokeStyle = '#d6249f'; ctx.fillStyle = '#d6249f'; ctx.lineWidth = 2.5 * d; ctx.setLineDash([10 * d, 5 * d]);
+  for (const g of pl.guides || []) { ctx.beginPath(); ctx.moveTo(...toS(g.a)); ctx.lineTo(...toS(g.b)); ctx.stroke(); }
+  if (S.guDraw) { ctx.beginPath(); ctx.moveTo(...toS(S.guDraw.a)); ctx.lineTo(...toS(S.guDraw.b)); ctx.stroke(); }
+  ctx.setLineDash([]); for (const q of pl.gpts || []) { const P = toS(q.p); ctx.beginPath(); ctx.moveTo(P[0] - 9 * d, P[1]); ctx.lineTo(P[0] + 9 * d, P[1]); ctx.moveTo(P[0], P[1] - 9 * d); ctx.lineTo(P[0], P[1] + 9 * d); ctx.stroke(); ctx.beginPath(); ctx.arc(P[0], P[1], 5 * d, 0, 7); ctx.stroke(); }
+  ctx.restore(); }
 
 // --- правка ---
 const JOIN = 0.015;
@@ -1799,7 +1917,7 @@ function drawPlan() {
   // свободные концы — оранжевые точки (угол не замкнут)
   for (const w of PL().walls) for (const e of ['a', 'b']) if (!joinedAt(w, e).length) { const P = toS(w[e]); ctx.fillStyle = '#ea580c'; ctx.beginPath(); ctx.arc(P[0], P[1], 3 * d, 0, 7); ctx.fill(); }
   if (S.pdraw) { ctx.strokeStyle = '#2563eb'; ctx.setLineDash([6 * d, 4 * d]); ctx.lineWidth = 2 * d; ctx.beginPath(); ctx.moveTo(...toS(S.pdraw.a)); ctx.lineTo(...toS(S.pdraw.b)); ctx.stroke(); ctx.setLineDash([]); }
-  scaleBar(ctx, V, W, H); renderPlanCard();
+  drawGuides(ctx, toS); scaleBar(ctx, V, W, H); renderPlanCard();
 }
 function drawOp(ctx, w, o, toS, isSel) { const u = wDir(w), n = [-u[1], u[0]], d = dpr(), A = addv(w.a, mul(u, o.t0)), B = addv(w.a, mul(u, o.t1)), Lw = o.t1 - o.t0;
   ctx.save(); ctx.strokeStyle = isSel ? '#2563eb' : '#0f8a4b'; ctx.lineWidth = (isSel ? 3 : 2) * d;
@@ -2036,6 +2154,7 @@ async function autoStitch() {
   S.autoEdges = R.edges.map(e => ({ a: list[e.i].id, b: list[e.j].id, ratio: e.ratio, rms: e.rms }));
   S.asmFitted = false; analyze(); setView('asm'); fitAsm(); saveSoon();
   const H = S.hints; stat(`Автосшивка: в общей группе ${main.length} из ${list.length} сканов${groups.length > 1 ? `, отдельно — ${list.length - main.length}` : ''}. ${H.length ? 'Подсказки, где помочь, — слева в списке.' : 'Все стыки сходятся.'}`);
+  if (main.length >= 2) { const st0 = $('#status').textContent; await refineStitch(); stat(st0.replace(/\.$/, '') + ' · сразу уточнено: ' + $('#status').textContent.replace(/^Уточнено:\s*/, '')); } // точная подгонка — сразу, одной кнопкой
 }
 // --- шары: найти на всех сканах, одинаковые шары — одной буквой (по нынешнему положению сканов) ---
 function runSpheres(list, R) { return new Promise((res, rej) => { const w = getWorker(), job = Math.random(); const on = e => { const d = e.data; if (d.job !== job) return; if (d.prog != null && !d.done) { busy(`${d.stage || 'Ищу шары'}… ${Math.round(d.prog * 100)}%`); return; } w.removeEventListener('message', on); if (d.error) rej(new Error(d.error)); else res(d.res); }; w.addEventListener('message', on);
