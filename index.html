@@ -292,7 +292,7 @@ html,body{touch-action:manipulation;-webkit-text-size-adjust:100%}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 9.4 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 9.5 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -5165,7 +5165,9 @@ const FIGS = {
   vent: { name: 'Вентшахта / короб', ic: '⊠', fill: 'x', def: [0.6, 0.4], s1: 'сторона 1', s2: 'сторона 2', tag: 'ВШ' },
   equip: { name: 'Оборудование / шкаф', ic: '◩', fill: 'diag', def: [0.8, 0.4], s1: 'длина', s2: 'глубина', tag: 'Обор.' },
   stairm: { name: 'Лестница металлическая', ic: '☷', fill: 'stair', def: [2.0, 0.8], s1: 'длина марша', s2: 'ширина', tag: 'Мет. лестн.' },
-  pillar: { name: 'Опора / тумба круглая', ic: '◯', round: true, sq: true, fill: 'cross', def: 0.3, s1: 'диаметр', tag: '' }
+  pillar: { name: 'Опора / тумба круглая', ic: '◯', round: true, sq: true, fill: 'cross', def: 0.3, s1: 'диаметр', tag: '' },
+  fund: { name: 'Фундамент', ic: '▦', fill: 'fund', def: [1.2, 0.8], s1: 'длина', s2: 'ширина', tag: 'Фм' },
+  fundr: { name: 'Фундамент круглый', ic: '◍', round: true, sq: true, fill: 'fund', def: 0.8, s1: 'диаметр', tag: 'Фм' }
 };
 const isFig4 = o => !!o && (o.type === 'hatch' || o.type === 'fig');
 function figSides(o) { const a = distMeas(o.ids[0], o.ids[1]), b = distMeas(o.ids[1], o.ids[2]); return [a && a.v, b && b.v]; }
@@ -5186,6 +5188,10 @@ function figGeom(o, poly) {
   for (let i = 0; i < shp.length; i++) add(shp[i], shp[(i + 1) % shp.length], 0.35);
   if (F.fill === 'hatch') { const step = Math.max(Math.min(a, b) / 7, 0.025), hu = [Math.SQRT1_2, Math.SQRT1_2], hn = [-hu[1], hu[0]]; const pr = shp.map(q => q[0] * hn[0] + q[1] * hn[1]), lo = Math.min(...pr), hi = Math.max(...pr);
     for (let t = lo + step / 2; t < hi; t += step) { const r = polyClip(shp, [0, 0], hu, hn, t); if (r) add([hn[0] * t + hu[0] * r[0], hn[1] * t + hu[1] * r[0]], [hn[0] * t + hu[0] * r[1], hn[1] * t + hu[1] * r[1]], 0.13); } }
+  else if (F.fill === 'fund') { // фундамент: двойной контур и косая сетка (штриховка крест-накрест)
+    const k = Math.min(0.05, Math.min(a, b) * 0.12), inn = shp.map(q => [c[0] + (q[0] - c[0]) * (1 - 2 * k / Math.max(a, b)), c[1] + (q[1] - c[1]) * (1 - 2 * k / Math.max(a, b))]); for (let i = 0; i < inn.length; i++) add(inn[i], inn[(i + 1) % inn.length], 0.18);
+    const step = Math.max(Math.min(a, b) / 6, 0.06); for (const hu of [[Math.SQRT1_2, Math.SQRT1_2], [Math.SQRT1_2, -Math.SQRT1_2]]) { const hn = [-hu[1], hu[0]], pr = inn.map(q => q[0] * hn[0] + q[1] * hn[1]), lo = Math.min(...pr), hi = Math.max(...pr);
+      for (let t = lo + step / 2; t < hi; t += step) { const r = polyClip(inn, [0, 0], hu, hn, t); if (r) add([hn[0] * t + hu[0] * r[0], hn[1] * t + hu[1] * r[0]], [hn[0] * t + hu[0] * r[1], hn[1] * t + hu[1] * r[1]], 0.1); } } }
   else if (F.fill === 'x') { add(p0, p2, 0.18); add(p1, p3, 0.18); }
   else if (F.fill === 'diag') add(p0, p2, 0.18);
   else if (F.fill === 'cross') { add([c[0] - u[0] * a / 2, c[1] - u[1] * a / 2], [c[0] + u[0] * a / 2, c[1] + u[1] * a / 2], 0.13); add([c[0] - v[0] * b / 2, c[1] - v[1] * b / 2], [c[0] + v[0] * b / 2, c[1] + v[1] * b / 2], 0.13); }
@@ -6600,7 +6606,7 @@ function drawTape() {
   for (const o of M.objs || []) {
     const g = objGeom(o, PX); if (!g) continue; const sel = (T.sel && T.sel.obj === o) || ((T.tool === 'hatch' || T.tool === 'fig') && T.hatch === o.id);
     ctx.beginPath(); g.poly.forEach((q, i) => { const sp = W2S(...q); i ? ctx.lineTo(...sp) : ctx.moveTo(...sp); }); ctx.closePath();
-    ctx.fillStyle = sel ? 'rgba(31,111,235,.16)' : o.type === 'column' || (g.fig && g.fig.fill === 'hatch') ? 'rgba(60,60,60,.18)' : 'rgba(123,75,214,.07)'; ctx.fill();
+    ctx.fillStyle = sel ? 'rgba(31,111,235,.16)' : o.type === 'column' || (g.fig && g.fig.fill === 'hatch') ? 'rgba(60,60,60,.18)' : g.fig && g.fig.fill === 'fund' ? 'rgba(150,105,50,.16)' : 'rgba(123,75,214,.07)'; ctx.fill();
     ctx.strokeStyle = sel ? '#1f6feb' : '#5b3aa8';
     for (const [a, b, w] of g.lines) { ctx.lineWidth = Math.max(1, w * 5) * dpr; ctx.beginPath(); ctx.moveTo(...W2S(...a)); ctx.lineTo(...W2S(...b)); ctx.stroke(); }
     ctx.fillStyle = ctx.strokeStyle; for (const d of g.dots) { const sp = W2S(...d); ctx.beginPath(); ctx.arc(sp[0], sp[1], 3.5 * dpr, 0, 7); ctx.fill(); }
@@ -6786,15 +6792,16 @@ const TTOOLS = [['erase', 'Удалить (ластик)', 'коснитесь �
   TTOOLS.push(['span', 'Общий промер', 'увязка: коснитесь стены, потом противоположной стены того же помещения — и замерьте расстояние между ними (по перпендикуляру). Невязка обхода разойдётся по всем замерам — углы сойдутся']);
   TTOOLS.push(['gap', 'Проём', 'проём без двери: коснитесь отрезка стены — весь станет проёмом; или двух точек — краёв проёма. Касание по проёму — снова стена']);
   TTOOLS.push(['sill', 'Подоконник', 'коснитесь стены у края подоконника (со стороны помещения). Замеры: вынос (угол подоконника → стена); привязка края — коснитесь точки, от которой мерите (угол стены, край окна), и замер; длина; второй угол так же; от края вглубь до рамы. Толщина стены ≈ глубина − вынос, наружная стена рисуется пунктиром'])
+  TTOOLS.push(['fund', 'Фундамент', 'фундамент под оборудование: коснитесь места — появится прямоугольник, введите длину и ширину; затем коснитесь стен, к которым привязать (как у фигур). Рисуется двойным контуром с сеткой, подпись «Фм длина×ширина». Круглый фундамент — в «Фигурах»']);
   TTOOLS.push(['draw', 'Маркер', 'рисование от руки и фигуры поверх плана: ведите пальцем (Apple Pencil) — линия; вверху выбор: от руки, линия, стрелка, прямоугольник, овал, цвет и толщина. Касание нарисованного — выбрать: тянуть внутри — двигать, за квадратики — растягивать и сжимать. Двумя пальцами — двигать и масштабировать план']);
   TTOOLS.push(['window', 'Окно', 'коснитесь отрезка стены — весь станет окном; или двух точек — краёв окна. Касание по окну: пустой проём → стена']); }
 // колонка: частое — одним касанием; родственные инструменты — в группах (касание группы включает последний из неё и показывает выбор)
 const RAIL = ['walk', 'G:meas', 'G:open', 'G:note', 'G:obj', '|', 'G:edit', 'check', 'erase']; // мерить · отметить · поправить и проверить
-const RGROUPS = { meas: { name: 'Промер', subs: ['meas', 'span', 'online', 'thick'] }, open: { name: 'Проём', subs: ['open', 'gap', 'window', 'sill'] }, note: { name: 'Фото / скан', subs: ['photo', 'scan', 'rlab', 'note', 'draw'] }, obj: { name: 'Ещё', subs: ['hatch', 'fig', 'obj', 'room', 'gps'] }, edit: { name: 'Правка', subs: ['select', 'drag', 'box'] } };
-const RHINT = { draw: 'от руки, линия, стрелка, прямоугольник, овал — тянуть и растягивать', sill: 'вынос, привязка к любой точке, длина, глубина → толщина и наружная стена', thick: 'толщина стены между соседними помещениями', gps: 'исполнительная съёмка: пикеты GPS по номерам', rlab: 'номер и название помещения', select: 'коснитесь точки, стены, размера — меню: перемерить, изменить, отвязать, удалить', drag: 'тащите точку или стену пальцем', box: 'рамка пальцем — выделить участок: выровнять 90°, повернуть, проверить', meas: 'размер между двумя местами: точки, стены, пустое место', online: 'новая точка на стене (угол, откос) — делит стену', span: 'общий промер стена — стена: увязать невязку обхода', open: 'дверь: касание стены или двух точек', gap: 'проём без двери: касание стены или двух точек', window: 'окно: касание стены или двух точек', hatch: 'люк, приступок — прямоугольник с размерами и привязками', fig: 'колонна, вентшахта, стояк, трап… (условные)', obj: 'лестница, пандус, шахта — по углам', room: 'контур помещения по точкам', note: 'выноска: стрелка и текст', photo: 'место и направление фото', scan: 'станция сканера' };
+const RGROUPS = { meas: { name: 'Промер', subs: ['meas', 'span', 'online', 'thick'] }, open: { name: 'Проём', subs: ['open', 'gap', 'window', 'sill'] }, note: { name: 'Фото / скан', subs: ['photo', 'scan', 'rlab', 'note', 'draw'] }, obj: { name: 'Ещё', subs: ['hatch', 'fig', 'fund', 'obj', 'room', 'gps'] }, edit: { name: 'Правка', subs: ['select', 'drag', 'box'] } };
+const RHINT = { fund: 'фундамент под оборудование: двойной контур и сетка, подпись Фм и размеры', draw: 'от руки, линия, стрелка, прямоугольник, овал — тянуть и растягивать', sill: 'вынос, привязка к любой точке, длина, глубина → толщина и наружная стена', thick: 'толщина стены между соседними помещениями', gps: 'исполнительная съёмка: пикеты GPS по номерам', rlab: 'номер и название помещения', select: 'коснитесь точки, стены, размера — меню: перемерить, изменить, отвязать, удалить', drag: 'тащите точку или стену пальцем', box: 'рамка пальцем — выделить участок: выровнять 90°, повернуть, проверить', meas: 'размер между двумя местами: точки, стены, пустое место', online: 'новая точка на стене (угол, откос) — делит стену', span: 'общий промер стена — стена: увязать невязку обхода', open: 'дверь: касание стены или двух точек', gap: 'проём без двери: касание стены или двух точек', window: 'окно: касание стены или двух точек', hatch: 'люк, приступок — прямоугольник с размерами и привязками', fig: 'колонна, вентшахта, стояк, трап… (условные)', obj: 'лестница, пандус, шахта — по углам', room: 'контур помещения по точкам', note: 'выноска: стрелка и текст', photo: 'место и направление фото', scan: 'станция сканера' };
 function closeFly() { const f = document.getElementById('tfly'); if (f) f.remove(); document.removeEventListener('pointerdown', flyOut, true); }
 function flyOut(e) { const f = document.getElementById('tfly'); if (!f) { document.removeEventListener('pointerdown', flyOut, true); return; } if (f.contains(e.target) || (e.target.closest && e.target.closest('#trail [data-tg]'))) return; closeFly(); }
-const TORDER = ['walk', 'meas', 'online', 'thick', 'gps', '|', 'open', 'window', 'sill', '|', 'room', 'rlab', 'hatch', 'fig', 'obj', '|', 'note', 'draw', 'photo', 'scan', '|', 'box', 'drag', 'select', 'erase'];
+const TORDER = ['walk', 'meas', 'online', 'thick', 'gps', '|', 'open', 'window', 'sill', '|', 'room', 'rlab', 'hatch', 'fig', 'fund', 'obj', '|', 'note', 'draw', 'photo', 'scan', '|', 'box', 'drag', 'select', 'erase'];
 TTOOLS.sort((a, b) => TORDER.indexOf(a[0]) - TORDER.indexOf(b[0]));
 function renderTape() {
   if (AS.pid && !AS.restoring) asSoon();
@@ -6804,8 +6811,8 @@ function renderTape() {
   const R = T.result || {};
   const rows = M.meas.filter(m => m.type !== 'line' && m.type !== 'angle' && m.type !== 'right').slice().reverse();
   const warn = m => Math.abs(m.res || 0) > 0.015 ? 'bad' : Math.abs(m.res || 0) > 0.005 ? 'warn' : 'ok';
-  const TICON = { walk: '⬠', meas: '⟷', span: '⇹', online: '⊸', open: '🚪', gap: '▯', window: '🪟', sill: '⊟', thick: '▥', room: '▢', obj: '◆', hatch: '⊠', fig: '◉', gps: '🛰', note: '💬', photo: '📷', scan: '◬', rlab: '№', draw: '🖍', box: '⬚', drag: '✥', select: '✎' };
-  const TSHORT = { walk: 'Обход', meas: 'Промер', span: 'Общий', online: 'На стене', open: 'Дверь', gap: 'Проём', window: 'Окно', sill: 'Подок.', thick: 'Толщина', room: 'Помещ.', obj: 'Объект', hatch: 'Люк', fig: 'Фигуры', gps: 'Исп GPS', note: 'Выноска', draw: 'Маркер', photo: 'Фото', scan: 'Скан', rlab: '№ пом.', box: 'Выделить', drag: 'Двигать', select: 'Правка' };
+  const TICON = { walk: '⬠', meas: '⟷', span: '⇹', online: '⊸', open: '🚪', gap: '▯', window: '🪟', sill: '⊟', thick: '▥', room: '▢', obj: '◆', hatch: '⊠', fig: '◉', gps: '🛰', note: '💬', photo: '📷', scan: '◬', rlab: '№', draw: '🖍', fund: '▦', box: '⬚', drag: '✥', select: '✎' };
+  const TSHORT = { walk: 'Обход', meas: 'Промер', span: 'Общий', online: 'На стене', open: 'Дверь', gap: 'Проём', window: 'Окно', sill: 'Подок.', thick: 'Толщина', room: 'Помещ.', obj: 'Объект', hatch: 'Люк', fig: 'Фигуры', gps: 'Исп GPS', note: 'Выноска', draw: 'Маркер', fund: 'Фундамент', photo: 'Фото', scan: 'Скан', rlab: '№ пом.', box: 'Выделить', drag: 'Двигать', select: 'Правка' };
   // панель инструментов на чертеже — всегда под рукой
   let rail = document.getElementById('trail'); if (!rail) { rail = document.createElement('div'); rail.id = 'trail'; $('#main').appendChild(rail); }
   const gCur = g => { const G = RGROUPS[g]; if (G.subs.includes(T.tool)) return T.tool; let l = null; try { l = localStorage.getItem('rul_g_' + g); } catch (e) { } return G.subs.includes(l) ? l : G.subs[0]; };
@@ -6902,7 +6909,7 @@ function renderTape() {
   const pa = $('#pAcc'); if (pa) pa.onclick = acceptPending; const pr = $('#pRej'); if (pr) pr.onclick = rejectPending;
   const ps = $('#pSkip'); if (ps) ps.onclick = e => { e.preventDefault(); skipPending(); };
   const mfi = $('#mFit'); void mfi;
-  const pick = (id, figAsk) => { T.numbering = null; if (id === 'fig' && (figAsk || !T.figKind)) setTimeout(pickFigKind, 0); else if (T.tool === 'fig' && id !== 'fig') T.hatch = null; if (T.selSet && id !== 'box') { T.selSet = null; showSelBox(); } T.opA = null; T.tool = id; T.mA = null; T.tA = null; T.roomIds = null; T.objIds = null; T.noteTip = null; T.moveObj = null; walkChipOff(); if (T.chain && id !== 'walk') { T.resume = T.chain; T.chain = null; } if (id === 'walk' && !T.chain) walkResume(); if (T.tool !== 'gps') T.gpsPrev = null;
+  const pick = (id, figAsk) => { T.numbering = null; if (id === 'fund') { T.figKind = 'fund'; T.hatch = null; id = 'fig'; figAsk = false; setTimeout(() => stat('Фундамент: коснитесь места — появится прямоугольник, введите длину и ширину; затем коснитесь стен для привязки. Круглый — в «Фигурах».'), 0); } if (id === 'fig' && (figAsk || !T.figKind)) setTimeout(pickFigKind, 0); else if (T.tool === 'fig' && id !== 'fig') T.hatch = null; if (T.selSet && id !== 'box') { T.selSet = null; showSelBox(); } T.opA = null; T.tool = id; T.mA = null; T.tA = null; T.roomIds = null; T.objIds = null; T.noteTip = null; T.moveObj = null; walkChipOff(); if (T.chain && id !== 'walk') { T.resume = T.chain; T.chain = null; } if (id === 'walk' && !T.chain) walkResume(); if (T.tool !== 'gps') T.gpsPrev = null;
     for (const [g, G] of Object.entries(RGROUPS)) if (G.subs.includes(id)) try { localStorage.setItem('rul_g_' + g, id); } catch (e) { }
     const tt = TTOOLS.find(t => t[0] === T.tool); if (tt) stat(tt[1] + ': ' + tt[2]); renderTape(); };
   rail.querySelectorAll('[data-tt]').forEach(b => b.onclick = () => { closeFly(); pick(b.dataset.tt, true); });
