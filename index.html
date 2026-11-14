@@ -292,7 +292,7 @@ html,body{touch-action:manipulation;-webkit-text-size-adjust:100%}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 9.5 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 9.6 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -5607,7 +5607,7 @@ function applyHindrance(c) { tPush();
   draw(); renderTape(); }
 // ---------- несколько листов одного PDF в одном проекте ----------
 const PGS = { data: {} };
-const MKEYS = ['pts', 'meas', 'edges', 'rooms', 'chains', 'objs', 'notes', 'marks', 'lastNum', 'nextId', 'nextMeas', 'cond', 'axis', 'snap90', 'scaleFit', 'scaleAsked', 'ortho', 'zoomLog', 'gpsHidden', 'sqStrict'];
+const MKEYS = ['ink', 'pts', 'meas', 'edges', 'rooms', 'chains', 'objs', 'notes', 'marks', 'lastNum', 'nextId', 'nextMeas', 'cond', 'axis', 'snap90', 'scaleFit', 'scaleAsked', 'ortho', 'zoomLog', 'gpsHidden', 'sqStrict'];
 function savePage() { if (!U.img || !U.srcPage || AS.hold) return; const m = {}; MKEYS.forEach(k => m[k] = M[k]); PGS.data[U.srcPage] = { m: JSON.stringify(m), u: { s: U.s, rot: U.rot, tx: U.tx, ty: U.ty, alpha: U.alpha, ptPerPx: U.ptPerPx, pw: U.pw || (U.img && U.img.width), ph: U.ph || (U.img && U.img.height) } }; }
 const mHas = m => !!m && ((m.pts || []).length > 0 || (m.ink || []).length > 0 || (m.marks || []).length > 0 || (m.notes || []).length > 0);
 function pgHas(n) { const d = PGS.data[n]; if (!d) return false; try { return mHas(JSON.parse(d.m)); } catch (e) { return false; } }
