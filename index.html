@@ -292,7 +292,7 @@ html,body{touch-action:manipulation;-webkit-text-size-adjust:100%}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 9.8 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 9.9 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -3974,7 +3974,7 @@ function pDown(ev) {
   const mx = (a[0] + b[0]) / 2 - r.left, my = (a[1] + b[1]) / 2 - r.top;
   // два пальца на выделенном — поворот (и перенос) выделенного; иначе — масштаб и сдвиг вида
   if (S.step === 'tape' && T.selSet && !T.calMode && inSel(S2W(a[0] - r.left, a[1] - r.top)) && inSel(S2W(b[0] - r.left, b[1] - r.top))) { const wm = S2W(mx, my);
-    if (startSelRot(wm)) { const g = T.rotSel; g.c = wm; g.twist = true; g.sa0 = Math.atan2(b[1] - a[1], b[0] - a[0]); TP.twist = true; TP.pinch = null; stat('Поворот двумя пальцами: вращайте — поворачивается выделенное, ведите — сдвигается. Около 0° и 90° липнет.'); draw(); return; } }
+    if (startSelRot(wm)) { const g = T.rotSel; g.c = wm; g.twist = true; g.sa0 = Math.atan2(b[1] - a[1], b[0] - a[0]); g.sd0 = Math.max(1, Math.hypot(b[0] - a[0], b[1] - a[1])); g.k = 1; TP.twist = true; TP.pinch = null; stat('Два пальца на выделенном: разводите — крупнее, сводите — мельче (замеры не меняются), вращайте — поворот, ведите — сдвиг. Около 0° и 90° липнет.'); draw(); return; } }
   TP.pinch = { d0: Math.hypot(a[0] - b[0], a[1] - b[1]) || 1, s0: S.view.s, w0: S2W(mx, my) };
 }
 function pMove(ev) {
@@ -3984,7 +3984,7 @@ function pMove(ev) {
   TP.pts.set(ev.pointerId, [ev.clientX, ev.clientY]);
   const r = cv.getBoundingClientRect();
   if (TP.twist && T.rotSel && TP.pts.size >= 2) { const [a, b] = [...TP.pts.values()], g = T.rotSel; const da = -(Math.atan2(b[1] - a[1], b[0] - a[0]) - g.sa0); // на экране y вниз — в чертеже вверх
-    moveSelRot(null, da, S2W((a[0] + b[0]) / 2 - r.left, (a[1] + b[1]) / 2 - r.top)); return; }
+    moveSelRot(null, da, S2W((a[0] + b[0]) / 2 - r.left, (a[1] + b[1]) / 2 - r.top), Math.hypot(b[0] - a[0], b[1] - a[1]) / g.sd0); return; }
   if (TP.pinch && TP.pts.size >= 2) {
     const [a, b] = [...TP.pts.values()]; const d = Math.hypot(a[0] - b[0], a[1] - b[1]);
     const mx = (a[0] + b[0]) / 2 - r.left, my = (a[1] + b[1]) / 2 - r.top;
@@ -3997,6 +3997,7 @@ function pMove(ev) {
     // «Рулетка»: палец лёг на точку и повёл — двигаем точку (линии идут за ней, замеры не меняются)
     if (S.step === 'tape' && T.tool === 'draw') { TP.toolDrag = true; onDown(fakeEv(t0.ev, t0.x, t0.y)); }
     else if (S.step === 'tape' && !T.calMode && T.selSet && selRotHit(t0.x - r.left, t0.y - r.top) && startSelRot(S2W(t0.x - r.left, t0.y - r.top))) TP.toolDrag = true;
+    else if (S.step === 'tape' && !T.calMode && T.selSet && selScaleHit(t0.x - r.left, t0.y - r.top) && startSelRot(S2W(t0.x - r.left, t0.y - r.top), true)) TP.toolDrag = true;
     else if (S.step === 'tape' && !T.calMode && (T.moveObj ? startMoveDrag(S2W(t0.x - r.left, t0.y - r.top)) : startActDrag(S2W(t0.x - r.left, t0.y - r.top)))) TP.toolDrag = true;
     else if (S.step === 'tape' && !T.calMode) { const w0 = S2W(t0.x - r.left, t0.y - r.top); let mkd = (T.tool === 'photo' || T.tool === 'scan') ? null : markAt(t0.x - r.left, t0.y - r.top), nt = mkd ? null : noteAt(t0.x - r.left, t0.y - r.top); const p = null;
       const mv = T.tool === 'drag';
@@ -5670,17 +5671,28 @@ function inSel(w) { const b = selBBox(); if (!b) return false; const pad = 26 / 
 const ptPos = p => ({ p, x0: p.x0, y0: p.y0, x: p.x, y: p.y });
 // ручка поворота: кружок ↻ над рамкой выделения; тянуть — поворот вокруг центра выделения (шаг 0,1°, около 0/90° — липнет)
 function selRotHandle() { const b = selBBox(); if (!b) return null; const c = [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2], top = W2S((b[0] + b[2]) / 2, b[3]), d = devicePixelRatio; const h = [top[0], top[1] - 14 * d - 34 * d]; return { c, h, hw: S2W(h[0] / d, h[1] / d) }; }
+// ручка масштаба: кружок ⤡ у правого нижнего угла рамки; тянуть от центра — крупнее, к центру — мельче (замеры не меняются — условно)
+function selScaleHandle() { const b = selBBox(); if (!b) return null; const c = [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2], br = W2S(b[2], b[1]), d = devicePixelRatio; return { c, h: [br[0] + 30 * d, br[1] + 30 * d] }; }
+function selScaleHit(sx, sy) { const r = selScaleHandle(); if (!r) return false; const d = devicePixelRatio; return Math.hypot(sx * d - r.h[0], sy * d - r.h[1]) < 24 * d; }
 function selRotHit(sx, sy) { const r = selRotHandle(); if (!r) return false; const d = devicePixelRatio; return Math.hypot(sx * d - r.h[0], sy * d - r.h[1]) < 24 * d; }
-function startSelRot(w0) { const r = selRotHandle(); if (!r) return false; const b = selBBox(), pad = 26 / S.view.s, inB = q => q && q[0] >= b[0] - pad && q[0] <= b[2] + pad && q[1] >= b[1] - pad && q[1] <= b[3] + pad; tPush(); T.selRect = null;
+function startSelRot(w0, scale) { const r = selRotHandle(); if (!r) return false; const b = selBBox(), pad = 26 / S.view.s, inB = q => q && q[0] >= b[0] - pad && q[0] <= b[2] + pad && q[1] >= b[1] - pad && q[1] <= b[3] + pad; tPush(); T.selRect = null;
   T.rotSel = { c: r.c, a0: Math.atan2(w0[1] - r.c[1], w0[0] - r.c[0]), pts: M.pts.filter(p => T.selSet.has(p.id)).map(p => ({ p, q: PX(p) })), marks: (M.marks || []).filter(m => inB(m.p)).map(m => ({ m, p: m.p.slice(), dir: m.dir })), notes: (M.notes || []).filter(n => inB(n.at)).map(n => ({ n, at: n.at.slice(), tip: n.tip ? n.tip.slice() : null })), rooms: M.rooms.filter(R => R.lp && R.ids.every(id => T.selSet.has(id))).map(R => ({ R, lp: R.lp.slice() })), all: T.selSet.size === M.pts.length, ax: M.axis, da: 0 };
-  stat('Поворот: ведите вокруг центра. Около 0° и 90° — липнет, шаг 0,1°.'); return true; }
-function moveSelRot(w, da0, cNow) { const g = T.rotSel; let da = da0 != null ? da0 : Math.atan2(w[1] - g.c[1], w[0] - g.c[0]) - g.a0; da = Math.atan2(Math.sin(da), Math.cos(da)); let deg = da * 180 / Math.PI;
-  for (const k of [-180, -90, 0, 90, 180]) if (Math.abs(deg - k) < 0.7) deg = k; deg = Math.round(deg * 10) / 10; da = deg * Math.PI / 180; g.da = da;
-  const cs = Math.cos(da), sn = Math.sin(da), c = g.c, c2 = cNow || c, R = (x, y) => [c2[0] + (x - c[0]) * cs - (y - c[1]) * sn, c2[1] + (x - c[0]) * sn + (y - c[1]) * cs];
+  if (scale) { const g = T.rotSel; g.scale = true; g.k = 1; g.d0 = Math.max(1e-6, Math.hypot(w0[0] - g.c[0], w0[1] - g.c[1])); stat('Масштаб: ведите ⤡ от центра — крупнее, к центру — мельче. Записанные замеры не меняются.' + (M.cond ? '' : ' В режиме «Факт» промеренные стены вернутся к своим длинам — масштабировать рисунок лучше в режиме «Условно».')); }
+  else stat('Поворот: ведите вокруг центра. Около 0° и 90° — липнет, шаг 0,1°.'); return true; }
+function moveSelRot(w, da0, cNow, k0) { const g = T.rotSel;
+  if (g.scale) { let k = Math.hypot(w[0] - g.c[0], w[1] - g.c[1]) / g.d0; k = Math.min(20, Math.max(0.05, k)); k = Math.round(k * 100) / 100; if (Math.abs(k - 1) < 0.02) k = 1; g.k = k;
+    const c = g.c, R = (x, y) => [c[0] + (x - c[0]) * k, c[1] + (y - c[1]) * k];
+    for (const o of g.pts) { const [x, y] = R(o.q[0], o.q[1]); o.p.x0 = x; o.p.y0 = y; o.p.x = x; o.p.y = y; }
+    for (const o of g.marks) o.m.p = R(...o.p); for (const o of g.notes) { o.n.at = R(...o.at); if (o.tip) o.n.tip = R(...o.tip); } for (const o of g.rooms) o.R.lp = R(...o.lp);
+    stat(`Масштаб рисунка ×${String(k).replace('.', ',')} (${Math.round(k * 100)}%) — замеры прежние`); draw(); return; } let da = da0 != null ? da0 : Math.atan2(w[1] - g.c[1], w[0] - g.c[0]) - g.a0; da = Math.atan2(Math.sin(da), Math.cos(da)); let deg = da * 180 / Math.PI;
+  for (const k of [-180, -90, 0, 90, 180]) if (Math.abs(deg - k) < (k0 != null ? 1.5 : 0.7)) deg = k; deg = Math.round(deg * 10) / 10; da = deg * Math.PI / 180; g.da = da;
+  let K = 1; if (k0 != null) { K = Math.min(20, Math.max(0.05, k0)); K = Math.round(K * 100) / 100; if (Math.abs(K - 1) < 0.02) K = 1; } g.k = K; // двумя пальцами: развели/свели — масштаб рисунка
+  const cs = Math.cos(da) * K, sn = Math.sin(da) * K, c = g.c, c2 = cNow || c, R = (x, y) => [c2[0] + (x - c[0]) * cs - (y - c[1]) * sn, c2[1] + (x - c[0]) * sn + (y - c[1]) * cs];
   for (const o of g.pts) { const [x, y] = R(o.q[0], o.q[1]); o.p.x0 = x; o.p.y0 = y; o.p.x = x; o.p.y = y; }
   for (const o of g.marks) { o.m.p = R(...o.p); if (o.dir != null) o.m.dir = o.dir + da; } for (const o of g.notes) { o.n.at = R(...o.at); if (o.tip) o.n.tip = R(...o.tip); } for (const o of g.rooms) o.R.lp = R(...o.lp);
-  if (g.all && g.ax != null) M.axis = g.ax + da; stat(`Поворот ${deg > 0 ? '⟲' : deg < 0 ? '⟳' : ''} ${String(Math.abs(deg)).replace('.', ',')}°`); draw(); }
-function endSelRot() { const g = T.rotSel; T.rotSel = null; adjust(); asSoon(); renderTape(); draw(); if (T.selSet) showSelBox(); const deg = Math.round(g.da * 1800 / Math.PI) / 10; stat(deg ? `${g.twist ? 'Двумя пальцами: п' : 'П'}овёрнуто на ${String(Math.abs(deg)).replace('.', ',')}° ${deg > 0 ? 'против' : 'по'} часовой.` : 'Без поворота.'); }
+  if (g.all && g.ax != null) M.axis = g.ax + da; stat((deg || K === 1 ? `Поворот ${deg > 0 ? '⟲' : deg < 0 ? '⟳' : ''} ${String(Math.abs(deg)).replace('.', ',')}°` : '') + (K !== 1 ? `${deg ? ' · м' : 'М'}асштаб ×${String(K).replace('.', ',')} (${Math.round(K * 100)}%), замеры прежние` : '')); draw(); }
+function endSelRot() { const g = T.rotSel; T.rotSel = null; adjust(); asSoon(); renderTape(); draw(); if (T.selSet) showSelBox();
+  if (g.scale) { stat(g.k !== 1 ? `Рисунок выделенного ×${String(g.k).replace('.', ',')} (${Math.round(g.k * 100)}%). Замеры не менялись. «↶ Отменить» — вернуть.` : 'Масштаб не изменён.'); return; } const deg = Math.round(g.da * 1800 / Math.PI) / 10, kk = g.k && g.k !== 1 ? ` Масштаб рисунка ×${String(g.k).replace('.', ',')} (${Math.round(g.k * 100)}%), замеры прежние.` : ''; stat(((deg ? `${g.twist ? 'Двумя пальцами: п' : 'П'}овёрнуто на ${String(Math.abs(deg)).replace('.', ',')}° ${deg > 0 ? 'против' : 'по'} часовой.` : kk ? '' : 'Без поворота.') + kk + (kk && !M.cond ? ' В режиме «Факт» промеренные стены вернутся к длинам замеров — подгонять под подложку лучше в режиме «Условно».' : '')).trim()); }
 function startSelDrag(w0) { const b = selBBox(), pad = 26 / S.view.s, inB = q => q[0] >= b[0] - pad && q[0] <= b[2] + pad && q[1] >= b[1] - pad && q[1] <= b[3] + pad;
   tPush(); T.dragSel = { w0: w0.slice(), rect: T.selRect ? T.selRect.slice() : null, pts: M.pts.filter(p => T.selSet.has(p.id)).map(ptPos), marks: (M.marks || []).filter(m => inB(m.p)).map(m => ({ m, p: m.p.slice() })), notes: (M.notes || []).filter(n => inB(n.at)).map(n => ({ n, at: n.at.slice(), tip: n.tip ? n.tip.slice() : null })) };
   stat(`Двигаю выделенное: точек ${T.dragSel.pts.length}. Отпустите — встанет на место.`); }
@@ -6328,7 +6340,7 @@ function tapeDown(e, w) {
   if (AS.hold) { stat('Подождите: идёт сохранение PDF — чертёж сейчас занят.'); return; }
   if (T.tool === 'draw') return inkDown(w);
   if (T.tool === 'erase') { const it = inkHit(w); if (it) { tPush(); M.ink = M.ink.filter(q => q !== it); T.inkSel = null; draw(); stat('Рисунок удалён. «↶ Отменить» — вернуть.'); return; } }
-  if (T.selSet && !T.calMode && !e.fromPress) { const sp = W2S(...w); if (selRotHit(sp[0] / devicePixelRatio, sp[1] / devicePixelRatio) && startSelRot(w)) return; }
+  if (T.selSet && !T.calMode && !e.fromPress) { const sp = W2S(...w); if (selRotHit(sp[0] / devicePixelRatio, sp[1] / devicePixelRatio) && startSelRot(w)) return; if (selScaleHit(sp[0] / devicePixelRatio, sp[1] / devicePixelRatio) && startSelRot(w, true)) return; }
   if (e.pointerType === 'mouse' && !e.fromPress && !T.calMode) { // мышь: нажали и повели — тянем; просто щелчок — как раньше
     T.mPre = [T.mPre ? T.mPre[1] : null, preTapSnap()];
     const aid = actPtId(), q = aid != null ? nearestPoint(w, 16) : null;
@@ -6664,7 +6676,8 @@ function drawTape() {
     ctx.setLineDash([]); }
   { const sb = selBBox(); if (sb) { const pad = 14 * dpr, a = W2S(sb[0], sb[3]), b = W2S(sb[2], sb[1]); ctx.strokeStyle = 'rgba(31,111,235,.75)'; ctx.fillStyle = 'rgba(31,111,235,.06)'; ctx.lineWidth = 1.5 * dpr; ctx.setLineDash([7 * dpr, 5 * dpr]); ctx.fillRect(a[0] - pad, a[1] - pad, b[0] - a[0] + 2 * pad, b[1] - a[1] + 2 * pad); ctx.strokeRect(a[0] - pad, a[1] - pad, b[0] - a[0] + 2 * pad, b[1] - a[1] + 2 * pad); ctx.setLineDash([]);
     ctx.fillStyle = '#1f6feb'; ctx.font = `600 ${11 * dpr}px Golos Text, Segoe UI`; ctx.fillText('✥ тащите выделенное', a[0] - pad, a[1] - pad - 5 * dpr);
-    const rh = selRotHandle(); if (rh) { const tp = W2S((sb[0] + sb[2]) / 2, sb[3]); ctx.strokeStyle = '#1f6feb'; ctx.lineWidth = 1.5 * dpr; ctx.beginPath(); ctx.moveTo(tp[0], tp[1] - pad); ctx.lineTo(rh.h[0], rh.h[1] + 13 * dpr); ctx.stroke(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(rh.h[0], rh.h[1], 13 * dpr, 0, 7); ctx.fill(); ctx.lineWidth = 2 * dpr; ctx.stroke(); ctx.fillStyle = '#1f6feb'; ctx.font = `bold ${15 * dpr}px Golos Text, Segoe UI`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('↻', rh.h[0], rh.h[1] + 1); ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic'; } } }
+    const rh = selRotHandle(); if (rh) { const tp = W2S((sb[0] + sb[2]) / 2, sb[3]); ctx.strokeStyle = '#1f6feb'; ctx.lineWidth = 1.5 * dpr; ctx.beginPath(); ctx.moveTo(tp[0], tp[1] - pad); ctx.lineTo(rh.h[0], rh.h[1] + 13 * dpr); ctx.stroke(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(rh.h[0], rh.h[1], 13 * dpr, 0, 7); ctx.fill(); ctx.lineWidth = 2 * dpr; ctx.stroke(); ctx.fillStyle = '#1f6feb'; ctx.font = `bold ${15 * dpr}px Golos Text, Segoe UI`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('↻', rh.h[0], rh.h[1] + 1); ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic'; }
+    const kh = selScaleHandle(); if (kh) { const cr = W2S(sb[2], sb[1]); ctx.strokeStyle = '#1f6feb'; ctx.lineWidth = 1.5 * dpr; ctx.beginPath(); ctx.moveTo(cr[0] + pad, cr[1] + pad); ctx.lineTo(kh.h[0] - 9 * dpr, kh.h[1] - 9 * dpr); ctx.stroke(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(kh.h[0], kh.h[1], 13 * dpr, 0, 7); ctx.fill(); ctx.lineWidth = 2 * dpr; ctx.stroke(); ctx.fillStyle = '#1f6feb'; ctx.font = `bold ${15 * dpr}px Golos Text, Segoe UI`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('⤡', kh.h[0], kh.h[1] + 1); ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic'; } } }
   if (T.snapG && (T.dragPt || T.dragEdge)) { ctx.strokeStyle = '#e8590c'; ctx.lineWidth = 1 * dpr; ctx.setLineDash([4 * dpr, 4 * dpr]); if (T.snapG.x != null) { const s0 = W2S(T.snapG.x, 0); ctx.beginPath(); ctx.moveTo(s0[0], 0); ctx.lineTo(s0[0], cv.height); ctx.stroke(); } if (T.snapG.y != null) { const s0 = W2S(0, T.snapG.y); ctx.beginPath(); ctx.moveTo(0, s0[1]); ctx.lineTo(cv.width, s0[1]); ctx.stroke(); } ctx.setLineDash([]); }
   if (T.selSet) for (const p of M.pts) if (T.selSet.has(p.id)) { const sp = W2S(...PX(p)); ctx.strokeStyle = '#1f6feb'; ctx.lineWidth = 2.5 * dpr; ctx.beginPath(); ctx.arc(sp[0], sp[1], 9 * dpr, 0, 7); ctx.stroke(); }
   if (T.noteTip) { const sp = W2S(...T.noteTip.tip); ctx.fillStyle = '#d9480f'; ctx.beginPath(); ctx.arc(sp[0], sp[1], 5 * dpr, 0, 7); ctx.fill(); }
