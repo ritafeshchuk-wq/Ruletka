@@ -196,7 +196,7 @@ body.touch #tmenu button{padding:13px 14px;font-size:15px}
 #help p{font-size:13.5px;color:var(--ink2);margin:6px 0}
 #help .close{position:absolute;right:16px;top:16px}
 #help kbd{border:1px solid var(--line);border-radius:4px;padding:0 5px;background:var(--soft);font:500 12px "Golos Text",sans-serif}
-@media (max-width:820px){#app{grid-template-columns:1fr;grid-template-rows:52px auto 1fr 26px}#rail{max-height:45vh}.cards{grid-template-columns:1fr}.brand span{display:none}}
+@media (max-width:820px){#app{grid-template-columns:1fr;grid-template-rows:52px auto 1fr 26px}header,footer{grid-column:1/-1}#rail{grid-column:1;grid-row:2}#main{grid-column:1;grid-row:3}footer{grid-row:4}#rail{max-height:45vh}.cards{grid-template-columns:1fr}.brand span{display:none}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 .asind{color:#9AA6B4;font-size:12px;align-self:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
 .asbox{border:1px solid var(--tape,#E3A21A);background:var(--tape-soft,#FCF2DC);border-radius:12px;padding:14px 16px;margin:0 0 18px;display:flex;flex-direction:column;gap:10px;color:var(--ink,#1B2430)}
@@ -292,7 +292,7 @@ html,body{touch-action:manipulation;-webkit-text-size-adjust:100%}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 9.6 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 9.7 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -2958,7 +2958,8 @@ function fitBounds(b) {
   if (!b || !isFinite(b[0])) return;
   const r = cv.getBoundingClientRect();
   S.view.cx = (b[0] + b[2]) / 2; S.view.cy = (b[1] + b[3]) / 2;
-  S.view.s = Math.min(r.width / Math.max(1, b[2] - b[0]), r.height / Math.max(1, b[3] - b[1])) * 0.9;
+  const w = r.width > 10 ? r.width : (innerWidth || 400), h = r.height > 10 ? r.height : Math.max(200, (innerHeight || 600) * 0.5); // поле ещё без размера (iPhone) — берём экран, масштаб не должен стать 0
+  S.view.s = Math.min(w / Math.max(1, b[2] - b[0]), h / Math.max(1, b[3] - b[1])) * 0.9;
 }
 function boundsXY(XY) { let b = [Infinity, Infinity, -Infinity, -Infinity]; for (let i = 0; i < XY.length; i += 2) { b[0] = Math.min(b[0], XY[i]); b[1] = Math.min(b[1], XY[i + 1]); b[2] = Math.max(b[2], XY[i]); b[3] = Math.max(b[3], XY[i + 1]); } return b; }
 
@@ -6580,8 +6581,10 @@ function drawTape() {
   if (!U.img) {
     ctx.strokeStyle = '#eef0f4'; ctx.lineWidth = 1;
     const a = S2W(0, 0), b = S2W(cv.width / dpr, cv.height / dpr);
-    for (let x = Math.floor(a[0]); x <= b[0]; x++) { const p = W2S(x, 0); ctx.beginPath(); ctx.moveTo(p[0], 0); ctx.lineTo(p[0], cv.height); ctx.stroke(); }
-    for (let y = Math.floor(b[1]); y <= a[1]; y++) { const p = W2S(0, y); ctx.beginPath(); ctx.moveTo(0, p[1]); ctx.lineTo(cv.width, p[1]); ctx.stroke(); }
+    // поле нулевого размера или масштаб 0 (узкий экран iPhone) — без этой проверки цикл сетки бесконечен и страница зависает
+    const gridOk = [a[0], a[1], b[0], b[1]].every(isFinite) && (b[0] - a[0]) < 5000 && (a[1] - b[1]) < 5000;
+    if (gridOk) for (let x = Math.floor(a[0]); x <= b[0]; x++) { const p = W2S(x, 0); ctx.beginPath(); ctx.moveTo(p[0], 0); ctx.lineTo(p[0], cv.height); ctx.stroke(); }
+    if (gridOk) for (let y = Math.floor(b[1]); y <= a[1]; y++) { const p = W2S(0, y); ctx.beginPath(); ctx.moveTo(0, p[1]); ctx.lineTo(cv.width, p[1]); ctx.stroke(); }
   }
   // rooms
   T.roomRects = [];
