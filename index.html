@@ -292,7 +292,7 @@ html,body{touch-action:manipulation;-webkit-text-size-adjust:100%}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 9.9 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 9.10 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -2983,24 +2983,44 @@ function zipStore(name, bytes) {
 }
 // окно «файл готов» — нажатие на кнопку даёт системное окно сохранения (там выбирается папка и создаётся новая)
 // файл готов: «Сохранить в Файлы» (окно «Поделиться»), «Открыть» (просмотр → Поделиться → Сохранить в Файлы), «Скачать»
-function fileReady(name, data, type, title) {
+// имена уже сохранённых файлов: выбрали прежнее имя — тот же файл (в «Файлах» iPhone спросит «Заменить»), не выбрали — новая копия с номером
+const FNKEY = 'ruletka_saved_names';
+function fnList() { try { const v = JSON.parse(localStorage.getItem(FNKEY) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } }
+function fnRemember(n) { try { const l = fnList().filter(x => x !== n); l.unshift(n); localStorage.setItem(FNKEY, JSON.stringify(l.slice(0, 40))); } catch (e) { } }
+const fnSplit = n => { const m = n.match(/^(.*?)(\.[^.]+)?$/); return [m[1], m[2] || '']; };
+function fnNewCopy(name, used) { const [b0, ext] = fnSplit(name), b = b0.replace(/ \(\d+\)$/, ''), u = new Set(used.map(x => x.toLowerCase())); if (!u.has(name.toLowerCase())) return name; for (let i = 2; i < 1000; i++) { const n = `${b} (${i})${ext}`; if (!u.has(n.toLowerCase())) return n; } return name; }
+function fileReady(name0, data, type, title) {
   return new Promise(res => {
-    const blob = data instanceof Blob ? data : new Blob([data], { type }); const url = URL.createObjectURL(blob);
+    const blob = data instanceof Blob ? data : new Blob([data], { type }); let url = URL.createObjectURL(blob);
+    const [b0, ext0] = fnSplit(name0), stem = b0.replace(/ \(\d+\)$/, '').toLowerCase();
+    const saved = fnList().filter(n => fnSplit(n)[1].toLowerCase() === ext0.toLowerCase());
+    const mine = saved.filter(n => fnSplit(n)[0].replace(/ \(\d+\)$/, '').toLowerCase() === stem), other = saved.filter(n => !mine.includes(n));
+    const prev = mine.concat(other).slice(0, 8); let name = fnNewCopy(name0, saved);
     let canShare = false; try { canShare = !!(navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], name, { type })] })); } catch (e) { }
     const isPdf = /pdf/.test(type);
     const ov = document.createElement('div'); ov.className = 'uidlg';
-    ov.innerHTML = `<div class="uidlg-box" role="dialog" style="max-width:560px"><div class="uidlg-t"></div><div class="uidlg-x" style="margin-bottom:6px"><b class="fr-n"></b></div>
+    ov.innerHTML = `<div class="uidlg-box" role="dialog" style="max-width:560px"><div class="uidlg-t"></div>
+      <div class="uidlg-x" style="margin:4px 0 2px"><b>Имя файла</b> <small class="fr-h" style="color:#6b7684"></small></div>
+      <input class="fr-in" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" style="width:100%;box-sizing:border-box;padding:10px;font:inherit;border:1px solid #cfd6df;border-radius:8px">
+      ${prev.length ? `<div style="margin:8px 0 0"><small style="color:#6b7684">Перезаписать сохранённый раньше — выберите его (в «Файлах» нажмите «Заменить»):</small><div class="fr-prev" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${prev.map((n, i) => `<button data-p="${i}" style="padding:6px 10px;font-size:13px;text-align:left">↻ ${escH(n)}</button>`).join('')}<button data-p="new" style="padding:6px 10px;font-size:13px">＋ Новая копия</button></div></div>` : ''}
       <div style="display:flex;flex-direction:column;gap:8px;margin:8px 0">
         ${canShare ? '<button class="pri" data-k="share" style="text-align:left;padding:12px">📤 <b>Сохранить в Файлы</b><br><small>откроется «Поделиться» → «Сохранить в Файлы» → выберите папку (новая папка — значок с «+»)</small></button>' : ''}
         ${isPdf || IOS ? `<button ${canShare ? '' : 'class="pri"'} data-k="open" style="text-align:left;padding:12px">👁 <b>Открыть ${isPdf ? 'PDF' : 'файл'}</b><br><small>${isPdf ? 'проверьте все листы; затем значок «Поделиться» ⬆ → «Сохранить в Файлы» → папка' : 'затем «Поделиться» ⬆ → «Сохранить в Файлы»'}</small></button>` : ''}
-        <button data-k="dl" style="text-align:left;padding:12px">⬇ <b>Скачать</b><br><small>${IOS ? 'файл попадёт в «Загрузки» браузера (Файлы → На iPad → Загрузки или папка Bluefy)' : 'в папку загрузок или с выбором папки'}</small></button>
+        <button data-k="dl" style="text-align:left;padding:12px">⬇ <b>Скачать</b><br><small>${IOS ? 'в «Загрузки» браузера; если имя занято — браузер сам добавит номер (перезаписать так нельзя, только через «Сохранить в Файлы»)' : 'в папку загрузок или с выбором папки (в окне можно выбрать прежний файл — он перезапишется)'}</small></button>
       </div><div class="row"><button data-k="close">Закрыть</button></div></div>`;
-    ov.querySelector('.uidlg-t').textContent = title; ov.querySelector('.fr-n').textContent = '«' + name + '»';
+    ov.querySelector('.uidlg-t').textContent = title;
+    const inp = ov.querySelector('.fr-in'), hint = ov.querySelector('.fr-h');
+    const mark = () => { const low = name.toLowerCase(), hit = prev.some(n => n.toLowerCase() === low); hint.textContent = hit ? '— перезапись: в «Файлах» выберите ту же папку и «Заменить»' : '— новая копия'; ov.querySelectorAll('[data-p]').forEach(b => { const on = b.dataset.p === 'new' ? !hit : prev[+b.dataset.p] && prev[+b.dataset.p].toLowerCase() === low; b.classList.toggle('pri', !!on); }); };
+    const setName = n => { name = n; inp.value = n; mark(); };
+    inp.oninput = () => { let v = inp.value.trim().replace(/[\\/:*?"<>|]/g, '_'); if (v && ext0 && !v.toLowerCase().endsWith(ext0.toLowerCase())) v += ext0; name = v || name0; mark(); };
+    ov.querySelectorAll('[data-p]').forEach(b => b.onclick = () => setName(b.dataset.p === 'new' ? fnNewCopy(name0, saved) : prev[+b.dataset.p]));
+    setName(name);
     const close = () => { ov.remove(); setTimeout(() => URL.revokeObjectURL(url), 120000); res(); };
     ov.querySelectorAll('[data-k]').forEach(b => b.onclick = async () => { const k = b.dataset.k;
       if (k === 'close') return close();
+      if (k !== 'close') fnRemember(name);
       if (k === 'share') { try { await navigator.share({ files: [new File([blob], name, { type })], title: name }); stat('Файл передан через «Поделиться»: «' + name + '».'); } catch (e) { if (!/abort|cancel/i.test((e && (e.name + e.message)) || '')) uiAlert('«Поделиться» не сработало: ' + (e && e.message || e) + '. Нажмите «Открыть» или «Скачать».'); } return; }
-      if (k === 'open') { const a = document.createElement('a'); a.href = url; a.target = '_blank'; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove(); return; }
+      if (k === 'open') { URL.revokeObjectURL(url); url = URL.createObjectURL(new File([blob], name, { type })); const a = document.createElement('a'); a.href = url; a.target = '_blank'; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove(); return; }
       if (k === 'dl') { await download(name, blob, type, true); return; } });
     document.body.appendChild(ov);
   });
