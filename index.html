@@ -293,7 +293,7 @@ html,body{touch-action:manipulation;-webkit-text-size-adjust:100%}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 9.11 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 9.12 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -3020,7 +3020,7 @@ function fileReady(name0, data, type, title) {
     ov.querySelectorAll('[data-k]').forEach(b => b.onclick = async () => { const k = b.dataset.k;
       if (k === 'close') return close();
       if (k !== 'close') fnRemember(name);
-      if (k === 'share') { try { await navigator.share({ files: [new File([blob], name, { type })], title: name }); stat('Файл передан через «Поделиться»: «' + name + '».'); } catch (e) { if (!/abort|cancel/i.test((e && (e.name + e.message)) || '')) uiAlert('«Поделиться» не сработало: ' + (e && e.message || e) + '. Нажмите «Открыть» или «Скачать».'); } return; }
+      if (k === 'share') { try { await navigator.share({ files: [new File([blob], name, { type })] }) /* только файл: с title iOS видит «2 объекта» и не предлагает «Заменить» */; stat('Файл передан через «Поделиться»: «' + name + '».'); } catch (e) { if (!/abort|cancel/i.test((e && (e.name + e.message)) || '')) uiAlert('«Поделиться» не сработало: ' + (e && e.message || e) + '. Нажмите «Открыть» или «Скачать».'); } return; }
       if (k === 'open') { URL.revokeObjectURL(url); url = URL.createObjectURL(new File([blob], name, { type })); const a = document.createElement('a'); a.href = url; a.target = '_blank'; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove(); return; }
       if (k === 'dl') { await download(name, blob, type, true); return; } });
     document.body.appendChild(ov);
@@ -3042,7 +3042,7 @@ async function download(name, data, type, direct) {
     try { const ext = (name.match(/\.([^.]+)$/) || [, 'bin'])[1]; const h = await window.showSaveFilePicker({ suggestedName: name, types: [{ description: ext.toUpperCase(), accept: { [type || 'application/octet-stream']: ['.' + ext] } }] });
       const w = await h.createWritable(); await w.write(data instanceof Blob ? data : new Blob([data], { type })); await w.close(); stat('Сохранено: ' + h.name); return; }
     catch (e) { if (e && e.name === 'AbortError') return; } }
-  if (IOS && !direct) { try { const f = new File([data], name, { type: type || 'application/octet-stream' }); if (navigator.canShare && navigator.canShare({ files: [f] })) { navigator.share({ files: [f], title: name }).catch(e => { if (!/abort|cancel/i.test(e && e.message || '')) stat('Не удалось передать файл: ' + (e && e.message || e)); }); return; } } catch (e) { } }
+  if (IOS && !direct) { try { const f = new File([data], name, { type: type || 'application/octet-stream' }); if (navigator.canShare && navigator.canShare({ files: [f] })) { navigator.share({ files: [f] }).catch(e => { if (!/abort|cancel/i.test(e && e.message || '')) stat('Не удалось передать файл: ' + (e && e.message || e)); }); return; } } catch (e) { } }
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data], { type })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
 function b64(f32) { const u = new Uint8Array(f32.buffer, f32.byteOffset, f32.byteLength); let s = ''; for (let i = 0; i < u.length; i += 32768) s += String.fromCharCode.apply(null, u.subarray(i, i + 32768)); return btoa(s); }
