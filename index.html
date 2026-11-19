@@ -293,7 +293,7 @@ html,body{touch-action:manipulation;-webkit-text-size-adjust:100%}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 9.15 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 9.16 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -7175,7 +7175,7 @@ async function exportOverlayPdf(opt = {}) {
     // разместить подпись: первый свободный вариант; если свободных нет — keep: наименее занятый, иначе не рисовать
     const place = (str, col, ang, cands, keep = true) => {
       let best = null, bn = 1e9;
-      for (const k of cands) { const B = boxOf(str, k.size, k.c, ang); let n = k.lead ? 0.35 : 0; if (INK) n += Math.min(1, INK(B) * 3.5) * 0.8; for (const o of OB) if (hit(o, B)) { n += o.w || 1; if (n >= bn) break; } if (n < bn) { bn = n; best = k; } if (!n) break; }
+      for (const k of cands) { const B = boxOf(str, k.size, k.c, ang); let n = k.lead ? (k.pen != null ? k.pen : 0.35) : 0; if (INK) n += Math.min(1, INK(B) * 3.5) * 0.8; for (const o of OB) if (hit(o, B)) { n += o.w || 1; if (n >= bn) break; } if (n < bn) { bn = n; best = k; } if (!n) break; }
       if (!best || (bn >= 1 && !keep)) return false;
       textC(str, best.c, best.size, col, ang); if (best.lead) leader(best.lead, OB[OB.length - 1], col); return true; };
     // варианты для размера на отрезке a–b: над/под, сдвиг вдоль, мельче, затем сноска
@@ -7259,7 +7259,14 @@ async function exportOverlayPdf(opt = {}) {
       const lab = (m.type === 'photo' ? 'Ф ' : 'Скан ') + m.num, fl = fs * 0.85 * stK(m); let c0;
       if (m.dir != null) { const q = toPt(m.p[0] + Math.cos(m.dir), m.p[1] + Math.sin(m.dir)); const a = Math.atan2(q[1] - c[1], q[0] - c[0]); c0 = [c[0] - Math.cos(a) * r * 2.6, c[1] - Math.sin(a) * r * 2.6]; }
       else c0 = [c[0] + r * 1.4 + font.getAdvanceWidth(lab, fl) / 2, c[1] + r * 1.2 + fl * 0.35];
-      place(lab, col, 0, [{ c: c0, size: fl }].concat(ptCands(c, fl, 1.4))); }
+      // подпись скана/фото — у своего значка: далеко не уводим (длинная сноска «цепляла» подпись к чужому помещению);
+      // линии и цифры подложки под подписью допустимы, сноска — только на шаг дальше и только если рядом занято другими подписями
+      { const wl = font.getAdvanceWidth(lab, fl), hl = fl * 1.15, a0 = m.dir != null ? Math.atan2(c[1] - c0[1], c[0] - c0[0]) + Math.PI : Math.PI / 4, C = [];
+        // вплотную к значку, но не на нём: сперва позади стрелки, затем по кругу; сноска — только на шаг дальше и дорого
+        for (const far of [0, 1]) for (const da of [0, 1, -1, 2, -2, 3, -3, 4]) { const t = a0 + da * Math.PI / 4, ca = Math.cos(t), sa = Math.sin(t), g = far ? 1.9 : 1;
+          const d = Math.min(Math.abs(ca) > 1e-3 ? (r * 1.35 + wl / 2) / Math.abs(ca) : 1e9, Math.abs(sa) > 1e-3 ? (r * 1.35 + hl / 2) / Math.abs(sa) : 1e9) * g;
+          C.push(far ? { c: [c[0] + ca * d, c[1] + sa * d], size: fl, lead: c, pen: 1.6 } : { c: [c[0] + ca * d, c[1] + sa * d], size: fl }); }
+        place(lab, col, 0, C); } }
     // выноски (их место выбрано вручную — рисуются как есть)
     const ORG0 = rgb(0.85, 0.28, 0.06);
     for (const n of M.notes || []) { const at = toPt(...n.at), ls = noteLines(n.text), fsn = fs * 0.95 * stK(n), ORG = sc(n, ORG0);
