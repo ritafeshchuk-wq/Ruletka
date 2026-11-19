@@ -293,7 +293,7 @@ html,body{touch-action:manipulation;-webkit-text-size-adjust:100%}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 9.12 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 9.13 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -2274,9 +2274,40 @@ const TAPE = (() => {
     diags += (M.meas || []).filter(m => m.type === 'angle' && m.on !== false && ids.includes(m.b)).length;
     const P = ids.map(id => M.pts.find(p => p.id === id));
     let area = 0; for (let i = 0; i < k; i++) { const a = P[i], b = P[(i + 1) % k]; area += a.x * b.y - b.x * a.y; }
-    return { sides, k, diags, need: Math.max(0, k - 3), area: Math.abs(area / 2) };
+    let am = null; try { am = roomAreaMeas(M, R, P); } catch (e) { }
+    return { sides, k, diags, need: Math.max(0, k - 3), area: am != null ? am : Math.abs(area / 2) };
   }
-  return { solve, roomInfo, SIG, angleAt: (X, i, j, k) => { const r = angleResJ(X, i, j, k); return r ? r.f * 180 / Math.PI : null; } };
+  // площадь по замерам: рисунок помещения (часто ужат/растянут под подложку, «Условно») сперва приводим к масштабу его замеров,
+  // затем уравниваем только это помещение. Иначе уравнивание тянется к ужатому рисунку и комната перекашивается (3,88 м² вместо 9,5)
+  const RAC = new Map();
+  function roomAreaMeas(M, R, P0) {
+    if (P0.some(p => !p)) return null; const set = new Set(R.ids);
+    const meas0 = (M.meas || []).filter(m => m.on !== false && !m.lab && [m.a, m.b, m.c, m.d, m.p].filter(v => v !== undefined).every(id => set.has(id)));
+    // соседние точки контура, стоящие на рисунке в одном месте без замера между ними, — одна точка (стена нулевой длины без направления перекашивает контур)
+    const al = new Map(), A = id => al.get(id) || id, P = [];
+    for (const p of P0) { const q = P[P.length - 1]; if (q && Math.hypot(p.x0 - q.x0, p.y0 - q.y0) < 0.002 && !meas0.some(m => m.type === 'dist' && ((m.a === p.id && m.b === q.id) || (m.a === q.id && m.b === p.id)))) al.set(p.id, q.id); else P.push(p); }
+    if (P.length > 3) { const f = P[0], l = P[P.length - 1]; if (Math.hypot(f.x0 - l.x0, f.y0 - l.y0) < 0.002 && !meas0.some(m => m.type === 'dist' && ((m.a === f.id && m.b === l.id) || (m.a === l.id && m.b === f.id)))) { al.set(l.id, f.id); P.pop(); } }
+    if (P.length < 3) return null;
+    const meas = meas0.map(m => { const o = Object.assign({}, m); ['a', 'b', 'c', 'd', 'p'].forEach(kk => { if (o[kk] !== undefined) o[kk] = A(o[kk]); }); return o; }).filter(m => m.a !== m.b);
+    const rr = []; for (const m of meas) if (m.type === 'dist' && m.v > 0) { const a = P.find(p => p.id === m.a), b = P.find(p => p.id === m.b); const d = Math.hypot(b.x0 - a.x0, b.y0 - a.y0); if (d > 1e-6) rr.push(m.v / d); }
+    if (!rr.length) return null; rr.sort((x, y) => x - y); const sc = rr[rr.length >> 1];
+    const edges = (M.edges || []).filter(e => set.has(e.a) && set.has(e.b)).map(e => Object.assign({}, e, { a: A(e.a), b: A(e.b) })).filter(e => e.a !== e.b);
+    const key = JSON.stringify([R.ids, P.map(p => [p.x0, p.y0, !!p.fixed]), meas.map(m => [m.type, m.a, m.b, m.c, m.d, m.p, m.v]), edges.map(e => [e.a, e.b]), M.ortho]);
+    const c0 = RAC.get(R); if (c0 && c0.key === key) return c0.area;
+    const cx = P.reduce((t, p) => t + p.x0, 0) / P.length, cy = P.reduce((t, p) => t + p.y0, 0) / P.length;
+    const run = strict => { const P2 = P.map(p => ({ id: p.id, x0: cx + (p.x0 - cx) * sc, y0: cy + (p.y0 - cy) * sc, free: p.free, soft: p.soft }));
+      const M2 = { pts: P2, meas: meas.map(m => Object.assign({}, m)), edges, rooms: [{ num: R.num, ids: P.map(p => p.id) }], chains: [], ortho: M.ortho, sqStrict: strict };
+      for (let it = 0; it < 6; it++) solve(M2);
+      const pos = new Map(P2.map(q => [q.id, q])); let worst = 0; for (const m of meas) if (m.type === 'dist') { const a = pos.get(m.a), b = pos.get(m.b); if (a && b) worst = Math.max(worst, Math.abs(Math.hypot(b.x - a.x, b.y - a.y) - m.v)); }
+      return { P2, worst }; };
+    // сперва углы около 90° строго (мм-расхождения — в длины); если стены тогда расходятся с замерами > 1 см — помещение не прямоугольное, верим замерам
+    let rs = run(true); if (rs.worst > 0.01) { const r2 = run(false); if (r2.worst < rs.worst) rs = r2; }
+    const P2 = rs.P2;
+    let a2 = 0; for (let i = 0; i < P2.length; i++) { const a = P2[i], b = P2[(i + 1) % P2.length]; a2 += a.x * b.y - b.x * a.y; }
+    const area = Math.abs(a2 / 2); if (!isFinite(area)) return null;
+    RAC.set(R, { key, area, pts: P2.map(q => [q.id, q.x, q.y]) }); return area;
+  }
+  return { solve, roomInfo, roomShape: R => (RAC.get(R) || {}).pts, SIG, angleAt: (X, i, j, k) => { const r = angleResJ(X, i, j, k); return r ? r.f * 180 / Math.PI : null; } };
 })();
 
 // ---- core.js ----
@@ -4020,7 +4051,8 @@ function pMove(ev) {
     if (Math.hypot(ev.clientX - TP.tap.x, ev.clientY - TP.tap.y) < 10) return;
     lpCancel(); const t0 = TP.tap; TP.tap = null;
     // «Рулетка»: палец лёг на точку и повёл — двигаем точку (линии идут за ней, замеры не меняются)
-    if (S.step === 'tape' && T.tool === 'draw') { TP.toolDrag = true; onDown(fakeEv(t0.ev, t0.x, t0.y)); }
+    if (S.step === 'tape' && T.dirMark) { TP.toolDrag = true; onDown(fakeEv(t0.ev, t0.x, t0.y)); }
+    else if (S.step === 'tape' && T.tool === 'draw') { TP.toolDrag = true; onDown(fakeEv(t0.ev, t0.x, t0.y)); }
     else if (S.step === 'tape' && !T.calMode && T.selSet && selRotHit(t0.x - r.left, t0.y - r.top) && startSelRot(S2W(t0.x - r.left, t0.y - r.top))) TP.toolDrag = true;
     else if (S.step === 'tape' && !T.calMode && T.selSet && selScaleHit(t0.x - r.left, t0.y - r.top) && startSelRot(S2W(t0.x - r.left, t0.y - r.top), true)) TP.toolDrag = true;
     else if (S.step === 'tape' && !T.calMode && (T.moveObj ? startMoveDrag(S2W(t0.x - r.left, t0.y - r.top)) : startActDrag(S2W(t0.x - r.left, t0.y - r.top)))) TP.toolDrag = true;
@@ -4912,6 +4944,7 @@ function tapeMenu(w, cx, cy) {
     if (m.type === 'rlab') { items.push(['✎ Номер и название…', async () => { const v = await askRoomLabel(m.num, m.name, 'Помещение'); if (v) { tPush(); m.num = v.num; m.name = v.name; draw(); renderTape(); } }]); items.push(['✥ Передвинуть', () => moveMode({ mark: m })]); items.push(['🗑 Удалить', () => { tPush(); M.marks = M.marks.filter(x => x !== m); draw(); renderTape(); }, 'danger']); }
     else {
     items.push(['№ Изменить номер…', async () => { const v = await uiAsk('Номер:', m.num); if (v && v.trim()) { tPush(); m.num = v.trim(); draw(); } }]);
+    items.push(['☝ Повернуть направление пальцем', () => { closeTapeMenu(); T.dirMark = m; T.sel = { mark: m }; draw(); renderTouchBar(); stat('Направление: ведите пальцем — стрелка смотрит на палец (около 0°, 45°, 90° липнет). Отпустите — готово. Можно просто коснуться, куда смотреть.'); }]);
     items.push(['↻ Повернуть направление на 45°', () => { tPush(); m.dir = (m.dir == null ? 0 : m.dir) + Math.PI / 4; draw(); }]);
     if (m.dir != null) items.push(['➝ Убрать направление', () => { tPush(); m.dir = null; draw(); }]);
     items.push(['✥ Передвинуть', () => moveMode({ mark: m })]);
@@ -6391,7 +6424,13 @@ function inkChip() { if (T.tool !== 'draw' || S.step !== 'tape') { inkChipOff();
     else if (d.ix === 'ok') { if (T.inkSel) T.inkSel = null; else { setTapeTool('walk'); renderTape(); draw(); return; } }
     inkChip(); draw(); asSoon(); });
   el.onpointerdown = ev => ev.stopPropagation(); }
+// направление скана/фото пальцем: стрелка смотрит на палец
+function dirSet(w) { const m = T.dirMark; if (!m) return; const dx = w[0] - m.p[0], dy = w[1] - m.p[1]; if (Math.hypot(dx, dy) < 1e-6) return;
+  let deg = Math.atan2(dy, dx) * 180 / Math.PI; deg = Math.round(deg); for (const k of [-180, -135, -90, -45, 0, 45, 90, 135, 180]) if (Math.abs(deg - k) <= 3) deg = k;
+  m.dir = deg * Math.PI / 180; stat(`Направление ${((deg % 360) + 360) % 360}° — отпустите палец, чтобы закончить.`); draw(); }
+function dirDone() { const m = T.dirMark; T.dirMark = null; T.dirDrag = false; if (m) { asSoon(); stat('Направление задано. «↶ Отменить» — вернуть как было.'); } renderTouchBar(); draw(); }
 function tapeDown(e, w) {
+  if (T.dirMark) { tPush(); T.dirDrag = true; dirSet(w); return; }
   if (AS.hold) { stat('Подождите: идёт сохранение PDF — чертёж сейчас занят.'); return; }
   if (T.tool === 'draw') return inkDown(w);
   if (T.tool === 'erase') { const it = inkHit(w); if (it) { tPush(); M.ink = M.ink.filter(q => q !== it); T.inkSel = null; draw(); stat('Рисунок удалён. «↶ Отменить» — вернуть.'); return; } }
@@ -6532,6 +6571,7 @@ function insertBetween(arr, a, b, p, cyclic) {
 function pendLabel(p) { if (p.label) return p.label; if (p.prom) return `промер ${pname(p.a)} → ${pname(p.b)}`; if (p.type === 'tie') return `привязка ↔ стена ${pname(p.a)}–${pname(p.b)}`; return p.type === 'thick' && p.span ? `общий промер ${pname(p.a)}–${pname(p.b)} ↔ ${pname(p.c)}–${pname(p.d)}` : p.type === 'thick' ? `толщины стены ${pname(p.a)}–${pname(p.b)} ↔ ${pname(p.c)}–${pname(p.d)}` : `${pname(p.a)} → ${pname(p.b)}`; }
 function approxOf(p) { if (p.type === 'val') return p.approx || null; if (p.type === 'tie') { const g = tieGeom(p, PX); return g ? Math.hypot(g.q[0] - g.p[0], g.q[1] - g.p[1]) : null; } if (p.type !== 'dist') return null; const a = PX(ptById(p.a)), b = PX(ptById(p.b)); return Math.hypot(b[0] - a[0], b[1] - a[1]); }
 function tapeMove(w) {
+  if (T.dirDrag) { dirSet(w); return true; }
   if (T.tool === 'draw') { inkMove(w); return true; }
   if (T.rotSel) { moveSelRot(w); return true; }
   if (T.dragRoom) { const d = T.dragRoom; d.R.lp = [w[0] + d.off[0], w[1] + d.off[1]]; draw(); return true; }
@@ -6552,7 +6592,7 @@ function tapeMove(w) {
   T.mouse = (T.tool === 'walk' && T.chain) ? snap90(T.chain[T.chain.length - 1], w) : w; if (T.tool === 'walk' && T.chain) draw();
   return false;
 }
-function tapeUp() { if (T.inkOp) { inkUp(); return; } if (T.rotSel) { endSelRot(); return; } if (T.dragRoom) { T.dragRoom = null; asSoon(); draw(); return; } if (T.mPress) { const mp = T.mPress; T.mPress = null; if (T.moveObj) moveDone(); else tapeDown(Object.assign({}, mp.e, { fromPress: true, pointerType: 'mouse', altKey: mp.e.altKey, clientX: mp.x, clientY: mp.y }), mp.w); return; } if (T.dragMark) { T.dragMark = null; asSoon(); draw(); }
+function tapeUp() { if (T.dirDrag) { dirDone(); return; } if (T.inkOp) { inkUp(); return; } if (T.rotSel) { endSelRot(); return; } if (T.dragRoom) { T.dragRoom = null; asSoon(); draw(); return; } if (T.mPress) { const mp = T.mPress; T.mPress = null; if (T.moveObj) moveDone(); else tapeDown(Object.assign({}, mp.e, { fromPress: true, pointerType: 'mouse', altKey: mp.e.altKey, clientX: mp.x, clientY: mp.y }), mp.w); return; } if (T.dragMark) { T.dragMark = null; asSoon(); draw(); }
   if (T.dragSel || T.dragEdge) { const n = T.dragSel ? T.dragSel.pts.length : 0; T.dragSel = null; T.dragEdge = null; T.snapG = null; adjust(); asSoon(); renderTape(); draw(); if (T.selSet) showSelBox(); stat(n ? `Передвинуто точек: ${n}` : 'Стена передвинута'); return; }
   if (T.dragPt) T.snapG = null;
   if (T.mk) { const k = T.mk; T.mk = null; const L = Math.hypot(k.q[0] - k.p[0], k.q[1] - k.p[1]) * S.view.s; const dir = L > 18 ? Math.atan2(k.q[1] - k.p[1], k.q[0] - k.p[0]) : null; addMark(k.type, k.p, dir); return; } if (T.box) { const b = T.box; T.box = null; const big = Math.hypot(b.w1[0] - b.w0[0], b.w1[1] - b.w0[1]) * S.view.s > 15;
@@ -7299,7 +7339,7 @@ function tapePlan() {
   for (const R of M.rooms) {
     const poly = R.ids.map(id => ptById(id)).filter(Boolean).map(PR); if (poly.length < 3) continue;
     const lens = M.cond ? R.ids.map((id, i) => { const m = distMeas(id, R.ids[(i + 1) % R.ids.length]); return m && m.on !== false ? m.v : null; }) : null;
-    let area = Math.abs(VEC.polyArea(poly)); if (M.cond) { try { area = TAPE.roomInfo(M, R).area; } catch (e) { } }
+    let area = Math.abs(VEC.polyArea(poly)); try { const a2 = TAPE.roomInfo(M, R).area; if (a2 > 0) area = a2; } catch (e) { } // площадь — по замерам помещения, не по рисунку
     rooms.push({ num: R.num, name: R.name, poly, area, lens, label: R.lp ? PR({ x0: R.lp[0], y0: R.lp[1], x: R.lp[0], y: R.lp[1] }) : null });
   }
   const extra = [], texts = [];
