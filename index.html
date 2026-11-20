@@ -293,7 +293,7 @@ html,body{touch-action:manipulation;-webkit-text-size-adjust:100%}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 9.19 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 9.20 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -7250,11 +7250,11 @@ async function exportOverlayPdf(opt = {}) {
     for (const e of M.edges) for (const [p1, p2, k] of openGeom(e, PX)) { const a = toPt(...p1), b = toPt(...p2); page.drawLine({ start: { x: a[0], y: a[1] }, end: { x: b[0], y: b[1] }, thickness: lw * (k === 'arc' ? 0.6 : 1.1), color: GRN }); }
     // диагонали и прочие замеры
     for (const m of M.meas) { if (m.type !== 'dist' || hasEdge(m.a, m.b) || m.on === false) continue; const A = ptById(m.a), B = ptById(m.b); if (!A || !B) continue; const a = P2(A), b = P2(B);
-      if (m.prom) { const TEAL = rgb(0.04, 0.45, 0.52), L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L, k = lw * 1.4;
-        page.drawLine({ start: { x: a[0], y: a[1] }, end: { x: b[0], y: b[1] }, thickness: lw * 0.6, color: TEAL });
-        // засечки — как в программе: тонко и мелко, на коротких промерах (колонна, ниша) — без них, иначе сливаются в жирные «стрелки»
-        if (L > k * 10) for (const z of [a, b]) page.drawLine({ start: { x: z[0] - (ux - uy) * k, y: z[1] - (uy + ux) * k }, end: { x: z[0] + (ux - uy) * k, y: z[1] + (uy + ux) * k }, thickness: lw * 0.6, color: TEAL });
-        DL.push({ pr: 2, L, a, b, s: fm(m.v), size: fs * 0.9 * stK(m), col: sc(m, TEAL) }); continue; }
+      if (m.prom) { const TEAL = rgb(0.04, 0.45, 0.52), L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+        // промер — размерная линия, а не контур: тонкий пунктир, на концах точки, подпись прямо у линии (без сносок)
+        page.drawLine({ start: { x: a[0], y: a[1] }, end: { x: b[0], y: b[1] }, thickness: lw * 0.65, color: TEAL, dashArray: [lw * 3, lw * 1.5] });
+        for (const z of [a, b]) page.drawCircle({ x: z[0], y: z[1], size: lw * 0.8, color: TEAL });
+        DL.push({ pr: 2, L, a, b, s: fm(m.v), size: fs * 0.8 * stK(m), col: sc(m, TEAL), near: true }); continue; }
       page.drawLine({ start: { x: a[0], y: a[1] }, end: { x: b[0], y: b[1] }, thickness: lw * 0.8, color: VIO, dashArray: [lw * 4, lw * 3] });
       DL.push({ pr: 3, L: Math.hypot(b[0] - a[0], b[1] - a[1]), a, b, s: fm(m.v), size: fs * 0.9 * stK(m), col: sc(m, VIO) }); }
     for (const m of M.meas) if (m.type === 'tie' && m.on !== false) { const g = tieGeom(m, PX); if (!g) continue; const a = toPt(...g.p), b = toPt(...g.q);
@@ -7309,7 +7309,7 @@ async function exportOverlayPdf(opt = {}) {
     // размеры: сначала короткие стены (им тесней всего), потом привязки, диагонали, толщины, углы; «≈» — только если есть место
     DL.sort((x, y) => x.pr - y.pr || (x.L || 0) - (y.L || 0));
     for (const d of DL) {
-      if (d.a) { const { ang, C } = segCands(d.a, d.b, d.s, d.size); place(d.s, d.col, ang, C, !d.opt); }
+      if (d.a) { const { ang, C } = segCands(d.a, d.b, d.s, d.size); place(d.s, d.col, ang, d.near ? C.filter(k => !k.lead || Math.hypot(k.c[0] - k.lead[0], k.c[1] - k.lead[1]) <= k.size * 4.3) : C, !d.opt); }
       else place(d.s, d.col, 0, [{ c: d.p, size: d.size }].concat(ptCands(d.p, d.size, 1.2)));
     }
     // номера точек — мелко и только там, где свободно
