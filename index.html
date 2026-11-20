@@ -138,7 +138,7 @@ body.touch #steps li{padding:10px 6px 8px}
 #selbox .sb-rot{align-items:center;flex-wrap:wrap}#selbox .sb-rot span{font-size:13px;color:var(--muted,#667)}#selbox .sb-rot button{padding:6px 9px}
 body.inkOn #mcard,body.stSheet #ichip{display:none!important}
 body.kb .uidlg{align-items:flex-start;padding-top:10px}
-#ichip{position:absolute;left:50%;transform:translateX(-50%);top:10px;z-index:8;display:flex;flex-wrap:wrap;gap:5px;align-items:center;justify-content:center;background:#1B2430;color:#fff;border-radius:14px;padding:7px 9px;box-shadow:0 6px 18px rgba(0,0,0,.25);max-width:calc(100% - 24px)}#ichip button{background:#2b3646;color:#fff;border:0;border-radius:10px;padding:8px 11px;font-size:15px;min-height:40px}#ichip button.on{background:#e2a12b;color:#1B2430}#ichip .sw{width:30px;height:30px;padding:0;border-radius:50%;border:3px solid #2b3646;min-height:30px}#ichip .sw.on{border-color:#fff}#ichip i{width:1px;height:26px;background:#3b4657;margin:0 3px}#ichip button:disabled{opacity:.35}
+#ichip{position:absolute;left:50%;transform:translateX(-50%);top:10px;z-index:8;display:flex;flex-wrap:wrap;gap:5px;align-items:center;justify-content:center;background:#1B2430;color:#fff;border-radius:14px;padding:7px 9px;box-shadow:0 6px 18px rgba(0,0,0,.25);max-width:calc(100% - 24px)}#ichip button{background:#2b3646;color:#fff;border:0;border-radius:10px;padding:8px 11px;font-size:15px;min-height:40px}#ichip button.on{background:#e2a12b;color:#1B2430}#ichip .sw{width:30px;height:30px;padding:0;border-radius:50%;border:3px solid #2b3646;min-height:30px}#ichip .sw.on{border-color:#fff}#ichip .sw{box-shadow:inset 0 0 0 1px rgba(255,255,255,.45)}#ichip .pal{position:relative;overflow:hidden;display:inline-block;box-sizing:border-box;cursor:pointer;background:conic-gradient(#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)}#ichip .pal input{position:absolute;inset:-8px;width:calc(100% + 16px);height:calc(100% + 16px);opacity:0;cursor:pointer;border:0;padding:0}#ichip i{width:1px;height:26px;background:#3b4657;margin:0 3px}#ichip button:disabled{opacity:.35}
 #dchip{position:absolute;left:50%;transform:translateX(-50%);bottom:150px;z-index:7;display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:center;background:#1B2430;color:#fff;border-radius:14px;padding:8px 10px;box-shadow:0 6px 18px rgba(0,0,0,.25);max-width:calc(100% - 24px)}#dchip span{font-weight:600;padding:0 6px}#dchip button{background:#2b3646;color:#fff;border:0;border-radius:10px;padding:9px 12px;font-size:15px}
 body.stSheet #trail,body.stSheet #mcard,body.stSheet #tbar,body.stSheet #selbox,body.stSheet #dchip,body.stSheet #wchip{display:none!important}
 #btprobe{position:fixed;right:12px;bottom:40px;width:min(520px,calc(100% - 24px));max-height:60vh;display:flex;flex-direction:column;background:#fff;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.25);padding:10px 12px;z-index:70;font-size:14px}#btprobe .bp-h{display:flex;justify-content:space-between;align-items:center}#btprobe .bp-t{color:#5b6577;margin:4px 0}#btprobe pre{flex:1;overflow:auto;background:#f4f6f9;border-radius:8px;padding:6px;font-size:11px;white-space:pre-wrap;margin:6px 0;min-height:80px}
@@ -293,7 +293,7 @@ html,body{touch-action:manipulation;-webkit-text-size-adjust:100%}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 9.16 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 9.17 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -6368,7 +6368,9 @@ function skipPending() { const p = T.pending; T.pending = null; if (p && p.after
 // ---------- canvas interaction for tape ----------
 // ---------- маркер: рисование от руки и фигуры поверх плана (не участвуют в замерах) ----------
 // M.ink: [{ id, k: 'pen'|'line'|'arrow'|'rect'|'ell', p: [[x,y]…] (м; у фигур — два угла / два конца), c: цвет, w: толщина в пикселях экрана }]
-const INKC = ['#d9480f', '#1f6feb', '#111827', '#16a34a', '#a21caf'], INKW = [2, 4, 7];
+const INKC = ['#d9480f', '#e11d48', '#facc15', '#16a34a', '#1f6feb', '#a21caf', '#ffffff', '#000000'], INKW = [2, 4, 7];
+// свои цвета из палитры 🎨: последние 6 (o.rc), новые — первыми
+function inkRecent(o, c) { c = String(c || '').toLowerCase(); if (!/^#[0-9a-f]{6}$/.test(c) || INKC.includes(c)) return; o.rc = [c].concat((o.rc || []).filter(x => x !== c)).slice(0, 6); }
 const INKK = [['pen', '🖍', 'От руки'], ['line', '／', 'Линия'], ['arrow', '➚', 'Стрелка'], ['rect', '▭', 'Прямоугольник'], ['ell', '◯', 'Овал']];
 function inkOpt() { let o = null; try { o = JSON.parse(localStorage.getItem('rul_ink') || 'null'); } catch (e) { } return Object.assign({ k: 'pen', c: INKC[0], w: INKW[1] }, o || {}); }
 function inkSave(o) { try { localStorage.setItem('rul_ink', JSON.stringify(o)); } catch (e) { } }
@@ -6425,7 +6427,8 @@ function inkChip() { if (T.tool !== 'draw' || S.step !== 'tape') { inkChipOff();
   document.body.classList.add('inkOn'); let el = document.getElementById('ichip'); if (!el) { el = document.createElement('div'); el.id = 'ichip'; $('#main').appendChild(el); }
   const o = inkOpt(), q = T.inkSel && inkById(T.inkSel), c = q ? q.c : o.c, w = q ? q.w : o.w;
   el.innerHTML = INKK.map(([k, t, nm]) => `<button data-ik="${k}" title="${nm}" class="${!q && o.k === k ? 'on' : ''}" style="font-size:19px;min-width:44px">${t}</button>`).join('') + '<i></i>' +
-    INKC.map(cc => `<button data-ic="${cc}" class="sw ${cc === c ? 'on' : ''}" style="background:${cc}" title="Цвет"></button>`).join('') + '<i></i>' +
+    INKC.concat((o.rc || []).filter(cc => !INKC.includes(cc))).concat(c && !INKC.includes(c) && !(o.rc || []).includes(c) ? [c] : []).map(cc => `<button data-ic="${cc}" class="sw ${cc === c ? 'on' : ''}" style="background:${cc}" title="${cc === '#ffffff' ? 'Белый' : cc === '#000000' ? 'Чёрный' : 'Цвет ' + cc}"></button>`).join('') +
+    `<label class="sw pal" title="Любой цвет — палитра"><input type="color" value="${/^#[0-9a-f]{6}$/i.test(c) ? c : '#d9480f'}"></label>` + '<i></i>' +
     INKW.map((ww, i) => `<button data-iw="${ww}" class="${ww === w ? 'on' : ''}" title="${['Тонко', 'Средне', 'Толсто'][i]}" style="min-width:40px"><b style="display:inline-block;width:20px;height:${ww}px;background:currentColor;border-radius:3px;vertical-align:middle"></b></button>`).join('') + '<i></i>' +
     `<button data-ix="del" ${q ? '' : 'disabled'}>🗑</button><button data-ix="ok">✓</button>`;
   el.querySelectorAll('button').forEach(b => b[window.PointerEvent ? 'onpointerup' : 'onclick'] = ev => { ev.stopPropagation(); ev.preventDefault(); const d = b.dataset, cur = T.inkSel && inkById(T.inkSel), op = inkOpt();
@@ -6435,6 +6438,14 @@ function inkChip() { if (T.tool !== 'draw' || S.step !== 'tape') { inkChipOff();
     else if (d.ix === 'del' && cur) { tPush(); M.ink = M.ink.filter(x => x !== cur); T.inkSel = null; stat('Рисунок удалён. «↶ Отменить» — вернуть.'); }
     else if (d.ix === 'ok') { if (T.inkSel) T.inkSel = null; else { setTapeTool('walk'); renderTape(); draw(); return; } }
     inkChip(); draw(); asSoon(); });
+  const inp = el.querySelector('.pal input'); let palPushed = false;
+  const palSet = (cc, fin) => { cc = String(cc).toLowerCase(); const cur = T.inkSel && inkById(T.inkSel), op = inkOpt(); op.c = cc;
+    if (cur) { if (!palPushed) { tPush(); palPushed = true; } cur.c = cc; }
+    if (fin) { inkRecent(op, cc); palPushed = false; } inkSave(op);
+    el.querySelectorAll('.sw').forEach(b => b.classList.toggle('on', b.dataset.ic === cc || (b.classList.contains('pal') && !el.querySelector(`[data-ic="${cc}"]`))));
+    draw(); if (fin) { asSoon(); inkChip(); } };
+  inp.oninput = () => palSet(inp.value, false); inp.onchange = () => palSet(inp.value, true);
+  inp.onclick = ev => ev.stopPropagation();
   el.onpointerdown = ev => ev.stopPropagation(); }
 // направление скана/фото пальцем: стрелка смотрит на палец
 function dirSet(w) { const m = T.dirMark; if (!m) return; const dx = w[0] - m.p[0], dy = w[1] - m.p[1]; if (Math.hypot(dx, dy) < 1e-6) return;
