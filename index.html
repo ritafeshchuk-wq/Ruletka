@@ -293,7 +293,7 @@ html,body{touch-action:manipulation;-webkit-text-size-adjust:100%}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 9.17 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 9.18 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -3975,6 +3975,7 @@ function renderTouchBar() {
     btn('fit', '⤢'),
     pend ? btn('esc', 'Пропустить') : (TB.shown && !tape ? btn('esc', 'Esc') : ''),
     tape && T.moveObj ? btn('mvok', '✓ Готово', 'pri') : '',
+    tape && T.noteAdd ? btn('ndone', '✓ Стрелки готовы', 'pri') : '',
     tape && T.chain ? btn('endc', '■ Закончить обход') : (tape && (T.mA || T.tA || T.roomIds || T.objIds || T.noteTip)) ? btn('esc', 'Стоп') : '',
     pend && T.pending.got != null ? btn('ok', '✓ Принять', 'pri') : '',
     tape && (T.selSet || T.sel) ? btn('trash', '🗑 Удалить', 'danger') : '',
@@ -3992,6 +3993,7 @@ function tbAct(e) {
   if (k === 'alt') TB.alt = !TB.alt;
   else if (k === 'shift') TB.shift = !TB.shift;
   else if (k === 'fit') { if (S.step === 'tape') fitTape(); else if (S.step === 'plan' && S.plans[S.active]) fitBounds(boundsXY(S.plans[S.active].XY)); else if (S.step === 'reg') fitGroup(); draw(); }
+  else if (k === 'ndone') { const n = T.noteAdd; T.noteAdd = null; stat(n ? 'Готово: стрелок у выноски — ' + noteTips(n).length + '.' : ''); draw(); }
   else if (k === 'undo') tbKey('z', { ctrlKey: true });
   else if (k === 'redo') tbKey('y', { ctrlKey: true });
   else if (k === 'edit') setTapeTool(T.tool === 'select' ? 'walk' : 'select');
@@ -4665,7 +4667,7 @@ function resetWork() {
   Object.assign(M, { ink: [], axis: null, snap90: true, pts: [], meas: [], edges: [], rooms: [], chains: [], objs: [], notes: [], marks: [], lastNum: {}, nextId: 1, nextMeas: 1, cond: false, scaleFit: false, scaleAsked: false, zoomLog: [], gpsHidden: [] });
   Object.assign(U, { img: null, pdf: null, pages: 0, page: 1, name: '', src: null, ptPerPx: null, srcPage: 1, _imgKey: null, _imgKeyFor: null, _imgSaved: false, _srcKey: null, _data: null, _dataFor: null, mip: null, mipSrc: null, pdfPage: null, s: 0.01, rot: 0, tx: 0, ty: 0, pw: null, ph: null, titles: null, zoomPdf: 0 });
   Object.assign(T, { zoomAll: [], gpsDb: null, gpsMode: null, gpsPrev: null, lastPtName: null, numbering: null, figLast: null, selRect: null, resume: null, jumpFrom: null, moveObj: null, mPress: null }); M.ortho = true;
-  Object.assign(T, { mk: null, dragMark: null, dragSel: null, dragEdge: null, snapG: null, selSet: null, box: null, noteTip: null, undo: [], redo: [], pending: null, chain: null, sel: null, buffer: null, objIds: null, roomIds: null, mA: null, tA: null, fitted: false });
+  Object.assign(T, { noteAdd: null, dirMark: null, dirDrag: false, mk: null, dragMark: null, dragSel: null, dragEdge: null, snapG: null, selSet: null, box: null, noteTip: null, undo: [], redo: [], pending: null, chain: null, sel: null, buffer: null, objIds: null, roomIds: null, mA: null, tA: null, fitted: false });
   PGS.data = {}; AS.last = ''; AS.savedAt = 0; AS.epoch = (AS.epoch || 0) + 1;
   adjust(); markSaved();
 }
@@ -4972,7 +4974,9 @@ function tapeMenu(w, cx, cy) {
   } else if (h.note) {
     const n = h.note; title = 'Выноска';
     items.push(['✎ Изменить текст…', async () => { tPush(); await noteEdit(n); renderTape(); draw(); }]);
-    if (n.arrow) items.push(['➝ Убрать стрелку', () => { tPush(); n.arrow = false; draw(); }]);
+    items.push(['➕ Добавить стрелку', () => { closeTapeMenu(); T.noteAdd = n; T.sel = { note: n }; draw(); renderTouchBar(); stat('Коснитесь места (или точки), куда указать ещё одной стрелкой. Можно несколько подряд; «Готово» — кнопкой внизу или касанием самой выноски.'); }]);
+    const nt = noteTips(n).length; if (nt > 1) items.push(['➝ Убрать последнюю стрелку', () => { tPush(); if (n.more && n.more.length) n.more.pop(); else n.arrow = false; draw(); }]);
+    if (nt) items.push([nt > 1 ? '➝ Убрать все стрелки' : '➝ Убрать стрелку', () => { tPush(); n.arrow = false; n.more = []; if (noteBlank(n)) M.notes = M.notes.filter(x => x !== n); draw(); renderTape(); }]);
     items.push(['✥ Передвинуть', () => moveMode({ note: n })]);
     items.push(['🗑 Удалить выноску', () => { tPush(); M.notes = M.notes.filter(x => x !== n); draw(); renderTape(); }, 'danger']);
   } else if (h.obj) {
@@ -5385,8 +5389,13 @@ function objAt(w) { for (const o of (M.objs || []).slice().reverse()) { const g 
 function SHEET_inside(P, w) { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const a = P[i], b = P[j]; if ((a[1] > w[1]) !== (b[1] > w[1]) && w[0] < (b[0] - a[0]) * (w[1] - a[1]) / (b[1] - a[1]) + a[0]) c = !c; } return c; }
 // ---------- выноски и комментарии ----------
 function noteTip(n) { const p = n.pt != null ? ptById(n.pt) : null; return p ? PX(p) : n.tip; }
+// выноска может указывать в несколько мест: основная стрелка (tip/pt) + n.more = [{ tip, pt }]
+function noteTips(n) { const out = []; if (n.arrow && (n.tip || n.pt != null)) { const t = noteTip(n); if (t) out.push(t); }
+  for (const t of n.more || []) { const p = t.pt != null ? ptById(t.pt) : null, q = p ? PX(p) : t.tip; if (q) out.push(q); } return out; }
+const noteBlank = n => !String(n.text || '').trim(); // выноска без текста — только стрелки из точки
+const shiftMore = (n, f) => { if (n.more) n.more = n.more.map(t => ({ tip: t.tip ? f(t.tip) : t.tip, pt: t.pt })); };
 function noteLines(t) { const out = []; for (const para of String(t).split(/\n|\s\/\s/)) { let cur = ''; for (const w of para.split(' ')) { if ((cur + ' ' + w).trim().length > 28 && cur) { out.push(cur); cur = w; } else cur = (cur + ' ' + w).trim(); } out.push(cur); } return out.filter(x => x !== ''); }
-async function noteEdit(n) { const v = await uiAsk('Текст выноски (« / » — новая строка):', n.text || ''); if (v == null) return false; if (!v.trim()) { M.notes = M.notes.filter(x => x !== n); } else n.text = v.trim(); return true; }
+async function noteEdit(n) { const v = await uiAsk('Текст выноски (« / » — новая строка). Пусто — выноска без текста, только стрелки:', n.text || ''); if (v == null) return false; if (!v.trim() && !noteTips(n).length) { M.notes = M.notes.filter(x => x !== n); } else n.text = v.trim(); return true; }
 function noteAt(sx, sy) { for (const r of (T.noteRects || []).slice().reverse()) if (sx >= r.x0 && sx <= r.x1 && sy >= r.y0 && sy <= r.y1) return r.n; return null; }
 // ---------- привязка 90°: новая стена ложится строго вдоль/поперёк предыдущей ----------
 function snap90(prevId, w) {
@@ -5534,7 +5543,7 @@ function clipPaste() {
   let rn = mx(M.rooms, 'num'); for (const r of b.rooms) M.rooms.push({ ...r, num: ++rn, ids: r.ids.map(R) });
   for (const ch of b.chains) M.chains.push(ch.map(R));
   let oi = mx(M.objs); for (const o of b.objs) (M.objs = M.objs || []).push({ ...o, id: ++oi, ids: o.ids.map(R) });
-  let ni = mx(M.notes); for (const n of b.notes) (M.notes = M.notes || []).push({ ...n, id: ++ni, at: [n.at[0] + dx, n.at[1] + dy], tip: n.tip ? [n.tip[0] + dx, n.tip[1] + dy] : n.tip, pt: n.pt != null ? (R(n.pt) ?? null) : null });
+  let ni = mx(M.notes); for (const n of b.notes) (M.notes = M.notes || []).push({ ...n, id: ++ni, at: [n.at[0] + dx, n.at[1] + dy], tip: n.tip ? [n.tip[0] + dx, n.tip[1] + dy] : n.tip, pt: n.pt != null ? (R(n.pt) ?? null) : null, more: (n.more || []).map(t => ({ tip: t.tip ? [t.tip[0] + dx, t.tip[1] + dy] : t.tip, pt: t.pt != null ? (R(t.pt) ?? null) : null })) });
   let ki = mx(M.marks); for (const m of b.marks) (M.marks = M.marks || []).push({ ...m, id: ++ki, p: [m.p[0] + dx, m.p[1] + dy] });
   markObjEdges(); adjust(); setTapeTool('box'); T.selRect = null; selectPts([...P.values()]); draw(); renderTape();
   stat(`Вставлено: точек ${b.pts.length}, замеров ${b.meas.length}. Перетащите пальцем за рамку на нужное место; «↶ Отменить» — убрать.`);
@@ -5593,7 +5602,7 @@ function rotateSel(deg) {
   const R = (x, y) => [c[0] + (x - c[0]) * cs - (y - c[1]) * sn, c[1] + (x - c[0]) * sn + (y - c[1]) * cs], inB = q => q && q[0] >= b[0] - pad && q[0] <= b[2] + pad && q[1] >= b[1] - pad && q[1] <= b[3] + pad;
   for (const p of M.pts) if (T.selSet.has(p.id)) { const q = PX(p); [p.x0, p.y0] = R(q[0], q[1]); if (p.x != null) { p.x = p.x0; p.y = p.y0; } }
   for (const m of M.marks || []) if (inB(m.p)) { m.p = R(...m.p); if (m.dir != null) m.dir += a; }
-  for (const n of M.notes || []) if (inB(n.at)) { n.at = R(...n.at); if (n.tip) n.tip = R(...n.tip); }
+  for (const n of M.notes || []) if (inB(n.at)) { n.at = R(...n.at); if (n.tip) n.tip = R(...n.tip); shiftMore(n, q => R(...q)); }
   for (const Rm of M.rooms) if (Rm.lp && Rm.ids.every(id => T.selSet.has(id))) Rm.lp = R(...Rm.lp);
   if (M.axis != null && T.selSet.size === M.pts.length) M.axis += a;
   adjust(); draw(); showSelBox(); stat(`Повёрнуто ${deg > 0 ? '⟲ против' : '⟳ по'} часовой на ${String(Math.abs(deg)).replace('.', ',')}°`); }
@@ -5776,25 +5785,25 @@ function selScaleHandle() { const b = selBBox(); if (!b) return null; const c = 
 function selScaleHit(sx, sy) { const r = selScaleHandle(); if (!r) return false; const d = devicePixelRatio; return Math.hypot(sx * d - r.h[0], sy * d - r.h[1]) < 24 * d; }
 function selRotHit(sx, sy) { const r = selRotHandle(); if (!r) return false; const d = devicePixelRatio; return Math.hypot(sx * d - r.h[0], sy * d - r.h[1]) < 24 * d; }
 function startSelRot(w0, scale) { const r = selRotHandle(); if (!r) return false; const b = selBBox(), pad = 26 / S.view.s, inB = q => q && q[0] >= b[0] - pad && q[0] <= b[2] + pad && q[1] >= b[1] - pad && q[1] <= b[3] + pad; tPush(); T.selRect = null;
-  T.rotSel = { c: r.c, a0: Math.atan2(w0[1] - r.c[1], w0[0] - r.c[0]), pts: M.pts.filter(p => T.selSet.has(p.id)).map(p => ({ p, q: PX(p) })), marks: (M.marks || []).filter(m => inB(m.p)).map(m => ({ m, p: m.p.slice(), dir: m.dir })), notes: (M.notes || []).filter(n => inB(n.at)).map(n => ({ n, at: n.at.slice(), tip: n.tip ? n.tip.slice() : null })), rooms: M.rooms.filter(R => R.lp && R.ids.every(id => T.selSet.has(id))).map(R => ({ R, lp: R.lp.slice() })), all: T.selSet.size === M.pts.length, ax: M.axis, da: 0 };
+  T.rotSel = { c: r.c, a0: Math.atan2(w0[1] - r.c[1], w0[0] - r.c[0]), pts: M.pts.filter(p => T.selSet.has(p.id)).map(p => ({ p, q: PX(p) })), marks: (M.marks || []).filter(m => inB(m.p)).map(m => ({ m, p: m.p.slice(), dir: m.dir })), notes: (M.notes || []).filter(n => inB(n.at)).map(n => ({ n, at: n.at.slice(), tip: n.tip ? n.tip.slice() : null, more: (n.more || []).map(t => t.tip ? t.tip.slice() : null) })), rooms: M.rooms.filter(R => R.lp && R.ids.every(id => T.selSet.has(id))).map(R => ({ R, lp: R.lp.slice() })), all: T.selSet.size === M.pts.length, ax: M.axis, da: 0 };
   if (scale) { const g = T.rotSel; g.scale = true; g.k = 1; g.d0 = Math.max(1e-6, Math.hypot(w0[0] - g.c[0], w0[1] - g.c[1])); stat('Масштаб: ведите ⤡ от центра — крупнее, к центру — мельче. Записанные замеры не меняются.' + (M.cond ? '' : ' В режиме «Факт» промеренные стены вернутся к своим длинам — масштабировать рисунок лучше в режиме «Условно».')); }
   else stat('Поворот: ведите вокруг центра. Около 0° и 90° — липнет, шаг 0,1°.'); return true; }
 function moveSelRot(w, da0, cNow, k0) { const g = T.rotSel;
   if (g.scale) { let k = Math.hypot(w[0] - g.c[0], w[1] - g.c[1]) / g.d0; k = Math.min(20, Math.max(0.05, k)); k = Math.round(k * 100) / 100; if (Math.abs(k - 1) < 0.02) k = 1; g.k = k;
     const c = g.c, R = (x, y) => [c[0] + (x - c[0]) * k, c[1] + (y - c[1]) * k];
     for (const o of g.pts) { const [x, y] = R(o.q[0], o.q[1]); o.p.x0 = x; o.p.y0 = y; o.p.x = x; o.p.y = y; }
-    for (const o of g.marks) o.m.p = R(...o.p); for (const o of g.notes) { o.n.at = R(...o.at); if (o.tip) o.n.tip = R(...o.tip); } for (const o of g.rooms) o.R.lp = R(...o.lp);
+    for (const o of g.marks) o.m.p = R(...o.p); for (const o of g.notes) { o.n.at = R(...o.at); if (o.tip) o.n.tip = R(...o.tip); (o.more || []).forEach((q, i) => { if (q && o.n.more && o.n.more[i]) o.n.more[i].tip = R(...q); }); } for (const o of g.rooms) o.R.lp = R(...o.lp);
     stat(`Масштаб рисунка ×${String(k).replace('.', ',')} (${Math.round(k * 100)}%) — замеры прежние`); draw(); return; } let da = da0 != null ? da0 : Math.atan2(w[1] - g.c[1], w[0] - g.c[0]) - g.a0; da = Math.atan2(Math.sin(da), Math.cos(da)); let deg = da * 180 / Math.PI;
   for (const k of [-180, -90, 0, 90, 180]) if (Math.abs(deg - k) < (k0 != null ? 1.5 : 0.7)) deg = k; deg = Math.round(deg * 10) / 10; da = deg * Math.PI / 180; g.da = da;
   let K = 1; if (k0 != null) { K = Math.min(20, Math.max(0.05, k0)); K = Math.round(K * 100) / 100; if (Math.abs(K - 1) < 0.02) K = 1; } g.k = K; // двумя пальцами: развели/свели — масштаб рисунка
   const cs = Math.cos(da) * K, sn = Math.sin(da) * K, c = g.c, c2 = cNow || c, R = (x, y) => [c2[0] + (x - c[0]) * cs - (y - c[1]) * sn, c2[1] + (x - c[0]) * sn + (y - c[1]) * cs];
   for (const o of g.pts) { const [x, y] = R(o.q[0], o.q[1]); o.p.x0 = x; o.p.y0 = y; o.p.x = x; o.p.y = y; }
-  for (const o of g.marks) { o.m.p = R(...o.p); if (o.dir != null) o.m.dir = o.dir + da; } for (const o of g.notes) { o.n.at = R(...o.at); if (o.tip) o.n.tip = R(...o.tip); } for (const o of g.rooms) o.R.lp = R(...o.lp);
+  for (const o of g.marks) { o.m.p = R(...o.p); if (o.dir != null) o.m.dir = o.dir + da; } for (const o of g.notes) { o.n.at = R(...o.at); if (o.tip) o.n.tip = R(...o.tip); (o.more || []).forEach((q, i) => { if (q && o.n.more && o.n.more[i]) o.n.more[i].tip = R(...q); }); } for (const o of g.rooms) o.R.lp = R(...o.lp);
   if (g.all && g.ax != null) M.axis = g.ax + da; stat((deg || K === 1 ? `Поворот ${deg > 0 ? '⟲' : deg < 0 ? '⟳' : ''} ${String(Math.abs(deg)).replace('.', ',')}°` : '') + (K !== 1 ? `${deg ? ' · м' : 'М'}асштаб ×${String(K).replace('.', ',')} (${Math.round(K * 100)}%), замеры прежние` : '')); draw(); }
 function endSelRot() { const g = T.rotSel; T.rotSel = null; adjust(); asSoon(); renderTape(); draw(); if (T.selSet) showSelBox();
   if (g.scale) { stat(g.k !== 1 ? `Рисунок выделенного ×${String(g.k).replace('.', ',')} (${Math.round(g.k * 100)}%). Замеры не менялись. «↶ Отменить» — вернуть.` : 'Масштаб не изменён.'); return; } const deg = Math.round(g.da * 1800 / Math.PI) / 10, kk = g.k && g.k !== 1 ? ` Масштаб рисунка ×${String(g.k).replace('.', ',')} (${Math.round(g.k * 100)}%), замеры прежние.` : ''; stat(((deg ? `${g.twist ? 'Двумя пальцами: п' : 'П'}овёрнуто на ${String(Math.abs(deg)).replace('.', ',')}° ${deg > 0 ? 'против' : 'по'} часовой.` : kk ? '' : 'Без поворота.') + kk + (kk && !M.cond ? ' В режиме «Факт» промеренные стены вернутся к длинам замеров — подгонять под подложку лучше в режиме «Условно».' : '')).trim()); }
 function startSelDrag(w0) { const b = selBBox(), pad = 26 / S.view.s, inB = q => q[0] >= b[0] - pad && q[0] <= b[2] + pad && q[1] >= b[1] - pad && q[1] <= b[3] + pad;
-  tPush(); T.dragSel = { w0: w0.slice(), rect: T.selRect ? T.selRect.slice() : null, pts: M.pts.filter(p => T.selSet.has(p.id)).map(ptPos), marks: (M.marks || []).filter(m => inB(m.p)).map(m => ({ m, p: m.p.slice() })), notes: (M.notes || []).filter(n => inB(n.at)).map(n => ({ n, at: n.at.slice(), tip: n.tip ? n.tip.slice() : null })) };
+  tPush(); T.dragSel = { w0: w0.slice(), rect: T.selRect ? T.selRect.slice() : null, pts: M.pts.filter(p => T.selSet.has(p.id)).map(ptPos), marks: (M.marks || []).filter(m => inB(m.p)).map(m => ({ m, p: m.p.slice() })), notes: (M.notes || []).filter(n => inB(n.at)).map(n => ({ n, at: n.at.slice(), tip: n.tip ? n.tip.slice() : null, more: (n.more || []).map(t => t.tip ? t.tip.slice() : null) })) };
   stat(`Двигаю выделенное: точек ${T.dragSel.pts.length}. Отпустите — встанет на место.`); }
 function startEdgeDrag(ed, w0) { const A = ptById(ed.e.a), B = ptById(ed.e.b); if (!A || !B) return false; const a = PX(A), b = PX(B), L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
   tPush(); T.dragEdge = { w0: w0.slice(), n: [-(b[1] - a[1]) / L, (b[0] - a[0]) / L], P: [ptPos(A), ptPos(B)] }; T.sel = { edge: ed.e };
@@ -6453,6 +6462,11 @@ function dirSet(w) { const m = T.dirMark; if (!m) return; const dx = w[0] - m.p[
   m.dir = deg * Math.PI / 180; stat(`Направление ${((deg % 360) + 360) % 360}° — отпустите палец, чтобы закончить.`); draw(); }
 function dirDone() { const m = T.dirMark; T.dirMark = null; T.dirDrag = false; if (m) { asSoon(); stat('Направление задано. «↶ Отменить» — вернуть как было.'); } renderTouchBar(); draw(); }
 function tapeDown(e, w) {
+  if (T.noteAdd) { const n = T.noteAdd; if (!(M.notes || []).includes(n)) { T.noteAdd = null; renderTouchBar(); }
+    else { const sp = W2S(...w); if (noteAt(sp[0] / devicePixelRatio, sp[1] / devicePixelRatio) === n) { T.noteAdd = null; stat('Готово: стрелок у выноски — ' + noteTips(n).length + '.'); renderTouchBar(); draw(); return; }
+      const p = nearestPoint(w); tPush(); const t = { tip: p ? PX(p) : w.slice(), pt: p ? p.id : null };
+      if (!n.arrow && !n.tip && n.pt == null) { n.arrow = true; n.tip = t.tip; n.pt = t.pt; } else if (!n.arrow) { n.arrow = true; n.tip = t.tip; n.pt = t.pt; } else (n.more = n.more || []).push(t);
+      asSoon(); draw(); stat('Стрелок у выноски: ' + noteTips(n).length + '. Коснитесь ещё места или самой выноски — готово.'); return; } }
   if (T.dirMark) { tPush(); T.dirDrag = true; dirSet(w); return; }
   if (AS.hold) { stat('Подождите: идёт сохранение PDF — чертёж сейчас занят.'); return; }
   if (T.tool === 'draw') return inkDown(w);
@@ -6550,7 +6564,7 @@ function tapeDown(e, w) {
     if (!T.noteTip) { const p = nearestPoint(w); T.noteTip = { tip: p ? PX(p) : w.slice(), pt: p ? p.id : null }; stat('Теперь коснитесь места, где будет текст (в ту же точку — подпись без стрелки)'); draw(); renderTape(); return; }
     const tp = T.noteTip; T.noteTip = null; const same = Math.hypot(w[0] - tp.tip[0], w[1] - tp.tip[1]) * S.view.s < 12;
     const n = { id: (M.notes || []).reduce((m, x) => Math.max(m, x.id), 0) + 1, at: w.slice(), tip: same ? null : tp.tip, pt: same ? null : tp.pt, text: '', arrow: !same };
-    uiAsk('Текст выноски (« / » — новая строка):', '').then(v => { if (!v || !v.trim()) { draw(); renderTape(); return; } tPush(); zoomNote(); n.text = v.trim(); (M.notes = M.notes || []).push(n); draw(); renderTape(); stat('Выноска добавлена. Долгое нажатие на неё — изменить или удалить; пальцем — передвинуть.'); });
+    uiAsk('Текст выноски (« / » — новая строка). Можно оставить пустым — будет выноска без текста, только стрелки:', '').then(v => { if (v == null || (!v.trim() && same)) { draw(); renderTape(); return; } tPush(); zoomNote(); n.text = v.trim(); (M.notes = M.notes || []).push(n); draw(); renderTape(); stat('Выноска добавлена. Ещё стрелка — долгое нажатие на выноску → «➕ Добавить стрелку». Пальцем — передвинуть.'); });
     return;
   }
   if (t === 'sill') { const pd = T.pending; if (pd && pd.pick != null && pd.got == null) { const o = (M.objs || []).find(x => x.id === pd.o), q = nearestPoint(w); if (o && q && !o.ids.includes(q.id)) { const end = o.ids[pd.pick]; if (pd.pick === 0) { pd.a = q.id; pd.b = end; } else { pd.a = end; pd.b = q.id; } pd.label = `Подоконник: ${pd.pick === 0 ? 'левый' : 'правый'} край ← от ${pname(q.id)}`; renderTape(); draw(); return; } if (o) { stat('Коснитесь точки на стене — угла или края окна, от которой меряете; или введите замер от ' + pname(pd.pick === 0 ? pd.a : pd.b)); return; } }
@@ -6604,7 +6618,7 @@ function tapeMove(w) {
   if (T.box) { T.box.w1 = w.slice(); const pth = T.box.path || (T.box.path = [T.box.w0.slice()]), lq = pth[pth.length - 1]; if (Math.hypot(w[0] - lq[0], w[1] - lq[1]) * S.view.s > 4) pth.push(w.slice()); T.box.lasso = boxIsLasso(T.box); draw(); return true; }
   if (T.dragNote) { const d = T.dragNote; d.n.at = [w[0] + d.off[0], w[1] + d.off[1]]; draw(); return true; }
   if (T.dragPt) { const o = T.dragOff || [0, 0]; let x = w[0] + o[0], y = w[1] + o[1]; [x, y] = snapXY(x, y, new Set([T.dragPt.id])); T.dragPt.x0 = x; T.dragPt.y0 = y; T.dragPt.x = x; T.dragPt.y = y; adjustSoon(); draw(); return true; }
-  if (T.dragSel) { const d = T.dragSel, dx = w[0] - d.w0[0], dy = w[1] - d.w0[1]; if (d.rect) T.selRect = [d.rect[0] + dx, d.rect[1] + dy, d.rect[2] + dx, d.rect[3] + dy]; for (const o of d.pts) movePt(o, dx, dy); for (const o of d.marks) o.m.p = [o.p[0] + dx, o.p[1] + dy]; for (const o of d.notes) { o.n.at = [o.at[0] + dx, o.at[1] + dy]; if (o.tip) o.n.tip = [o.tip[0] + dx, o.tip[1] + dy]; } adjustSoon(); draw(); return true; }
+  if (T.dragSel) { const d = T.dragSel, dx = w[0] - d.w0[0], dy = w[1] - d.w0[1]; if (d.rect) T.selRect = [d.rect[0] + dx, d.rect[1] + dy, d.rect[2] + dx, d.rect[3] + dy]; for (const o of d.pts) movePt(o, dx, dy); for (const o of d.marks) o.m.p = [o.p[0] + dx, o.p[1] + dy]; for (const o of d.notes) { o.n.at = [o.at[0] + dx, o.at[1] + dy]; if (o.tip) o.n.tip = [o.tip[0] + dx, o.tip[1] + dy]; (o.more || []).forEach((q, i) => { if (q && o.n.more && o.n.more[i]) o.n.more[i].tip = [q[0] + dx, q[1] + dy]; }); } adjustSoon(); draw(); return true; }
   if (T.dragEdge) { const d = T.dragEdge; let k = (w[0] - d.w0[0]) * d.n[0] + (w[1] - d.w0[1]) * d.n[1];
     // магнит для стены по осям: встать в линию с другими точками
     const a = [d.P[0].p.x0, d.P[0].p.y0].map((v, i) => [d.P[0].x0, d.P[0].y0][i] + d.n[i] * k), skip = new Set(d.P.map(o => o.p.id)); T.snapG = null;
@@ -6643,7 +6657,7 @@ function tapeDelete() {
     M.meas = M.meas.filter(m => ![m.a, m.b, m.c, m.d, m.p].includes(id));
     M.rooms.forEach(R => R.ids = R.ids.filter(x => x !== id)); M.rooms = M.rooms.filter(R => R.ids.length >= 3);
     M.chains.forEach(c => { const i = c.indexOf(id); if (i >= 0) c.splice(i, 1); });
-    (M.notes || []).forEach(n => { if (n.pt === id) { n.tip = PX(T.sel.pt); n.pt = null; } });
+    (M.notes || []).forEach(n => { if (n.pt === id) { n.tip = PX(T.sel.pt); n.pt = null; } (n.more || []).forEach(t => { if (t.pt === id) { t.tip = PX(T.sel.pt); t.pt = null; } }); });
     (M.objs || []).forEach(o => o.ids = o.ids.filter(x => x !== id)); M.objs = (M.objs || []).filter(o => o.ids.length >= 3); markObjEdges();
   } else if (T.sel.edge) { const e = T.sel.edge; M.edges = M.edges.filter(x => x !== e); }
   else if (T.sel.meas) { const m = T.sel.meas; M.meas = M.meas.filter(x => x !== m); }
@@ -6719,6 +6733,7 @@ function drawTape() {
     if (gridOk) for (let x = Math.floor(a[0]); x <= b[0]; x++) { const p = W2S(x, 0); ctx.beginPath(); ctx.moveTo(p[0], 0); ctx.lineTo(p[0], cv.height); ctx.stroke(); }
     if (gridOk) for (let y = Math.floor(b[1]); y <= a[1]; y++) { const p = W2S(0, y); ctx.beginPath(); ctx.moveTo(0, p[1]); ctx.lineTo(cv.width, p[1]); ctx.stroke(); }
   }
+  drawInk(); // маркер — под всем текстом: подписи помещений, сканы, фото, выноски, размеры ложатся сверху
   // rooms
   T.roomRects = [];
   for (const R of M.rooms) {
@@ -6750,7 +6765,6 @@ function drawTape() {
     const tw = ctx.measureText(g.label.s).width; ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fillRect(lp[0] - tw / 2 - 4 * dpr, lp[1] - 12 * dpr * ok_, tw + 8 * dpr, 17 * dpr * ok_);
     ctx.fillStyle = stC(o, '#5b3aa8'); ctx.fillText(g.label.s, lp[0], lp[1]); ctx.textAlign = 'start';
   }
-  drawInk();
   { const ow = outerWalls(); if (ow.length) { ctx.save(); ctx.strokeStyle = '#5b3aa8'; ctx.lineWidth = 1.6 * dpr; ctx.setLineDash([10 * dpr, 6 * dpr]); for (const s2 of ow) { ctx.beginPath(); ctx.moveTo(...W2S(...s2.a)); ctx.lineTo(...W2S(...s2.b)); ctx.stroke(); } ctx.restore(); } } // наружная стена (условно)
   // фото и сканы
   T.markRects = [];
@@ -6776,16 +6790,17 @@ function drawTape() {
   // выноски
   T.noteRects = [];
   for (const n of M.notes || []) {
-    const lines = noteLines(n.text), fsz = 12 * dpr * stK(n), lh = fsz * 1.25; ctx.font = `600 ${fsz}px Golos Text, Segoe UI`;
+    const blank = noteBlank(n), lines = blank ? [] : noteLines(n.text), fsz = 12 * dpr * stK(n), lh = fsz * 1.25; ctx.font = `600 ${fsz}px Golos Text, Segoe UI`;
     const wmax = Math.max(...lines.map(l => ctx.measureText(l).width), 10), at = W2S(...n.at), sel = T.sel && T.sel.note === n;
-    const x0 = at[0] - wmax / 2 - 6 * dpr, y0 = at[1] - lh * lines.length / 2 - 4 * dpr, x1 = at[0] + wmax / 2 + 6 * dpr, y1 = at[1] + lh * lines.length / 2 + 4 * dpr;
+    const x0 = blank ? at[0] - 7 * dpr : at[0] - wmax / 2 - 6 * dpr, y0 = blank ? at[1] - 7 * dpr : at[1] - lh * lines.length / 2 - 4 * dpr, x1 = blank ? at[0] + 7 * dpr : at[0] + wmax / 2 + 6 * dpr, y1 = blank ? at[1] + 7 * dpr : at[1] + lh * lines.length / 2 + 4 * dpr;
     const col = sel ? '#1f6feb' : stC(n, '#d9480f');
-    if (n.arrow && (n.tip || n.pt != null)) { const tip = W2S(...noteTip(n)); const cx = Math.max(x0, Math.min(x1, tip[0])), cy = Math.max(y0, Math.min(y1, tip[1]));
-      const st = (tip[0] > x0 && tip[0] < x1) ? [at[0], tip[1] < at[1] ? y0 : y1] : [tip[0] < at[0] ? x0 : x1, at[1]];
+    for (const tq of noteTips(n)) { const tip = W2S(...tq); // стрелки — от края рамки текста (без текста — из точки выноски)
+      const st = blank ? at : (tip[0] > x0 && tip[0] < x1) ? [at[0], tip[1] < at[1] ? y0 : y1] : [tip[0] < at[0] ? x0 : x1, at[1]];
       ctx.strokeStyle = col; ctx.lineWidth = 1.6 * dpr; ctx.beginPath(); ctx.moveTo(...st); ctx.lineTo(...tip); ctx.stroke();
-      const a = Math.atan2(tip[1] - st[1], tip[0] - st[0]), h = 9 * dpr; ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(...tip); ctx.lineTo(tip[0] - h * Math.cos(a - 0.4), tip[1] - h * Math.sin(a - 0.4)); ctx.lineTo(tip[0] - h * Math.cos(a + 0.4), tip[1] - h * Math.sin(a + 0.4)); ctx.closePath(); ctx.fill(); void cx; void cy; }
-    ctx.fillStyle = 'rgba(255,255,255,.93)'; ctx.fillRect(x0, y0, x1 - x0, y1 - y0); ctx.strokeStyle = col; ctx.lineWidth = 1.4 * dpr; ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
-    ctx.fillStyle = col; ctx.textAlign = 'center'; lines.forEach((l, i) => ctx.fillText(l, at[0], y0 + 4 * dpr + lh * (i + 0.8))); ctx.textAlign = 'start';
+      const a = Math.atan2(tip[1] - st[1], tip[0] - st[0]), h = 9 * dpr; ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(...tip); ctx.lineTo(tip[0] - h * Math.cos(a - 0.4), tip[1] - h * Math.sin(a - 0.4)); ctx.lineTo(tip[0] - h * Math.cos(a + 0.4), tip[1] - h * Math.sin(a + 0.4)); ctx.closePath(); ctx.fill(); }
+    if (blank) { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(at[0], at[1], 3.2 * dpr, 0, 7); ctx.fill(); if (sel || T.noteAdd === n) { ctx.strokeStyle = col; ctx.lineWidth = 1.2 * dpr; ctx.strokeRect(x0, y0, x1 - x0, y1 - y0); } }
+    else { ctx.fillStyle = 'rgba(255,255,255,.93)'; ctx.fillRect(x0, y0, x1 - x0, y1 - y0); ctx.strokeStyle = col; ctx.lineWidth = 1.4 * dpr; ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+      ctx.fillStyle = col; ctx.textAlign = 'center'; lines.forEach((l, i) => ctx.fillText(l, at[0], y0 + 4 * dpr + lh * (i + 0.8))); ctx.textAlign = 'start'; }
     T.noteRects.push({ n, x0: x0 / dpr, y0: y0 / dpr, x1: x1 / dpr, y1: y1 / dpr });
   }
   if (T.box) { const B = T.box; ctx.lineWidth = 1.5 * dpr;
@@ -7215,6 +7230,9 @@ async function exportOverlayPdf(opt = {}) {
         for (let i = 0; i < n; i++) { const t = -B.hw + (i + 0.5) * 2 * B.hw / n, c = [B.c[0] + B.u[0] * t, B.c[1] + B.u[1] * t], X = c[0] / sx * k, Y = (H - c[1]) / sy * k, r = hh / sx * k; const [a, b] = sum(X - r, Y - r, X + r, Y + r); ink += a; ar += b; }
         return ar ? ink / ar : 0; };
     } catch (e) { console.warn('underlay ink', e); INK = null; }
+    // маркер: рисунки от руки и фигуры — своим цветом; рисуем первым, чтобы весь текст (сканы, фото, выноски, подписи, размеры) лёг сверху
+    for (const q of M.ink || []) { const hx = q.c.replace('#', ''), col = rgb(parseInt(hx.slice(0, 2), 16) / 255, parseInt(hx.slice(2, 4), 16) / 255, parseInt(hx.slice(4, 6), 16) / 255), th = Math.max(0.4, q.w * 0.3);
+      for (const L of inkPoly(q)) for (let i = 1; i < L.length; i++) { const a = toPt(...L[i - 1]), b = toPt(...L[i]); page.drawLine({ start: { x: a[0], y: a[1] }, end: { x: b[0], y: b[1] }, thickness: th, color: col, lineCap: 1 }); } }
     // занятые заранее: точки
     for (const p of M.pts) { if (p.soft) continue; const q = P2(p); OB.push(obb(q, 0, lw * 2.2, lw * 2.2)); }
     // объекты
@@ -7280,14 +7298,12 @@ async function exportOverlayPdf(opt = {}) {
         place(lab, col, 0, C); } }
     // выноски (их место выбрано вручную — рисуются как есть)
     const ORG0 = rgb(0.85, 0.28, 0.06);
-    for (const n of M.notes || []) { const at = toPt(...n.at), ls = noteLines(n.text), fsn = fs * 0.95 * stK(n), ORG = sc(n, ORG0);
-      if (n.arrow && (n.tip || n.pt != null)) { const tp = toPt(...noteTip(n)); const dx = tp[0] - at[0], dy = tp[1] - at[1], L = Math.hypot(dx, dy) || 1, st = [at[0] + dx / L * fsn * 1.2, at[1] + dy / L * fsn * 1.2];
+    for (const n of M.notes || []) { const at = toPt(...n.at), blank = noteBlank(n), ls = blank ? [] : noteLines(n.text), fsn = fs * 0.95 * stK(n), ORG = sc(n, ORG0);
+      if (blank && noteTips(n).length > 1) page.drawCircle({ x: at[0], y: at[1], size: lw * 1.6, color: ORG });
+      for (const tq of noteTips(n)) { const tp = toPt(...tq); const dx = tp[0] - at[0], dy = tp[1] - at[1], L = Math.hypot(dx, dy) || 1, g = blank ? 0 : fsn * 1.2, st = [at[0] + dx / L * g, at[1] + dy / L * g];
         page.drawLine({ start: { x: st[0], y: st[1] }, end: { x: tp[0], y: tp[1] }, thickness: lw, color: ORG }); const a = Math.atan2(dy, dx), h = fsn * 0.8;
         page.drawSvgPath(`M0 0L${-h * Math.cos(a - 0.4)} ${h * Math.sin(a - 0.4)}L${-h * Math.cos(a + 0.4)} ${h * Math.sin(a + 0.4)}Z`, { x: tp[0], y: tp[1], color: ORG, borderWidth: 0 }); }
       ls.forEach((l, i) => textC(l, [at[0], at[1] - (i - (ls.length - 1) / 2) * fsn * 1.25], fsn, ORG)); }
-    // маркер: рисунки от руки и фигуры — своим цветом
-    for (const q of M.ink || []) { const hx = q.c.replace('#', ''), col = rgb(parseInt(hx.slice(0, 2), 16) / 255, parseInt(hx.slice(2, 4), 16) / 255, parseInt(hx.slice(4, 6), 16) / 255), th = Math.max(0.4, q.w * 0.3);
-      for (const L of inkPoly(q)) for (let i = 1; i < L.length; i++) { const a = toPt(...L[i - 1]), b = toPt(...L[i]); page.drawLine({ start: { x: a[0], y: a[1] }, end: { x: b[0], y: b[1] }, thickness: th, color: col, lineCap: 1 }); } }
     // размеры: сначала короткие стены (им тесней всего), потом привязки, диагонали, толщины, углы; «≈» — только если есть место
     DL.sort((x, y) => x.pr - y.pr || (x.L || 0) - (y.L || 0));
     for (const d of DL) {
@@ -7389,9 +7405,9 @@ function tapePlan() {
     if (m.dir != null) { const t0 = PR({ x0: m.p[0] + Math.cos(m.dir), y0: m.p[1] + Math.sin(m.dir), x: m.p[0] + Math.cos(m.dir), y: m.p[1] + Math.sin(m.dir) }); const a = Math.atan2(t0[1] - c[1], t0[0] - c[0]), L = 0.55, tip = [c[0] + Math.cos(a) * L, c[1] + Math.sin(a) * L];
       extra.push({ a: [c[0] + Math.cos(a) * r, c[1] + Math.sin(a) * r], b: tip, w: 0.25, layer: 'FOTO_SKAN' }, { a: tip, b: [tip[0] - 0.15 * Math.cos(a - 0.4), tip[1] - 0.15 * Math.sin(a - 0.4)], w: 0.25, layer: 'FOTO_SKAN' }, { a: tip, b: [tip[0] - 0.15 * Math.cos(a + 0.4), tip[1] - 0.15 * Math.sin(a + 0.4)], w: 0.25, layer: 'FOTO_SKAN' }); }
     texts.push({ p: [c[0] + 0.25, c[1] + 0.25], s: (m.type === 'photo' ? 'Ф ' : 'Скан ') + m.num, h: 2.0, rot: 0 }); }
-  for (const n of M.notes || []) { const at = PR({ x0: n.at[0], y0: n.at[1], x: n.at[0], y: n.at[1] }); const ls = noteLines(n.text);
+  for (const n of M.notes || []) { const at = PR({ x0: n.at[0], y0: n.at[1], x: n.at[0], y: n.at[1] }); const blank = noteBlank(n), ls = blank ? [] : noteLines(n.text);
     ls.forEach((l, i) => texts.push({ p: [at[0], at[1] - (i - (ls.length - 1) / 2) * 0.32], s: l, h: 2.2, rot: 0 }));
-    if (n.arrow && (n.tip || n.pt != null)) { const tq = noteTip(n), tp = PR({ x0: tq[0], y0: tq[1], x: tq[0], y: tq[1] }); const dx = tp[0] - at[0], dy = tp[1] - at[1], L = Math.hypot(dx, dy) || 1; const st = [at[0] + dx / L * 0.35, at[1] + dy / L * 0.35];
+    for (const tq of noteTips(n)) { const tp = PR({ x0: tq[0], y0: tq[1], x: tq[0], y: tq[1] }); const dx = tp[0] - at[0], dy = tp[1] - at[1], L = Math.hypot(dx, dy) || 1, g = blank ? 0 : 0.35; const st = [at[0] + dx / L * g, at[1] + dy / L * g];
       extra.push({ a: st, b: tp, w: 0.2 }); const a = Math.atan2(dy, dx), h = 0.18; extra.push({ a: tp, b: [tp[0] - h * Math.cos(a - 0.35), tp[1] - h * Math.sin(a - 0.35)], w: 0.2 }, { a: tp, b: [tp[0] - h * Math.cos(a + 0.35), tp[1] - h * Math.sin(a + 0.35)], w: 0.2 }); } }
   for (const q of M.ink || []) for (const L of inkPoly(q)) for (let i = 1; i < L.length; i++) { const P = v => PR({ x0: v[0], y0: v[1], x: v[0], y: v[1] }); extra.push({ a: P(L[i - 1]), b: P(L[i]), w: q.w >= 7 ? 0.5 : q.w >= 4 ? 0.35 : 0.2, layer: 'RISUNKI' }); } // маркер
   return { gid: 'tape', XY: new Float32Array(0), stations: [], segs, openings, walls, rooms, dims: [], texts, extra };
