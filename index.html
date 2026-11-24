@@ -293,7 +293,7 @@ html,body{touch-action:manipulation;-webkit-text-size-adjust:100%}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 9.22 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 9.23 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -4965,8 +4965,10 @@ function tapeMenu(w, cx, cy) {
     items.push(['✥ Передвинуть', () => moveMode({ mark: m })]);
     items.push(['🗑 Удалить', () => { tPush(); M.marks = M.marks.filter(x => x !== m); draw(); renderTape(); }, 'danger']); }
   } else if (h.room) {
-    const R = h.room; let area = 0; try { area = TAPE.roomInfo(M, R).area; } catch (e) { } const info = TAPE.roomInfo(M, R); title = `Помещение ${R.num}${R.name && R.name !== 'Помещение' ? ' · ' + R.name : ''} · ${SHEET.fmtArea(area)} м²`;
-    if (info.diags < info.need) items.push(['⚠ Нет диагонали — углы около 90° приняты прямыми. Добавить диагональ: «Промер»', () => { setTapeTool('meas'); }]);
+    const R = h.room; let area = 0; try { area = TAPE.roomInfo(M, R).area; } catch (e) { } const info = TAPE.roomInfo(M, R); title = isWallRoom(R) ? `Толщина стен (контур ${R.num})` : `Помещение ${R.num}${R.name && R.name !== 'Помещение' ? ' · ' + R.name : ''} · ${SHEET.fmtArea(area)} м²`;
+    if (isWallRoom(R)) items.push(['▭ Это помещение (считать площадь)', () => { tPush(); R.wall = false; draw(); renderTape(); stat(`Контур ${R.num} — снова помещение, площадь считается.`); }]);
+    else items.push(['▨ Это толщина стен (не помещение)', () => { tPush(); R.wall = true; draw(); renderTape(); stat(`Контур ${R.num} — толщина стен: залит серым, без площади, не входит в экспликацию.`); }]);
+    if (!isWallRoom(R) && info.diags < info.need) items.push(['⚠ Нет диагонали — углы около 90° приняты прямыми. Добавить диагональ: «Промер»', () => { setTapeTool('meas'); }]);
     items.push(['✎ Название…', async () => { const v = await uiAsk('Название помещения:', R.name || ''); if (v == null) return; tPush(); R.name = v.trim() || 'Помещение'; renderTape(); draw(); }]);
     items.push(['✥ Передвинуть подпись', () => moveMode({ room: R })]);
     items.push(['◌ Скрыть площадь на экране', () => { tPush(); R.hideLbl = true; draw(); renderTape(); stat('Площадь скрыта. Вернуть — «Помещения и замеры» слева, кнопка «м²».'); }]);
@@ -5165,7 +5167,7 @@ function buildIFC(opt = {}) {
         const el = isD ? add(`IFCDOOR('${ifcGuid()}',$,${str('Дверь ' + fm(wv))},$,$,${lpf},${rep},$,${f(hh)},${f(wv)},.DOOR.,$,$)`) : add(`IFCWINDOW('${ifcGuid()}',$,${str('Окно ' + fm(wv))},$,$,${lpf},${rep},$,${f(hh)},${f(wv)},.WINDOW.,$,$)`);
         add(`IFCRELFILLSELEMENT('${ifcGuid()}',$,$,$,${op},${el})`); inStorey.push(el); isD ? nD++ : nWin++; prop(el, 'Рулетка', [['Ширина по замеру, м', m ? m.v : null], ['Высота принята, м', hh]]); } } }
   // помещения
-  for (const R of M.rooms) { const P = R.ids.map(i2 => ptById(i2)).filter(Boolean).map(PX); if (P.length < 3) continue; let area = 0; try { area = TAPE.roomInfo(M, R).area; } catch (e) { }
+  for (const R of M.rooms) { if (isWallRoom(R)) continue; const P = R.ids.map(i2 => ptById(i2)).filter(Boolean).map(PX); if (P.length < 3) continue; let area = 0; try { area = TAPE.roomInfo(M, R).area; } catch (e) { }
     const poly = add(`IFCPOLYLINE((${P.concat([P[0]]).map(q => pt(q[0], q[1])).join(',')}))`), prof = add(`IFCARBITRARYCLOSEDPROFILEDEF(.AREA.,$,${poly})`), sol = add(`IFCEXTRUDEDAREASOLID(${prof},${AX},${Z},${f(H)})`);
     const pds = add(`IFCPRODUCTDEFINITIONSHAPE($,$,(${add(`IFCSHAPEREPRESENTATION(${body},'Body','SweptSolid',(${sol}))`)}))`), lp = add(`IFCLOCALPLACEMENT(${lpS},${AX})`);
     const sp = add(`IFCSPACE('${ifcGuid()}',$,${str(String(R.num))},$,$,${lp},${pds},${str(R.name || 'Помещение')},.ELEMENT.,.INTERNAL.,$)`); spaces.push(sp);
@@ -5963,11 +5965,17 @@ function rebuildRooms() {
     for (const R of old) { if (used.has(R)) continue; const S2 = new Set(R.ids); let c = 0; for (const x of S1) if (S2.has(x)) c++; const j = c / (S1.size + S2.size - c); if (j > bj) { bj = j; best = R; } }
     if (best) { used.add(best); out.push(Object.assign(best, { ids: f.ids })); } else { const R = { name: 'Помещение', ids: f.ids }; out.push(R); added.push(R); } }
   let mx = out.reduce((m, r) => Math.max(m, +r.num || 0), 0); for (const R of added) R.num = ++mx;
-  const removed = old.filter(R => !used.has(R)).length; M.rooms = out; return { n: out.length, added, removed };
+  const removed = old.filter(R => !used.has(R)).length; M.rooms = out; try { wallAuto(); } catch (e) { } return { n: out.length, added, removed };
 }
+// «Толщина стен»: замкнутый контур между внутренним и наружным обводом — не помещение. Узкие (средняя ширина 2S/P < 45 см) — сами
+function roomThin(R) { const P = R.ids.map(ptById).filter(Boolean).map(PX); if (P.length < 3) return false; let A = 0, L = 0;
+  for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length]; A += a[0] * b[1] - b[0] * a[1]; L += Math.hypot(b[0] - a[0], b[1] - a[1]); }
+  return L > 0 && Math.abs(A) / L < 0.45; } // |A|/L = 2S/P, т.к. A = 2S
+function wallAuto() { for (const R of M.rooms || []) if (R.wall === undefined) R.wall = roomThin(R); }
+const isWallRoom = R => R && R.wall === true;
 function roomsSanity() { // проекты до 8.2: помещение по «воображаемой» стороне или одно в другом — пересобрать по замкнутым областям
   try { const bad = M.rooms.some(R => R.ids.some((a, i) => !hasEdge(a, R.ids[(i + 1) % R.ids.length]))) || M.rooms.some((R, i) => M.rooms.some((Q, j) => j > i && [...R.ids].sort().join() === [...Q.ids].sort().join()));
-    if (bad && M.edges.length) { rebuildRooms(); M.roomsFixed = true; } } catch (e) { console.warn('roomsSanity', e); } }
+    if (bad && M.edges.length) { rebuildRooms(); M.roomsFixed = true; } wallAuto(); } catch (e) { console.warn('roomsSanity', e); } }
 function roomWith(a, b) { return M.rooms.find(R => { const k = R.ids.indexOf(a); return k >= 0 && (R.ids[(k + 1) % R.ids.length] === b || R.ids[(k - 1 + R.ids.length) % R.ids.length] === b); }); }
 // найти все замкнутые контуры стен, которые ещё не помещения; концы обхода, почти совпавшие (до 15 см, «не попал в точку»), соединяются стеной
 function findRooms() { let joined = 0; const deg = new Map(); for (const e of M.edges) { if (e.obj) continue; deg.set(e.a, (deg.get(e.a) || 0) + 1); deg.set(e.b, (deg.get(e.b) || 0) + 1); }
@@ -6747,6 +6755,10 @@ function drawTape() {
   for (const R of M.rooms) {
     const pts = R.ids.map(id => ptById(id)).filter(Boolean); if (pts.length < 3) continue;
     ctx.beginPath(); pts.forEach((p, i) => { const s = W2S(...PX(p)); i ? ctx.lineTo(...s) : ctx.moveTo(...s); }); ctx.closePath();
+    if (isWallRoom(R)) { ctx.fillStyle = 'rgba(70,70,70,.30)'; ctx.fill();
+      if (R.hideLbl) continue; const [x, y] = W2S(...(R.lp || roomLabelAt(R))); ctx.font = `${10 * dpr}px Golos Text, Segoe UI`; const t = 'стены', bw = ctx.measureText(t).width + 8 * dpr, bh = 14 * dpr;
+      ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.fillRect(x - bw / 2, y - bh / 2, bw, bh); ctx.fillStyle = '#555'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(t, x, y); ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+      T.roomRects.push({ R, x: x / dpr, y: y / dpr, rw: bw / 2 / dpr, rh: bh / 2 / dpr }); continue; }
     ctx.fillStyle = 'rgba(31,111,235,.08)'; ctx.fill();
     if (R.hideLbl) continue;
     const info = TAPE.roomInfo(M, R);
@@ -7037,7 +7049,7 @@ function renderTape() {
   <p class="hint">${pdfSc() === 'auto' ? 'Авто — программа берёт такой масштаб, чтобы размеры помещались на стенах (обычно 1:50); масштаб пишется внизу листа.' : 'Лист в масштабе 1:' + pdfSc() + '.'}</p>
   </details>
   <details><summary>Помещения и замеры (${M.rooms.length} / ${M.meas.filter(m => m.type !== 'line' && m.type !== 'angle' && m.type !== 'right').length}) · невязка <b class="${(R.maxR || 0) > 0.015 ? 'bad' : (R.maxR || 0) > 0.005 ? 'warn' : 'ok'}">${Math.round((R.maxR || 0) * 1000)} мм</b></summary>
-  ${M.rooms.map(Rm => { const i = TAPE.roomInfo(M, Rm); return `<div class="item" data-room="${Rm.num}"><input type="text" value="${escH(Rm.name)}" data-rn="${Rm.num}" style="width:120px">${Rm.num}<button data-rlb="${Rm.num}" title="Показывать площадь на чертеже" style="padding:1px 6px" class="${Rm.hideLbl ? '' : 'on'}">м²</button><span class="q ${i.diags < i.need ? 'warn' : 'ok'}">${SHEET.fmtArea(i.area)} м² · стороны ${i.sides}/${i.k} · диаг. ${i.diags}${i.diags < i.need ? ' (нужно ' + i.need + ')' : ''}</span></div>`; }).join('')}
+  ${M.rooms.map(Rm => { const i = TAPE.roomInfo(M, Rm); return `<div class="item" data-room="${Rm.num}"><input type="text" value="${escH(Rm.name)}" data-rn="${Rm.num}" style="width:120px">${Rm.num}<button data-rlb="${Rm.num}" title="Показывать площадь на чертеже" style="padding:1px 6px" class="${Rm.hideLbl ? '' : 'on'}">м²</button>${isWallRoom(Rm) ? '<span class="q">▨ толщина стен</span>' : ''}<span class="q ${i.diags < i.need ? 'warn' : 'ok'}" ${isWallRoom(Rm) ? 'style="display:none"' : ''}>${SHEET.fmtArea(i.area)} м² · стороны ${i.sides}/${i.k} · диаг. ${i.diags}${i.diags < i.need ? ' (нужно ' + i.need + ')' : ''}</span></div>`; }).join('')}
   <div class="list" style="margin-top:6px">${rows.map(m => `<div class="item"><input type="checkbox" data-mon="${m.id}" ${m.on !== false ? 'checked' : ''}><span>${m.type === 'tie' ? 'люк ↔ ' : m.type === 'thick' ? (m.span ? '↔ ' : 'δ ') : ''}${pname(m.a)}–${pname(m.type === 'thick' ? m.c : m.b)}</span><input type="text" data-mv="${m.id}" value="${fm(m.v)}" style="width:72px"><span class="q ${warn(m)}">${m.res != null ? (m.res > 0 ? '+' : '') + Math.round(m.res * 1000) + ' мм' : ''}</span><button data-mdel="${m.id}" style="padding:1px 6px">×</button></div>`).join('') || '<div class="hint" style="padding:6px">Замеров пока нет</div>'}</div>
   </details>
   <div class="row" style="display:none"><button id="tUndo"></button><button id="tRedo"></button></div>`;
@@ -7248,6 +7260,9 @@ async function exportOverlayPdf(opt = {}) {
       for (const [a, b, w] of g.lines) page.drawLine({ start: { x: toPt(...a)[0], y: toPt(...a)[1] }, end: { x: toPt(...b)[0], y: toPt(...b)[1] }, thickness: lw * (w > 0.3 ? 1.2 : 0.7), color: VIO });
       for (const d0 of g.dots) { const d = toPt(...d0); page.drawCircle({ x: d[0], y: d[1], size: lw * 2.2, color: VIO }); }
       if (g.label) { const fo = fs * 0.95 * stK(o); place(g.label.s, sc(o, VIO), 0, ptCands(toPt(...g.label.p), fo, 0).map((k, i) => i ? k : { c: toPt(...g.label.p), size: fo })); } }
+    // толщина стен — серая заливка под линиями
+    for (const R of M.rooms) if (isWallRoom(R)) { const q = R.ids.map(ptById).filter(Boolean).map(P2); if (q.length < 3) continue;
+      page.drawSvgPath(q.map((v, i) => (i ? 'L' : 'M') + v[0].toFixed(2) + ' ' + (-v[1]).toFixed(2)).join('') + 'Z', { x: 0, y: 0, color: rgb(0.55, 0.55, 0.55), opacity: 0.45, borderWidth: 0 }); }
     // стены (линии сразу, подписи — в очередь)
     const DL = [];
     for (const e of M.edges) { const A = ptById(e.a), B = ptById(e.b); if (!A || !B || e.obj) continue; const a = P2(A), b = P2(B), m = distMeas(e.a, e.b);
@@ -7273,7 +7288,7 @@ async function exportOverlayPdf(opt = {}) {
     for (const m of M.meas) if (m.type === 'thick' && !m.span && m.on !== false) { const q = [m.a, m.b, m.c, m.d].map(id => P2(ptById(id))); DL.push({ pr: 4, p: [(q[0][0] + q[1][0] + q[2][0] + q[3][0]) / 4, (q[0][1] + q[1][1] + q[2][1] + q[3][1]) / 4], s: 'δ ' + fm(m.v), size: fs * 0.85 * stK(m), col: sc(m, RED) }); }
     for (const m of M.meas) if (m.type === 'angle' && m.on !== false) { const q = P2(ptById(m.b)); DL.push({ pr: 5, p: q, s: '∠' + fdeg(m.v), size: fs * 0.85 * stK(m), col: sc(m, VIO) }); }
     // помещения
-    for (const R of M.rooms) { const pts = R.ids.map(ptById).filter(Boolean).map(P2); if (pts.length < 3) continue; const c = toPt(...(R.lp || roomLabelAt(R)));
+    for (const R of M.rooms) { if (isWallRoom(R)) continue; const pts = R.ids.map(ptById).filter(Boolean).map(P2); if (pts.length < 3) continue; const c = toPt(...(R.lp || roomLabelAt(R)));
       let area = 0; try { area = TAPE.roomInfo(M, R).area; } catch (e) { }
       const nm = R.name && R.name !== 'Помещение' ? `${R.num}. ${R.name}` : null, ar = SHEET.fmtArea(area) + ' м²', l1 = nm || `${R.num} · ${ar}`;
       let best = null, bn = 1e9; for (const k of [{ c }].concat(ptCands(c, fs * 1.1, 1.2))) { const B1 = boxOf(l1, fs * 1.05, nm ? [k.c[0], k.c[1] + fs * 0.7] : k.c, 0), B2 = nm ? boxOf(ar, fs, [k.c[0], k.c[1] - fs * 0.7], 0) : null; let n = k.lead ? 0.35 : 0;
@@ -7392,7 +7407,7 @@ function tapePlan() {
     let rot = Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI; if (rot > 90) rot -= 180; if (rot <= -90) rot += 180;
     walls.push({ p: [(a[0] + b[0] + c[0] + d[0]) / 4, (a[1] + b[1] + c[1] + d[1]) / 4], t: m.v, rot });
   }
-  for (const R of M.rooms) {
+  for (const R of M.rooms) { if (isWallRoom(R)) continue;
     const poly = R.ids.map(id => ptById(id)).filter(Boolean).map(PR); if (poly.length < 3) continue;
     const lens = M.cond ? R.ids.map((id, i) => { const m = distMeas(id, R.ids[(i + 1) % R.ids.length]); return m && m.on !== false ? m.v : null; }) : null;
     let area = Math.abs(VEC.polyArea(poly)); try { const a2 = TAPE.roomInfo(M, R).area; if (a2 > 0) area = a2; } catch (e) { } // площадь — по замерам помещения, не по рисунку
