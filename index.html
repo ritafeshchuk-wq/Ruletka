@@ -293,7 +293,7 @@ html,body{touch-action:manipulation;-webkit-text-size-adjust:100%}
 </header>
 <aside id="rail"><ol id="steps"></ol><div id="side"></div></aside>
 <main id="main"><canvas id="cv"></canvas><div id="sheets"></div><div id="busy"></div><div id="tbar" hidden></div></main>
-<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 9.20 · © d1sco, 2026</span></footer>
+<footer><span id="stat">Готово</span><span id="coord"></span><span id="help-line"></span><span style="margin-left:auto;flex-shrink:0;color:var(--faint)">Рулетка 9.21 · © d1sco, 2026</span></footer>
 
 <section id="home">
   <div class="homein">
@@ -6005,7 +6005,7 @@ function walkJump(p, prevEnd) { // обход продолжается от то
   const skipped = T.pending && T.pending.got == null ? pendLabel(T.pending) : null; if (skipped) skipPending();
   const was = T.chain && T.chain.length ? T.chain : null;
   T.chain = [p.id]; T.sel = null; T.jumpFrom = prevEnd != null && was ? { chain: was, end: prevEnd, to: p.id } : null;
-  stat(`Обход продолжается от ${pname(p.id)}${skipped ? ' (замер ' + skipped + ' пропущен — его можно сделать позже: Правка → стена → «Замерить»)' : ''}. Касайтесь следующего угла; поправить ${pname(p.id)} — тяните её пальцем.`);
+  stat(`Обход продолжается от ${pname(p.id)}${skipped ? ' (замер ' + skipped + ' пропущен — его можно сделать позже: Правка → стена → «Замерить»)' : ''}. Касайтесь следующего угла или готовой точки — к ней пройдёт стена; поправить ${pname(p.id)} — тяните её пальцем.`);
   renderTape(); draw(); walkChip(); }
 function walkChipOff() { const c = document.getElementById('wchip'); if (c) c.remove(); clearTimeout(T.chipT); }
 function walkChip() { walkChipOff(); const J = T.jumpFrom; if (!J || !ptById(J.end) || !ptById(J.to) || hasEdge(J.end, J.to)) return;
@@ -6015,7 +6015,7 @@ function walkChip() { walkChipOff(); const J = T.jumpFrom; if (!J || !ptById(J.e
   el.style.left = Math.max(8, Math.min(hr.width - 260, cr.left - hr.left + q[0] / devicePixelRatio + 14)) + 'px'; el.style.top = Math.max(8, cr.top - hr.top + q[1] / devicePixelRatio - 52) + 'px';
   el.onpointerdown = ev => ev.stopPropagation();
   el.onclick = ev => { ev.stopPropagation(); const J2 = T.jumpFrom; walkChipOff(); if (!J2) return; T.jumpFrom = null; T.chain = J2.chain; const p = ptById(J2.to); if (p && T.chain && T.chain[T.chain.length - 1] === J2.end) walkTo(p, PX(p), {}); };
-  host.appendChild(el); T.chipT = setTimeout(walkChipOff, 7000); }
+  host.appendChild(el); T.chipT = setTimeout(walkChipOff, 20000); }
 function startMoveDrag(w0) { // «✥ Передвинуть»: объект едет за пальцем, где бы палец ни лёг
   const o = T.moveObj; if (!o) return false; tPush();
   if (o.mark) { T.dragMark = { m: o.mark, off: [o.mark.p[0] - w0[0], o.mark.p[1] - w0[1]] }; T.sel = { mark: o.mark }; }
@@ -6501,6 +6501,8 @@ function tapeDown(e, w) {
     if (!T.chain) { if (p) { walkJump(p, null); return; } tPush(); p = addPoint(w); T.chain = [p.id]; M.chains.push(T.chain); stat(`Старт обхода в ${pname(p.id)}. Касайтесь следующего угла. Точку можно сразу поправить — тяните её пальцем.`); renderTape(); draw(); return; }
     const prev = T.chain[T.chain.length - 1];
     if (p && p.id === prev) return;
+    // обход только начат (одна точка): касание другой готовой точки — стена к ней (так соединяются две любые точки: коснуться первой, потом второй)
+    if (p && T.chain.length === 1 && !hasEdge(prev, p.id)) { T.jumpFrom = null; walkTo(p, PX(p), e); return; }
     if (p && !(p.id === T.chain[0] && T.chain.length >= 3)) { walkJump(p, prev); return; } // касание другой точки — продолжить обход от неё
     walkTo(p, w, e); return;
   }
